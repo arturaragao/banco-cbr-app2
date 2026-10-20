@@ -61,7 +61,7 @@
       imgs: (u.imgs || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       imgsCom: (u.imgsCom || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       acerto: u.acerto ?? null, ar: u.ar || undefined, cl: u.cl || [], dif: u.dif || null,
-      curso: u.curso || null, chegou: u.chegou || null, classif: u.classif || null, origem: u.origem || null, legendas: u.legendas || [],
+      curso: u.curso || null, claudeMd: u.claude_md || "", chegou: u.chegou || null, classif: u.classif || null, origem: u.origem || null, legendas: u.legendas || [],
     }));
   }
   async function carregarDados() {

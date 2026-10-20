@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.0.0"
+VERSAO = "1.1.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -22,12 +22,15 @@ troca("Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}", "Notion
 # comentário do curso + do Claude em cada alternativa
 troca("${fb&&q.coment[l]?`<div class=\"mut md cm\" style=\"margin-top:6px\">${md(q.coment[l])}</div>`:''}", "${fb?comentAlt(q,l):''}")
 # ponto de ensino do curso antes do CCQ do Claude
-troca("${pontoBloco(q)}${iaBloco(q)}", "${cursoBloco(q)}${pontoBloco(q)}${iaBloco(q)}")
+troca("${pontoBloco(q)}${iaBloco(q)}", "${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}")
 # IA = Gemini
 troca("'CCQ e resumo rápido com o Claude ('+keyLab('ia')+')'", "'CCQ e resumo rápido com IA ('+keyLab('ia')+')'")
 troca("toast('O Claude não está disponível nesta janela.')", "toast('Cole a chave do Gemini em Banco › Chaves deste aparelho.')")
 troca("toast(e&&e.code==='not_granted'?'Permissão negada para usar o Claude.':'Não consegui gerar agora. Tente de novo.')",
       "toast(e&&e.code==='not_granted'?'Cole a chave do Gemini em Banco › Chaves deste aparelho.':'Não consegui gerar agora. Tente de novo.')")
+# botão de IA: modelo novo de comentário (+ "Por que você errou")
+i0 = js.index("const prompt=`Tutor de radiologia"); i1 = js.index("`;", i0) + 2
+js = js[:i0] + "const prompt=promptIA(q);" + js[i1:]
 # texto da sincronização
 js = js.replace("Seu progresso é salvo automaticamente na sua conta e aparece igual em todos os aparelhos que abrirem este link.",
                 "Seu progresso é salvo automaticamente no GitHub (banco-cbr-app) e aparece igual em todos os aparelhos.")

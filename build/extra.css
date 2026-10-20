@@ -17,3 +17,4 @@
 .src{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border-radius:6px;padding:0 6px;margin-right:6px;border:1px solid currentColor}
 .cmc .src{color:var(--mut)}.cmk .src{color:var(--pri)}
 .pcurso{opacity:.95}
+.pclaude .kick{color:var(--pri)}
