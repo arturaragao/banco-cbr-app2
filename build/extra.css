@@ -29,10 +29,18 @@
 .gal .galt img{width:64px;height:48px;object-fit:cover;border-radius:6px;border:2px solid transparent;cursor:pointer;flex:0 0 auto;opacity:.7;margin:0}
 .gal .galt img.on{border-color:var(--pri);opacity:1}
 /* ===== layouts da questão (body.emquiz + body.lay-*) ===== */
-#focoSair{position:fixed;top:8px;right:8px;z-index:20;border:1px solid var(--bd);background:var(--card);color:var(--mut);border-radius:99px;padding:4px 12px;font-size:.78rem;cursor:pointer}
-/* 1 compacto (e base do otimizado/grade/ajustada) */
-body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) #nav{display:none}
-body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) header{padding:6px 12px}
+#focoBtn{position:fixed;bottom:14px;right:14px;z-index:20;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:99px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+/* painel de questões em faixa horizontal acima da questão (todos os layouts, menos o original) */
+body.emquiz:not(.lay-original) .qlay{grid-template-columns:minmax(0,1fr)!important;gap:8px}
+body.emquiz:not(.lay-original) .qlay>.qnav{order:-1;position:static;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:12px}
+body.emquiz:not(.lay-original) .qnav>.row{flex:0 0 auto;flex-direction:column;align-items:flex-start;gap:0;font-size:.82rem;line-height:1.25}
+body.emquiz:not(.lay-original) .qnav>.mut,body.emquiz:not(.lay-original) .qnav>p,body.emquiz:not(.lay-original) .qnav>div:not(.row):not(.qgrid){display:none}
+body.emquiz:not(.lay-original) .qnav .qgrid{flex:1 1 auto;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:5px;margin:0;padding:2px 0;scrollbar-width:thin}
+body.emquiz:not(.lay-original) .qnav .qn{flex:0 0 34px;height:30px;font-size:.8rem}
+body.emquiz:not(.lay-original) .qlay .card{margin-bottom:56px}
+/* 1 compacto (e base do otimizado/grade/ajustada) — abas continuam visíveis no compacto */
+body.emquiz:is(.lay-otimizado,.lay-grade,.lay-ajustada) #nav{display:none}
+body.emquiz:is(.lay-otimizado,.lay-grade,.lay-ajustada) header{padding:6px 12px}
 body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) main{padding:8px 10px 24px}
 body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) .qlay .card{padding:10px 12px;gap:4px}
 body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) .alt{padding:8px 10px;margin:5px 0;gap:8px}

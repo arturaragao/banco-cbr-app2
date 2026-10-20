@@ -117,18 +117,21 @@ function pesosUI(){
 }
 
 // ===== layouts da tela da questão =====
-const LAYOUTS=[['compfoco','Compacto + Foco (escolhido) — tela cheia, sem cabeçalho, menos espaço vazio (PC e celular)'],['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
+const LAYOUTS=[['compacto','Compacto (padrão) — abas em cima, painel de questões em faixa acima da questão'],['compfoco','Compacto + Foco — igual, sem cabeçalho (botão ⤢ Foco na questão)'],['otimizado','Otimizado — combina os outros conforme a tela'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
 function aplicaLayout(){
-  const b=document.body,l=cfg.layout||'compfoco';
+  const b=document.body,l=cfg.layout||'compacto';
   b.classList.toggle('emquiz',tela==='quiz');
   LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
-  let fb=document.getElementById('focoSair');
-  if((l==='foco'||l==='compfoco')&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='compacto';persist('_est');render()};b.appendChild(fb)}}
+  let fb=document.getElementById('focoBtn');const foco=l==='foco'||l==='compfoco';
+  if(tela==='quiz'&&l!=='original'){if(!fb){fb=document.createElement('button');fb.id='focoBtn';b.appendChild(fb)}
+    fb.textContent=foco?'⤡ Sair do foco':'⤢ Foco';fb.title=foco?'Mostrar o cabeçalho e as abas':'Esconder o cabeçalho e as abas';
+    fb.onclick=()=>{cfg.layout=foco?(l==='foco'?'otimizado':'compacto'):'compfoco';persist('_est');render()}}
   else if(fb)fb.remove();
+  if(tela==='quiz')setTimeout(()=>{const c=document.querySelector('.qnav .qn.cur');if(c)c.scrollIntoView({block:'nearest',inline:'center'})},0);
 }
 function layoutUI(){
   return `<h3>Layout da questão</h3><p class="mut">Como a questão aparece quando você está respondendo. Muda na hora.</p>
-  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'compfoco')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'compacto')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
 }
 
 // ===== MODO PRÉ-PROVA (pedido do Artur, 20/10/2026 — vale até a prova) =====
