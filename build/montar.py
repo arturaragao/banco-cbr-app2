@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.1.0"
+VERSAO = "1.2.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -31,6 +31,14 @@ troca("toast(e&&e.code==='not_granted'?'Permissão negada para usar o Claude.':'
 # botão de IA: modelo novo de comentário (+ "Por que você errou")
 i0 = js.index("const prompt=`Tutor de radiologia"); i1 = js.index("`;", i0) + 2
 js = js[:i0] + "const prompt=promptIA(q);" + js[i1:]
+# imagens: minivisualizador
+troca("const imgs=(q.imgs||[]).filter(imgSrc).map(u=>`<img src=\"${imgSrc(u)}\" onclick=\"zoom('${u}')\" loading=\"lazy\" alt=\"Imagem da questão\">`).join('');", "const imgs=galeria(q,'q',fb);")
+troca("const imgsC=fb?(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src=\"${imgSrc(u)}\" onclick=\"zoom('${u}')\" alt=\"Imagem do comentário\">`).join(''):'';", "const imgsC=fb?galeria(q,'c'):'';")
+# peso das áreas automático
+troca("function pesoArea(id,S){if(cfg.pesos[id]!=null)return cfg.pesos[id];const tot=Q.length||1;return (S[id]?.banco||0)/tot*100}",
+      "function pesoArea(id,S){if(cfg.pesoAuto===false&&cfg.pesos[id]!=null)return cfg.pesos[id];return incidencia(id)}")
+i0 = js.index("<h3>Peso das áreas na prova (%)</h3>"); i1 = js.index("</label>`).join('')}</div></div>`;", i0) + len("</label>`).join('')}</div>")
+js = js[:i0] + "${pesosUI()}" + js[i1:]
 # texto da sincronização
 js = js.replace("Seu progresso é salvo automaticamente na sua conta e aparece igual em todos os aparelhos que abrirem este link.",
                 "Seu progresso é salvo automaticamente no GitHub (banco-cbr-app) e aparece igual em todos os aparelhos.")

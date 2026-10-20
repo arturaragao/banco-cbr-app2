@@ -15,8 +15,7 @@ function cursoBloco(q){
 function bStatus(q,ult){const l=ult[q.id];return l?(l.ok?'<span class="bok">✓</span>':'<span class="bbad">✗</span>'):'<span class="mut">·</span>'}
 function bCorpo(q){
   const ult={};log.forEach(l=>ult[l.q]=l);const r=ult[q.id];
-  const imgs=[...(q.imgs||[])].filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" loading="lazy" alt="Imagem da questão">`).join('');
-  const imgsC=(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" loading="lazy" alt="Imagem do comentário">`).join('');
+  const imgs=galeria(q,'q'),imgsC=galeria(q,'c');
   const alts=Object.entries(q.alts).map(([l,tx])=>`<div class="alt ${l===q.gab?'ok':r&&!r.ok&&r.e===l?'bad':''}"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${comentAlt(q,l)}</div></div>`).join('');
   return `<div class="bc">
     <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${q.acerto!=null?' · acerto estimado ~'+q.acerto+'%':''}</div>
@@ -83,4 +82,36 @@ ${Object.entries(q.alts).map(([l,t])=>l+') '+t.slice(0,300)).join('\n')}
 Gabarito: ${q.gab}
 Comentário do curso (não repetir): ${JSON.stringify(cur.coment||{}).slice(0,1500)}
 Ponto de ensino do curso: ${String(cur.ponto||'').slice(0,600)}`;
+}
+
+// ===== minivisualizador de imagens: uma por vez, miniaturas, setas; clique abre o zoom de sempre =====
+const gIdx={},gLeg={};
+function galLista(q,t){const L=(t==='c'?q.imgsCom:q.imgs)||[],G=(t==='c'?q.legendasCom:q.legendas)||[];return L.map((u,i)=>({u,leg:G[i]||''})).filter(x=>imgSrc(x.u))}
+function galInner(q,t){
+  const L=galLista(q,t),k=q.id+'_'+t;if(!L.length)return'';
+  let i=gIdx[k]||0;if(i>=L.length)i=0;const x=L[i],n=L.length;
+  return `<div class="galm">${n>1?`<button class="galb" aria-label="Imagem anterior" onclick="galVai('${q.id}','${t}',-1)">‹</button>`:''}
+    <img src="${imgSrc(x.u)}" onclick="zoom('${x.u}')" alt="Imagem ${i+1} de ${n}" loading="lazy">
+    ${n>1?`<button class="galb dir" aria-label="Próxima imagem" onclick="galVai('${q.id}','${t}',1)">›</button><span class="galn">${i+1}/${n}</span>`:''}</div>
+    ${x.leg&&gLeg[k]!==false?`<div class="gall md">${md(x.leg)}</div>`:''}
+    ${n>1?`<div class="galt">${L.map((y,j)=>`<img src="${imgSrc(y.u)}" class="${j===i?'on':''}" onclick="galVai('${q.id}','${t}',0,${j})" alt="Miniatura ${j+1}" loading="lazy">`).join('')}</div>`:''}`;
+}
+function galeria(q,t,leg=true){gLeg[q.id+'_'+t]=leg;const h=galInner(q,t);return h?`<div class="gal" id="gal_${q.id}_${t}">${h}</div>`:''}
+function galVai(id,t,d,abs){const q=QID[id],n=galLista(q,t).length,k=id+'_'+t;
+  gIdx[k]=abs!=null?abs:((gIdx[k]||0)+d+n)%n;
+  document.querySelectorAll('#gal_'+CSS.escape(k)).forEach(el=>el.innerHTML=galInner(q,t))}
+
+// ===== peso das áreas automático pela incidência do banco =====
+let _inc=null,_incN=-1;
+function incidencia(id){
+  if(_incN!==Q.length){const c={};let tot=0;Q.forEach(q=>{if(!q.gab||q._a==='sem'||!q._a)return;c[q._a]=(c[q._a]||0)+1;tot++});
+    _inc={};Object.keys(c).forEach(a=>_inc[a]=c[a]/(tot||1)*100);_incN=Q.length}
+  return _inc[id]||0;
+}
+function pesosUI(){
+  const auto=cfg.pesoAuto!==false;
+  return `<h3>Peso das áreas na prova (%)</h3>
+  <label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${auto?'checked':''} onchange="cfg.pesoAuto=this.checked;persist('_est');render()"> <b>Automático pela incidência do banco</b> (recomendado — se atualiza sozinho quando entram questões novas)</label>
+  <p class="mut">${auto?'Calculado agora com '+Q.filter(q=>q.gab&&q._a&&q._a!=='sem').length+' questões (sem contar as de fora da radiologia).':'Manual: vazio = usa a incidência do banco.'}</p>
+  <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} ${auto?`<b>${incidencia(a.id).toFixed(1)}%</b>`:`<input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${incidencia(a.id).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)">`}</label>`).join('')}</div>`;
 }

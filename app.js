@@ -1,4 +1,4 @@
-// Banco CBR app 1.1.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.2.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -256,7 +256,7 @@ function statsPor(fn){
   return S;
 }
 const acertoSuav=s=>(s.ok+1)/(s.n+2);
-function pesoArea(id,S){if(cfg.pesos[id]!=null)return cfg.pesos[id];const tot=Q.length||1;return (S[id]?.banco||0)/tot*100}
+function pesoArea(id,S){if(cfg.pesoAuto===false&&cfg.pesos[id]!=null)return cfg.pesos[id];return incidencia(id)}
 function prioridades(){
   const S=statsPor(q=>q._a);const P={};
   Object.keys(S).forEach(id=>{if(id==='sem')return;P[id]=pesoArea(id,S)*(1-acertoSuav(S[id]))});
@@ -823,8 +823,8 @@ function vQuiz(){
   const alts=Object.entries(q.alts).map(([l,tx])=>{
     let c='';if(fb){if(l===q.gab)c='ok';else if(l===r.esc)c='bad'}else if(sel===l)c='sel';
     return `<div class="alt ${c} ${cut.includes(l)?'cutd':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
-  const imgs=(q.imgs||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" loading="lazy" alt="Imagem da questão">`).join('');
-  const imgsC=fb?(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" alt="Imagem do comentário">`).join(''):'';
+  const imgs=galeria(q,'q',fb);
+  const imgsC=fb?galeria(q,'c'):'';
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
   <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q)}</b>${fb?difTag(q):''}</div>
@@ -1230,8 +1230,7 @@ function cursoBloco(q){
 function bStatus(q,ult){const l=ult[q.id];return l?(l.ok?'<span class="bok">✓</span>':'<span class="bbad">✗</span>'):'<span class="mut">·</span>'}
 function bCorpo(q){
   const ult={};log.forEach(l=>ult[l.q]=l);const r=ult[q.id];
-  const imgs=[...(q.imgs||[])].filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" loading="lazy" alt="Imagem da questão">`).join('');
-  const imgsC=(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" loading="lazy" alt="Imagem do comentário">`).join('');
+  const imgs=galeria(q,'q'),imgsC=galeria(q,'c');
   const alts=Object.entries(q.alts).map(([l,tx])=>`<div class="alt ${l===q.gab?'ok':r&&!r.ok&&r.e===l?'bad':''}"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${comentAlt(q,l)}</div></div>`).join('');
   return `<div class="bc">
     <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${q.acerto!=null?' · acerto estimado ~'+q.acerto+'%':''}</div>
@@ -1300,6 +1299,38 @@ Comentário do curso (não repetir): ${JSON.stringify(cur.coment||{}).slice(0,15
 Ponto de ensino do curso: ${String(cur.ponto||'').slice(0,600)}`;
 }
 
+// ===== minivisualizador de imagens: uma por vez, miniaturas, setas; clique abre o zoom de sempre =====
+const gIdx={},gLeg={};
+function galLista(q,t){const L=(t==='c'?q.imgsCom:q.imgs)||[],G=(t==='c'?q.legendasCom:q.legendas)||[];return L.map((u,i)=>({u,leg:G[i]||''})).filter(x=>imgSrc(x.u))}
+function galInner(q,t){
+  const L=galLista(q,t),k=q.id+'_'+t;if(!L.length)return'';
+  let i=gIdx[k]||0;if(i>=L.length)i=0;const x=L[i],n=L.length;
+  return `<div class="galm">${n>1?`<button class="galb" aria-label="Imagem anterior" onclick="galVai('${q.id}','${t}',-1)">‹</button>`:''}
+    <img src="${imgSrc(x.u)}" onclick="zoom('${x.u}')" alt="Imagem ${i+1} de ${n}" loading="lazy">
+    ${n>1?`<button class="galb dir" aria-label="Próxima imagem" onclick="galVai('${q.id}','${t}',1)">›</button><span class="galn">${i+1}/${n}</span>`:''}</div>
+    ${x.leg&&gLeg[k]!==false?`<div class="gall md">${md(x.leg)}</div>`:''}
+    ${n>1?`<div class="galt">${L.map((y,j)=>`<img src="${imgSrc(y.u)}" class="${j===i?'on':''}" onclick="galVai('${q.id}','${t}',0,${j})" alt="Miniatura ${j+1}" loading="lazy">`).join('')}</div>`:''}`;
+}
+function galeria(q,t,leg=true){gLeg[q.id+'_'+t]=leg;const h=galInner(q,t);return h?`<div class="gal" id="gal_${q.id}_${t}">${h}</div>`:''}
+function galVai(id,t,d,abs){const q=QID[id],n=galLista(q,t).length,k=id+'_'+t;
+  gIdx[k]=abs!=null?abs:((gIdx[k]||0)+d+n)%n;
+  document.querySelectorAll('#gal_'+CSS.escape(k)).forEach(el=>el.innerHTML=galInner(q,t))}
+
+// ===== peso das áreas automático pela incidência do banco =====
+let _inc=null,_incN=-1;
+function incidencia(id){
+  if(_incN!==Q.length){const c={};let tot=0;Q.forEach(q=>{if(!q.gab||q._a==='sem'||!q._a)return;c[q._a]=(c[q._a]||0)+1;tot++});
+    _inc={};Object.keys(c).forEach(a=>_inc[a]=c[a]/(tot||1)*100);_incN=Q.length}
+  return _inc[id]||0;
+}
+function pesosUI(){
+  const auto=cfg.pesoAuto!==false;
+  return `<h3>Peso das áreas na prova (%)</h3>
+  <label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${auto?'checked':''} onchange="cfg.pesoAuto=this.checked;persist('_est');render()"> <b>Automático pela incidência do banco</b> (recomendado — se atualiza sozinho quando entram questões novas)</label>
+  <p class="mut">${auto?'Calculado agora com '+Q.filter(q=>q.gab&&q._a&&q._a!=='sem').length+' questões (sem contar as de fora da radiologia).':'Manual: vazio = usa a incidência do banco.'}</p>
+  <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} ${auto?`<b>${incidencia(a.id).toFixed(1)}%</b>`:`<input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${incidencia(a.id).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)">`}</label>`).join('')}</div>`;
+}
+
 
 let cfgTab='geral';
 function vConfig(){
@@ -1315,8 +1346,7 @@ function cfgGeral(){
   <label>Máx. revisões de cartões por dia <input id="c_fm" type="number" min="10" max="2000" value="${cfg.fcMax}" onchange="cfg.fcMax=+this.value;persist('_est')" style="width:90px"></label>
   <label>Data da prova <input id="c_p" type="date" value="${cfg.prova}" onchange="cfg.prova=this.value;persist('_est');render()"></label></p>
   <p class="mut">A lista da Revisão Inteligente de hoje já foi montada; mudanças em "questões" valem a partir de amanhã.</p>
-  <h3>Peso das áreas na prova (%)</h3><p class="mut">Vazio = usa a incidência no banco. Preencha com o peso real quando tiver.</p>
-  <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} <input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${(S[a.id]?.banco/(Q.length||1)*100||0).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)"></label>`).join('')}</div></div>`;
+  ${pesosUI()}</div>`;
 }
 function cfgAtalhos(){
   const grupo=(t,ns)=>`<div class="card"><h2>${t}</h2><div class="tw"><table>${ns.map(n=>`<tr><td>${KEYLAB[n]}</td><td style="text-align:right"><button class="b ${capKey===n?'':'s'}" style="min-width:150px" onclick="capStart('${n}')">${capKey===n?'Pressione uma tecla…':keyLab(n)}</button></td></tr>`).join('')}</table></div></div>`;
