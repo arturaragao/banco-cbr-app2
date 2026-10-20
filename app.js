@@ -1,4 +1,4 @@
-// Banco CBR app 1.5.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.5.3 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -1433,7 +1433,7 @@ function criaFlashErro(q){
 }
 function posResposta(q,l){if(!l.ok&&PARAM.flash_erro!==0)criaFlashErro(q)}
 // 2) errou com certeza = hipercorreção · 4) comentários recolhidos quando acertou com certeza
-function verCom(q){const r=sess&&sess.resp[q.id];return !(r&&r.ok&&r.conf==='certeza')||!!(sess.verCom&&sess.verCom[q.id])}
+function verCom(q){return true}   // pedido do Artur (20/10): comentários sempre visíveis, inclusive quando acerta com certeza
 function bannerResp(q,r){return r&&!r.ok&&r.conf==='certeza'?`<div class="hiper">⚠️ <b>Você errou com certeza.</b> É o tipo de erro que mais se corrige agora: leia os dois comentários com calma. Já virou flashcard.</div>`:''}
 function blocoFeedback(q,r,html){
   if(verCom(q))return html;

@@ -33,11 +33,16 @@
 #focoBtn{position:fixed;bottom:14px;right:14px;z-index:20;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:99px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 /* painel de questões em faixa horizontal acima da questão (todos os layouts, menos o original) */
 body.emquiz:not(.lay-original) .qlay{grid-template-columns:minmax(0,1fr)!important;gap:8px}
-body.emquiz:not(.lay-original) .qlay>.qnav{order:-1;position:static;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:12px}
+body.emquiz:not(.lay-original) .qlay>.qnav{order:-1;position:static;display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 10px;padding:6px 10px;border-radius:12px}
 body.emquiz:not(.lay-original) .qnav>.row{flex:0 0 auto;flex-direction:column;align-items:flex-start;gap:0;font-size:.82rem;line-height:1.25}
-body.emquiz:not(.lay-original) .qnav>.mut,body.emquiz:not(.lay-original) .qnav>p,body.emquiz:not(.lay-original) .qnav>div:not(.row):not(.qgrid){display:none}
-body.emquiz:not(.lay-original) .qnav .qgrid{flex:1 1 auto;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:5px;margin:0;padding:2px 0;scrollbar-width:thin}
+body.emquiz:not(.lay-original) .qnav>.mut,body.emquiz:not(.lay-original) .qnav>p,body.emquiz:not(.lay-original) .qnav>.bar{display:none}
+/* números em até 3 fileiras (se passar disso, rola para baixo dentro da faixa) */
+body.emquiz:not(.lay-original) .qnav .qgrid{flex:1 1 300px;display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:2px 0;max-height:110px;overflow-y:auto;scrollbar-width:thin}
 body.emquiz:not(.lay-original) .qnav .qn{flex:0 0 34px;height:30px;font-size:.8rem}
+/* "Ver por dificuldade" continua, compacto, à direita */
+body.emquiz:not(.lay-original) .qnav>div:not(.row):not(.qgrid):not(.bar){flex:0 0 auto;margin:0!important;align-self:center}
+body.emquiz:not(.lay-original) .qnav>div:not(.row):not(.qgrid):not(.bar)>button{width:auto!important;padding:5px 10px!important}
+body.emquiz:not(.lay-original) .qnav>div:not(.row):not(.qgrid):not(.bar)>div{flex-direction:row!important;flex-wrap:wrap;gap:6px 14px!important}
 body.emquiz:not(.lay-original) .qlay .card{margin-bottom:56px}
 /* 1 compacto (e base do otimizado/grade/ajustada) — abas continuam visíveis no compacto */
 body.emquiz:is(.lay-otimizado,.lay-grade,.lay-ajustada) #nav{display:none}

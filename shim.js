@@ -162,6 +162,30 @@
     return fs.length;
   };
 
+  // ---------- imagens: plano B quando o service worker não serve ./img/ (1ª abertura, endereço alternativo) ----------
+  const imgCache = new Map();
+  async function imgDireto(nome) {
+    if (imgCache.has(nome)) return imgCache.get(nome);
+    const p = (async () => {
+      try { const c = await caches.open("bcbr-img"); const h = await c.match("./img/" + encodeURIComponent(nome)); if (h) return URL.createObjectURL(await h.blob()); } catch (e) {}
+      const r = await fetch(`${API}/repos/${REPO}/contents/imagens/${encodeURIComponent(nome)}`, { headers: { Authorization: "Bearer " + tok(), Accept: "application/vnd.github.raw" } });
+      if (!r.ok) throw new Error("img " + r.status);
+      const b = await r.blob();
+      try { const c = await caches.open("bcbr-img"); await c.put("./img/" + encodeURIComponent(nome), new Response(b.slice(0), { headers: { "Content-Type": b.type || "image/jpeg" } })); } catch (e) {}
+      return URL.createObjectURL(b);
+    })();
+    imgCache.set(nome, p); p.catch(() => imgCache.delete(nome)); return p;
+  }
+  document.addEventListener("error", (ev) => {
+    const el = ev.target;
+    if (!el || el.tagName !== "IMG" || el.dataset.bcbrTentou) return;
+    const m = String(el.getAttribute("src") || "").match(/(?:^|\/)img\/([^/?#]+)$/);
+    if (!m) return;
+    el.dataset.bcbrTentou = "1";
+    imgDireto(decodeURIComponent(m[1])).then((u) => { el.src = u; }).catch(() => {});
+  }, true);
+  window.BCBR.imgDireto = imgDireto;
+
   // ---------- início ----------
   async function iniciar() {
     if ("serviceWorker" in navigator) { try { await navigator.serviceWorker.register("./sw.js"); await passarChaveSW(); } catch (e) {} }
