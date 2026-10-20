@@ -1,4 +1,4 @@
-// Banco CBR app 1.2.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.3.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -412,7 +412,7 @@ function tabsOrdenadas(){const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=
 // ===== telas =====
 const TABS=[['hoje','Hoje'],['estudar','Estudar'],['fc','Flashcards'],['painel','Painel'],['banco','Banco'],['config','Config']];
 function go(t,s){tela=t;sub=s??null;render();scrollTo(0,0)}
-function render(){
+function render(){aplicaLayout();
   const ativa=tela==='quiz'||tela==='fim'?'':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
   $('#nav').innerHTML=tabsOrdenadas().map(([k,n])=>`<button data-k="${k}" class="${ativa===k?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
   const f={hoje:vHoje,agenda:vAgenda,rt:vRT,estudar:vEstudar,painel:vPainel,banco:vBanco,config:vConfig,quiz:vQuiz,fim:vFim,fc:vFc,fcstudy:vFcStudy}[tela];
@@ -822,7 +822,7 @@ function vQuiz(){
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),cut=sess.cut[q.id]||[];
   const alts=Object.entries(q.alts).map(([l,tx])=>{
     let c='';if(fb){if(l===q.gab)c='ok';else if(l===r.esc)c='bad'}else if(sel===l)c='sel';
-    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
+    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
   const imgs=galeria(q,'q',fb);
   const imgsC=fb?galeria(q,'c'):'';
   const last=sess.i>=sess.ids.length-1;
@@ -868,6 +868,7 @@ document.addEventListener('keydown',e=>{
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),L=Object.keys(q.alts);
   if(k==='ArrowRight'){e.preventDefault();if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1);return}
   if(k==='ArrowLeft'){e.preventDefault();irPara(sess.i-1);return}
+  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.6),behavior:'smooth'});return}
   if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();const c=sel?L.indexOf(sel):-1;
     escolher(L[k==='ArrowDown'?Math.min(c+1,L.length-1):c<0?L.length-1:Math.max(c-1,0)]);return}
   if(keyIs(e,'cut')&&sel){riscar(sel);return}
@@ -1331,6 +1332,21 @@ function pesosUI(){
   <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} ${auto?`<b>${incidencia(a.id).toFixed(1)}%</b>`:`<input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${incidencia(a.id).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)">`}</label>`).join('')}</div>`;
 }
 
+// ===== layouts da tela da questão =====
+const LAYOUTS=[['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
+function aplicaLayout(){
+  const b=document.body,l=cfg.layout||'otimizado';
+  b.classList.toggle('emquiz',tela==='quiz');
+  LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
+  let fb=document.getElementById('focoSair');
+  if(l==='foco'&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='otimizado';persist('_est');render()};b.appendChild(fb)}}
+  else if(fb)fb.remove();
+}
+function layoutUI(){
+  return `<h3>Layout da questão</h3><p class="mut">Como a questão aparece quando você está respondendo. Muda na hora.</p>
+  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'otimizado')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+}
+
 
 let cfgTab='geral';
 function vConfig(){
@@ -1346,7 +1362,7 @@ function cfgGeral(){
   <label>Máx. revisões de cartões por dia <input id="c_fm" type="number" min="10" max="2000" value="${cfg.fcMax}" onchange="cfg.fcMax=+this.value;persist('_est')" style="width:90px"></label>
   <label>Data da prova <input id="c_p" type="date" value="${cfg.prova}" onchange="cfg.prova=this.value;persist('_est');render()"></label></p>
   <p class="mut">A lista da Revisão Inteligente de hoje já foi montada; mudanças em "questões" valem a partir de amanhã.</p>
-  ${pesosUI()}</div>`;
+  ${layoutUI()}${pesosUI()}</div>`;
 }
 function cfgAtalhos(){
   const grupo=(t,ns)=>`<div class="card"><h2>${t}</h2><div class="tw"><table>${ns.map(n=>`<tr><td>${KEYLAB[n]}</td><td style="text-align:right"><button class="b ${capKey===n?'':'s'}" style="min-width:150px" onclick="capStart('${n}')">${capKey===n?'Pressione uma tecla…':keyLab(n)}</button></td></tr>`).join('')}</table></div></div>`;

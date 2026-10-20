@@ -28,3 +28,44 @@
 .gal .galt{display:flex;gap:6px;overflow-x:auto;margin-top:6px;padding-bottom:2px}
 .gal .galt img{width:64px;height:48px;object-fit:cover;border-radius:6px;border:2px solid transparent;cursor:pointer;flex:0 0 auto;opacity:.7;margin:0}
 .gal .galt img.on{border-color:var(--pri);opacity:1}
+/* ===== layouts da questão (body.emquiz + body.lay-*) ===== */
+#focoSair{position:fixed;top:8px;right:8px;z-index:20;border:1px solid var(--bd);background:var(--card);color:var(--mut);border-radius:99px;padding:4px 12px;font-size:.78rem;cursor:pointer}
+/* 1 compacto (e base do otimizado/grade/ajustada) */
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) #nav{display:none}
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) header{padding:6px 12px}
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) main{padding:8px 10px 24px}
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) .qlay .card{padding:10px 12px;gap:4px}
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) .alt{padding:8px 10px;margin:5px 0;gap:8px}
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) .enun{margin-bottom:4px;line-height:1.38}
+body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada) .gal{margin:6px 0}
+body.emquiz:is(.lay-compacto,.lay-grade) .gal .galm>img{max-height:42vh}
+/* 2 lado a lado (PC/tablet) */
+@media(min-width:900px){
+ body.emquiz:is(.lay-lado,.lay-otimizado) main{max-width:1280px}
+ body.emquiz:is(.lay-lado,.lay-otimizado) .qlay>div:first-child>.card:has(>.imgs .gal){display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);column-gap:18px;align-items:start}
+ body.emquiz:is(.lay-lado,.lay-otimizado) .qlay>div:first-child>.card:has(>.imgs .gal)>*{grid-column:2}
+ body.emquiz:is(.lay-lado,.lay-otimizado) .qlay>div:first-child>.card:has(>.imgs .gal)>.imgs{grid-column:1;grid-row:1 / span 60;position:sticky;top:64px;margin:0}
+ body.emquiz:is(.lay-lado,.lay-otimizado) .card>.imgs .gal .galm>img{max-height:calc(100vh - 170px)}
+}
+/* 3 foco */
+body.emquiz.lay-foco header{display:none}
+body.emquiz.lay-foco main{max-width:900px;padding:10px 12px 30px}
+body.emquiz.lay-foco .qlay{grid-template-columns:minmax(0,1fr)!important}
+body.emquiz.lay-foco .qlay>div:nth-child(2){display:none}
+body.emquiz.lay-foco .gal .galm>img{max-height:50vh}
+/* 4 alternativas em grade (curtas; no celular só as bem curtas) */
+@media(min-width:600px){
+ body.emquiz:is(.lay-grade,.lay-otimizado) .qlay .card:has(>.alt):not(:has(>.alt:not(.curta))){display:flex;flex-direction:row;flex-wrap:wrap;column-gap:8px;align-content:flex-start}
+ body.emquiz:is(.lay-grade,.lay-otimizado) .qlay .card:has(>.alt):not(:has(>.alt:not(.curta)))>*{flex:1 1 100%;min-width:0}
+ body.emquiz:is(.lay-grade,.lay-otimizado) .qlay .card:has(>.alt):not(:has(>.alt:not(.curta)))>.alt{flex:0 0 calc(50% - 4px);margin:3px 0}
+}
+@media(max-width:599px){
+ body.emquiz:is(.lay-grade,.lay-otimizado) .qlay .card:has(>.alt):not(:has(>.alt:not(.curtinha))){display:flex;flex-direction:row;flex-wrap:wrap;column-gap:8px;align-content:flex-start}
+ body.emquiz:is(.lay-grade,.lay-otimizado) .qlay .card:has(>.alt):not(:has(>.alt:not(.curtinha)))>*{flex:1 1 100%;min-width:0}
+ body.emquiz:is(.lay-grade,.lay-otimizado) .qlay .card:has(>.alt):not(:has(>.alt:not(.curtinha)))>.alt{flex:0 0 calc(50% - 4px);margin:3px 0}
+}
+/* 5 imagem ajustada à tela */
+body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galm>img{max-height:38vh}
+body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galt{display:none}
+body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galm{min-height:0}
+@media(min-width:900px){body.emquiz.lay-otimizado .gal .galt{display:flex}}

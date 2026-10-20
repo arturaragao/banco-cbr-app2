@@ -115,3 +115,18 @@ function pesosUI(){
   <p class="mut">${auto?'Calculado agora com '+Q.filter(q=>q.gab&&q._a&&q._a!=='sem').length+' questões (sem contar as de fora da radiologia).':'Manual: vazio = usa a incidência do banco.'}</p>
   <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} ${auto?`<b>${incidencia(a.id).toFixed(1)}%</b>`:`<input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${incidencia(a.id).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)">`}</label>`).join('')}</div>`;
 }
+
+// ===== layouts da tela da questão =====
+const LAYOUTS=[['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
+function aplicaLayout(){
+  const b=document.body,l=cfg.layout||'otimizado';
+  b.classList.toggle('emquiz',tela==='quiz');
+  LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
+  let fb=document.getElementById('focoSair');
+  if(l==='foco'&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='otimizado';persist('_est');render()};b.appendChild(fb)}}
+  else if(fb)fb.remove();
+}
+function layoutUI(){
+  return `<h3>Layout da questão</h3><p class="mut">Como a questão aparece quando você está respondendo. Muda na hora.</p>
+  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'otimizado')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+}
