@@ -1,6 +1,6 @@
 // Service worker do Banco CBR: guarda o app para abrir sem internet e serve as imagens (./img/<arquivo>)
 // lendo do repositório privado com a chave do aparelho. Imagem vista uma vez fica no aparelho.
-const VERSAO = "bcbr-v4";
+const VERSAO = "bcbr-v5";
 const APP = ["./", "./index.html", "./shim.js", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 const REPO = "arturaragao/banco-cbr-app";
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(APP)).catch(() => {})); self.skipWaiting(); });
@@ -23,5 +23,8 @@ self.addEventListener("fetch", (e) => {
   const m = u.pathname.match(/\/img\/([^/]+)$/);
   if (m) return e.respondWith(imagem(e.request, decodeURIComponent(m[1])));
   // app: rede primeiro (pega versão nova), cache se estiver sem internet
-  e.respondWith(fetch(e.request).then((r) => { if (r.ok && e.request.method === "GET") { const cp = r.clone(); caches.open(VERSAO).then((c) => c.put(e.request, cp)); } return r; }).catch(() => caches.match(e.request, { ignoreSearch: true })));
+  e.respondWith(fetch(e.request).then((r) => {
+    if (r.ok && e.request.method === "GET") { const cp = r.clone(); caches.open(VERSAO).then((c) => c.put(e.request, cp)); return r; }
+    return caches.match(e.request, { ignoreSearch: true }).then((c) => c || r);   // GitHub fora do ar (erro 5xx): usa a cópia do aparelho
+  }).catch(() => caches.match(e.request, { ignoreSearch: true })));
 });

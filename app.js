@@ -1,4 +1,4 @@
-// Banco CBR app 1.3.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.4.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -276,7 +276,7 @@ function sorteioPonderado(cands,w,k){
 const embaralha=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const dKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 function riHoje(){ // a lista só muda à 00:00
-  if(!cfg.ri||cfg.ri.v!==4||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:4,ids:revisaoDoDia()};persist('_est')}
+  if(!cfg.ri||cfg.ri.v!==5||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:5,ids:revisaoDoDia()};persist('_est')}
   return cfg.ri.ids;
 }
 function iniciaRI(){
@@ -289,7 +289,7 @@ function iniciaRI(){
     sess.i=first;render();
   }
 }
-function revisaoDoDia(){
+function revisaoDoDiaOrig(){
   // prioridade: 1) questões ainda não respondidas; 2) repetição só do que já venceu, puxando erros,
   // temas mais incidentes (área) e questões fáceis que você erra
   const n=cfg.diario,now=Date.now(),{P}=prioridades();
@@ -324,7 +324,7 @@ function temas(){
     return {...x,inc,erro,dias,score:inc*(0.5+erro*1.5)*rec};
   }).sort((a,b)=>b.score-a.score);
 }
-function questoesTema(t){   // prioriza questões ainda não vistas; só entram poucas erradas há 14+ dias
+function questoesTemaOrig(t){   // prioriza questões ainda não vistas; só entram poucas erradas há 14+ dias
   const base=Q.filter(q=>q.gab&&(q._x.t.includes(t)||q._x.o.includes(t)));
   const ult={};log.forEach(l=>ult[l.q]=l);const now=Date.now(),nova=q=>!ult[q.id];
   let sel=sorteioPonderado(base.filter(nova),()=>1,10);
@@ -486,7 +486,7 @@ function etCorpo(){
   return `<p class="mut">Temas do dia, pelo peso de incidência no banco, seus erros e tempo sem rever:</p>${T.map(x=>`<div class="sk"><b>${esc(x.t)}</b><div class="mut">${Math.round(x.inc)}% do banco · ${x.n?'erro '+Math.round(x.erro*100)+'%':'ainda sem respostas'}</div></div>`).join('')||'<p class="mut">Sem temas ainda.</p>'}<div class="row"><button class="b ${ok?'s':''}" onclick="etMarca()">${ok?'Desmarcar estudado':'Marcar como estudado'}</button></div>`;
 }
 function etMarca(){const k=dKey(Date.now());if(cfg.etDone[k])delete cfg.etDone[k];else cfg.etDone[k]=1;persist('_est');render()}
-function simulado(et){   // prioriza questões inéditas
+function simuladoOrig(et){   // prioriza questões inéditas
   const c=Q.filter(q=>q.gab&&(etapaDe(q)===et||etapaDe(q)==='?'));
   const {S}=prioridades(),seen=new Set(log.map(l=>l.q)),w=q=>pesoArea(q._a,S)||1;
   let sel=sorteioPonderado(c.filter(q=>!seen.has(q.id)),w,60);
@@ -634,7 +634,7 @@ function filtrar(){
     if(fl.status==='vencidas')return srs[q.id]&&srs[q.id].due<=now;
     return true});
 }
-function comecaFiltro(){
+function comecaFiltroOrig(){
   let c=filtrar();c=fl.modo==='misto'?embaralha(c):c.sort((a,b)=>a._a.localeCompare(b._a));
   iniciar(c.slice(0,fl.n).map(q=>q.id),'estudo')
 }
@@ -1109,7 +1109,7 @@ function vCobertura(){
   <div class="row mut" style="gap:14px;margin:8px 0 12px;font-size:.82rem"><span><i class="lg" style="background:var(--ok)"></i> certas na última vez ${ok}</span><span><i class="lg" style="background:var(--bad)"></i> erradas ${er}</span><span><i class="lg" style="background:var(--bd)"></i> inéditas ${nov}</span></div>
   ${nov?`<p class="ponto" style="margin:0 0 12px">Ritmo dos últimos 14 dias: <b>${r14.toFixed(1)}</b> inéditas por dia${prev?` → no ritmo atual você termina as inéditas em <b>${prev}</b>`:' (resolva algumas para ver a previsão)'}.</p>`:'<p class="ponto" style="margin:0 0 12px">Você já viu todas as questões do banco.</p>'}
   <div class="tw"><table><tr><th>Área</th><th>Vistas</th><th style="text-align:right">Restam</th><th></th></tr>${rows}</table></div></div>`}
-function novasArea(id){const U=new Set(log.map(l=>l.q)),c=embaralha(Q.filter(q=>q.gab&&q._a===id&&!U.has(q.id)));iniciar(c.slice(0,cfg.diario||20).map(q=>q.id),'estudo')}
+function novasAreaOrig(id){const U=new Set(log.map(l=>l.q)),c=embaralha(Q.filter(q=>q.gab&&q._a===id&&!U.has(q.id)));iniciar(c.slice(0,cfg.diario||20).map(q=>q.id),'estudo')}
 function revisarVencidas(){const now=Date.now(),U={};log.forEach(l=>U[l.q]=l);
   const c=Q.filter(q=>q.gab&&U[q.id]&&!U[q.id].ok&&srs[q.id]&&srs[q.id].due<=now).sort((a,b)=>srs[a.id].due-srs[b.id].due);
   if(!c.length){toast('Nenhuma errada vencida agora.');return}iniciar(c.slice(0,cfg.diario||20).map(q=>q.id),'erros')}
@@ -1333,18 +1333,82 @@ function pesosUI(){
 }
 
 // ===== layouts da tela da questão =====
-const LAYOUTS=[['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
+const LAYOUTS=[['compfoco','Compacto + Foco (escolhido) — tela cheia, sem cabeçalho, menos espaço vazio (PC e celular)'],['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
 function aplicaLayout(){
-  const b=document.body,l=cfg.layout||'otimizado';
+  const b=document.body,l=cfg.layout||'compfoco';
   b.classList.toggle('emquiz',tela==='quiz');
   LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
   let fb=document.getElementById('focoSair');
-  if(l==='foco'&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='otimizado';persist('_est');render()};b.appendChild(fb)}}
+  if((l==='foco'||l==='compfoco')&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='compacto';persist('_est');render()};b.appendChild(fb)}}
   else if(fb)fb.remove();
 }
 function layoutUI(){
   return `<h3>Layout da questão</h3><p class="mut">Como a questão aparece quando você está respondendo. Muda na hora.</p>
-  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'otimizado')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'compfoco')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+}
+
+// ===== MODO PRÉ-PROVA (pedido do Artur, 20/10/2026 — vale até a prova) =====
+// Objetivo: ver o MÁXIMO de questões novas. Regras: só questões ainda não respondidas (nem as erradas voltam por enquanto);
+// fáceis >> médias >> difíceis (quase nunca); peso maior para área/tema/subtema mais incidentes no banco e para os temas que
+// ele mais erra; intercalado (poucas do mesmo subtema por pacote). Vale para RI, temas, simulados, Estudar e "novas da área".
+// Parâmetros no Manual (aba Config): modo_prova, peso_facil, peso_media, peso_dificil, max_por_subtema.
+const modoProva=()=>String(PARAM.modo_prova??1)!=='0';
+let _pv=null,_pvN=-1;
+function _pvBase(){
+  if(_pvN===log.length+Q.length*1e6)return _pv;
+  const C=(f)=>{const m={};Q.forEach(q=>{if(!q.gab||q._a==='sem')return;const k=f(q);if(k)m[k]=(m[k]||0)+1});const v=Object.values(m),me=v.reduce((a,b)=>a+b,0)/(v.length||1)||1;return {m,me}};
+  const kA=q=>q._a,kT=q=>q.cl&&q.cl[0]?q._a+'|'+q.cl[0]:null,kS=q=>q.cl&&q.cl[1]?q._a+'|'+q.cl[0]+'|'+q.cl[1]:null;
+  const iA=C(kA),iT=C(kT),iS=C(kS);
+  const E=(f)=>{const m={};log.forEach(l=>{const q=QID[l.q];if(!q)return;const k=f(q);if(!k)return;const x=m[k]??={n:0,e:0};x.n++;if(!l.ok)x.e++});return m};
+  const eA=E(kA),eT=E(kT),eS=E(kS);
+  _pv={kA,kT,kS,iA,iT,iS,eA,eT,eS};_pvN=log.length+Q.length*1e6;return _pv;
+}
+function pesoVolume(q){
+  const b=_pvBase(),dif={f:+(PARAM.peso_facil??6),m:+(PARAM.peso_media??3),d:+(PARAM.peso_dificil??0.15)};
+  const wd=q.classif?(dif[q._d]??dif.m):dif.m;
+  const r=(I,k,ex)=>k&&I.m[k]?Math.pow(I.m[k]/I.me,ex):1;
+  const wInc=Math.min(4,Math.max(.3,r(b.iA,b.kA(q),.5)*r(b.iT,b.kT(q),.5)*r(b.iS,b.kS(q),.25)));
+  // erro: média bayesiana — subtema puxado para o tema, tema puxado para a área, área para 35%
+  const ea=b.eA[b.kA(q)]||{n:0,e:0},pA=(ea.e+.35*4)/(ea.n+4);
+  const et=b.eT[b.kT(q)]||{n:0,e:0},pT=(et.e+pA*4)/(et.n+4);
+  const es=b.eS[b.kS(q)]||{n:0,e:0},pS=(es.e+pT*3)/(es.n+3);
+  const wErr=0.5+2.2*pS;
+  return wd*wInc*wErr;
+}
+function pacoteVolume(n,filtro=()=>true){
+  const vistas=new Set(all.map(l=>l.q)),maxS=+(PARAM.max_por_subtema??2),b=_pvBase();
+  const pool=Q.filter(q=>q.gab&&q._a!=='sem'&&!vistas.has(q.id)&&filtro(q)).map(q=>({q,w:Math.max(pesoVolume(q),1e-6)}));
+  const out=[],cS={},cT={};
+  while(out.length<n&&pool.length){
+    pool.forEach(x=>{const s=b.kS(x.q),t=b.kT(x.q);x.wa=x.w*((cS[s]||0)>=maxS?.05:1)*Math.pow(.6,cT[t]||0)});
+    let tot=pool.reduce((a,x)=>a+x.wa,0),r=Math.random()*tot,i=0;
+    for(;i<pool.length-1;i++){r-=pool[i].wa;if(r<=0)break}
+    const x=pool.splice(i,1)[0];out.push(x.q.id);const s=b.kS(x.q),t=b.kT(x.q);cS[s]=(cS[s]||0)+1;cT[t]=(cT[t]||0)+1;
+  }
+  return out;
+}
+function revisaoDoDia(){return modoProva()?pacoteVolume(cfg.diario):revisaoDoDiaOrig()}
+function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
+function simulado(et){
+  if(!modoProva())return simuladoOrig(et);
+  const ids=pacoteVolume(60,q=>etapaDe(q)===et||etapaDe(q)==='?');iniciar(ids,'simulado',et);
+}
+function novasArea(id){if(!modoProva())return novasAreaOrig(id);iniciar(pacoteVolume(cfg.diario||20,q=>q._a===id),'estudo')}
+function comecaFiltro(){
+  if(!modoProva()||(fl.status&&fl.status!=='novas'))return comecaFiltroOrig();
+  const ok=new Set(filtrar().map(q=>q.id));let ids=pacoteVolume(fl.n,q=>ok.has(q.id));
+  if(fl.modo!=='misto')ids.sort((a,b)=>QID[a]._a.localeCompare(QID[b]._a));
+  iniciar(ids,'estudo');
+}
+function modoProvaUI(){
+  const n=Q.filter(q=>q.gab&&q._a!=='sem'&&!all.some(l=>l.q===q.id)).length;
+  return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas (inclusive erradas) não voltam.</label>
+  <p class="mut">Vale para a Revisão Inteligente, temas, simulados e pacotes do Estudar. ${n} questões novas disponíveis. Pesos no Manual: fácil ${PARAM.peso_facil??6} · média ${PARAM.peso_media??3} · difícil ${PARAM.peso_dificil??0.15}.</p>`;
+}
+function setModoProva(on){
+  const lin='@param modo_prova='+(on?1:0);
+  metodo=/^@param\s+modo_prova\s*=.*$/m.test(metodo)?metodo.replace(/^@param\s+modo_prova\s*=.*$/m,lin):metodo+'\n'+lin;
+  metoU=Date.now();saveL('cbr_metodo',{t:metodo,u:metoU});lerManual(metodo);persist('m:0');cfg.ri=null;persist('_est');render();
 }
 
 
@@ -1362,7 +1426,7 @@ function cfgGeral(){
   <label>Máx. revisões de cartões por dia <input id="c_fm" type="number" min="10" max="2000" value="${cfg.fcMax}" onchange="cfg.fcMax=+this.value;persist('_est')" style="width:90px"></label>
   <label>Data da prova <input id="c_p" type="date" value="${cfg.prova}" onchange="cfg.prova=this.value;persist('_est');render()"></label></p>
   <p class="mut">A lista da Revisão Inteligente de hoje já foi montada; mudanças em "questões" valem a partir de amanhã.</p>
-  ${layoutUI()}${pesosUI()}</div>`;
+  ${modoProvaUI()}${layoutUI()}${pesosUI()}</div>`;
 }
 function cfgAtalhos(){
   const grupo=(t,ns)=>`<div class="card"><h2>${t}</h2><div class="tw"><table>${ns.map(n=>`<tr><td>${KEYLAB[n]}</td><td style="text-align:right"><button class="b ${capKey===n?'':'s'}" style="min-width:150px" onclick="capStart('${n}')">${capKey===n?'Pressione uma tecla…':keyLab(n)}</button></td></tr>`).join('')}</table></div></div>`;

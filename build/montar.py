@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.3.0"
+VERSAO = "1.4.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -44,6 +44,14 @@ troca("function render(){", "function render(){aplicaLayout();")
 troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.6),behavior:'smooth'});return}\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
+# modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
+troca("function revisaoDoDia(){", "function revisaoDoDiaOrig(){")
+troca("function questoesTema(t){", "function questoesTemaOrig(t){")
+troca("function simulado(et){", "function simuladoOrig(et){")
+troca("function novasArea(id){", "function novasAreaOrig(id){")
+troca("function comecaFiltro(){", "function comecaFiltroOrig(){")
+troca("cfg.ri.v!==4", "cfg.ri.v!==5"); troca("cfg.ri={d:dKey(Date.now()),v:4,", "cfg.ri={d:dKey(Date.now()),v:5,")
+js = js.replace("${layoutUI()}${pesosUI()}", "${modoProvaUI()}${layoutUI()}${pesosUI()}", 1)
 # texto da sincronização
 js = js.replace("Seu progresso é salvo automaticamente na sua conta e aparece igual em todos os aparelhos que abrirem este link.",
                 "Seu progresso é salvo automaticamente no GitHub (banco-cbr-app) e aparece igual em todos os aparelhos.")

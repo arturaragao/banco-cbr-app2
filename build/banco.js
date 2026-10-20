@@ -117,16 +117,80 @@ function pesosUI(){
 }
 
 // ===== layouts da tela da questão =====
-const LAYOUTS=[['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
+const LAYOUTS=[['compfoco','Compacto + Foco (escolhido) — tela cheia, sem cabeçalho, menos espaço vazio (PC e celular)'],['otimizado','Otimizado (recomendado) — combina os melhores conforme a tela'],['compacto','1 · Compacto — menos espaço vazio, abas escondidas na questão'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
 function aplicaLayout(){
-  const b=document.body,l=cfg.layout||'otimizado';
+  const b=document.body,l=cfg.layout||'compfoco';
   b.classList.toggle('emquiz',tela==='quiz');
   LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
   let fb=document.getElementById('focoSair');
-  if(l==='foco'&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='otimizado';persist('_est');render()};b.appendChild(fb)}}
+  if((l==='foco'||l==='compfoco')&&tela==='quiz'){if(!fb){fb=document.createElement('button');fb.id='focoSair';fb.textContent='⤢ sair do foco';fb.onclick=()=>{cfg.layout='compacto';persist('_est');render()};b.appendChild(fb)}}
   else if(fb)fb.remove();
 }
 function layoutUI(){
   return `<h3>Layout da questão</h3><p class="mut">Como a questão aparece quando você está respondendo. Muda na hora.</p>
-  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'otimizado')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">${LAYOUTS.map(([k,n])=>`<label class="check"><input type="radio" name="lay" ${ (cfg.layout||'compfoco')===k?'checked':''} onchange="cfg.layout='${k}';persist('_est');render()"> ${n}</label>`).join('')}</div>`;
+}
+
+// ===== MODO PRÉ-PROVA (pedido do Artur, 20/10/2026 — vale até a prova) =====
+// Objetivo: ver o MÁXIMO de questões novas. Regras: só questões ainda não respondidas (nem as erradas voltam por enquanto);
+// fáceis >> médias >> difíceis (quase nunca); peso maior para área/tema/subtema mais incidentes no banco e para os temas que
+// ele mais erra; intercalado (poucas do mesmo subtema por pacote). Vale para RI, temas, simulados, Estudar e "novas da área".
+// Parâmetros no Manual (aba Config): modo_prova, peso_facil, peso_media, peso_dificil, max_por_subtema.
+const modoProva=()=>String(PARAM.modo_prova??1)!=='0';
+let _pv=null,_pvN=-1;
+function _pvBase(){
+  if(_pvN===log.length+Q.length*1e6)return _pv;
+  const C=(f)=>{const m={};Q.forEach(q=>{if(!q.gab||q._a==='sem')return;const k=f(q);if(k)m[k]=(m[k]||0)+1});const v=Object.values(m),me=v.reduce((a,b)=>a+b,0)/(v.length||1)||1;return {m,me}};
+  const kA=q=>q._a,kT=q=>q.cl&&q.cl[0]?q._a+'|'+q.cl[0]:null,kS=q=>q.cl&&q.cl[1]?q._a+'|'+q.cl[0]+'|'+q.cl[1]:null;
+  const iA=C(kA),iT=C(kT),iS=C(kS);
+  const E=(f)=>{const m={};log.forEach(l=>{const q=QID[l.q];if(!q)return;const k=f(q);if(!k)return;const x=m[k]??={n:0,e:0};x.n++;if(!l.ok)x.e++});return m};
+  const eA=E(kA),eT=E(kT),eS=E(kS);
+  _pv={kA,kT,kS,iA,iT,iS,eA,eT,eS};_pvN=log.length+Q.length*1e6;return _pv;
+}
+function pesoVolume(q){
+  const b=_pvBase(),dif={f:+(PARAM.peso_facil??6),m:+(PARAM.peso_media??3),d:+(PARAM.peso_dificil??0.15)};
+  const wd=q.classif?(dif[q._d]??dif.m):dif.m;
+  const r=(I,k,ex)=>k&&I.m[k]?Math.pow(I.m[k]/I.me,ex):1;
+  const wInc=Math.min(4,Math.max(.3,r(b.iA,b.kA(q),.5)*r(b.iT,b.kT(q),.5)*r(b.iS,b.kS(q),.25)));
+  // erro: média bayesiana — subtema puxado para o tema, tema puxado para a área, área para 35%
+  const ea=b.eA[b.kA(q)]||{n:0,e:0},pA=(ea.e+.35*4)/(ea.n+4);
+  const et=b.eT[b.kT(q)]||{n:0,e:0},pT=(et.e+pA*4)/(et.n+4);
+  const es=b.eS[b.kS(q)]||{n:0,e:0},pS=(es.e+pT*3)/(es.n+3);
+  const wErr=0.5+2.2*pS;
+  return wd*wInc*wErr;
+}
+function pacoteVolume(n,filtro=()=>true){
+  const vistas=new Set(all.map(l=>l.q)),maxS=+(PARAM.max_por_subtema??2),b=_pvBase();
+  const pool=Q.filter(q=>q.gab&&q._a!=='sem'&&!vistas.has(q.id)&&filtro(q)).map(q=>({q,w:Math.max(pesoVolume(q),1e-6)}));
+  const out=[],cS={},cT={};
+  while(out.length<n&&pool.length){
+    pool.forEach(x=>{const s=b.kS(x.q),t=b.kT(x.q);x.wa=x.w*((cS[s]||0)>=maxS?.05:1)*Math.pow(.6,cT[t]||0)});
+    let tot=pool.reduce((a,x)=>a+x.wa,0),r=Math.random()*tot,i=0;
+    for(;i<pool.length-1;i++){r-=pool[i].wa;if(r<=0)break}
+    const x=pool.splice(i,1)[0];out.push(x.q.id);const s=b.kS(x.q),t=b.kT(x.q);cS[s]=(cS[s]||0)+1;cT[t]=(cT[t]||0)+1;
+  }
+  return out;
+}
+function revisaoDoDia(){return modoProva()?pacoteVolume(cfg.diario):revisaoDoDiaOrig()}
+function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
+function simulado(et){
+  if(!modoProva())return simuladoOrig(et);
+  const ids=pacoteVolume(60,q=>etapaDe(q)===et||etapaDe(q)==='?');iniciar(ids,'simulado',et);
+}
+function novasArea(id){if(!modoProva())return novasAreaOrig(id);iniciar(pacoteVolume(cfg.diario||20,q=>q._a===id),'estudo')}
+function comecaFiltro(){
+  if(!modoProva()||(fl.status&&fl.status!=='novas'))return comecaFiltroOrig();
+  const ok=new Set(filtrar().map(q=>q.id));let ids=pacoteVolume(fl.n,q=>ok.has(q.id));
+  if(fl.modo!=='misto')ids.sort((a,b)=>QID[a]._a.localeCompare(QID[b]._a));
+  iniciar(ids,'estudo');
+}
+function modoProvaUI(){
+  const n=Q.filter(q=>q.gab&&q._a!=='sem'&&!all.some(l=>l.q===q.id)).length;
+  return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas (inclusive erradas) não voltam.</label>
+  <p class="mut">Vale para a Revisão Inteligente, temas, simulados e pacotes do Estudar. ${n} questões novas disponíveis. Pesos no Manual: fácil ${PARAM.peso_facil??6} · média ${PARAM.peso_media??3} · difícil ${PARAM.peso_dificil??0.15}.</p>`;
+}
+function setModoProva(on){
+  const lin='@param modo_prova='+(on?1:0);
+  metodo=/^@param\s+modo_prova\s*=.*$/m.test(metodo)?metodo.replace(/^@param\s+modo_prova\s*=.*$/m,lin):metodo+'\n'+lin;
+  metoU=Date.now();saveL('cbr_metodo',{t:metodo,u:metoU});lerManual(metodo);persist('m:0');cfg.ri=null;persist('_est');render();
 }
