@@ -1,4 +1,4 @@
-// Banco CBR app 1.5.3 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.5.4 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -126,7 +126,7 @@ let cards=load('cbr_cards',[]);      // {id,f,v,tg,u,x}
 let fcs=load('cbr_fcs',{});          // id -> [ease,ivl,reps,due,lapses,t,susp]
 let over=load('cbr_over',{});        // id -> areaId (manual)
 let uimg=load('cbr_uimg',{});        // id -> dataURL das imagens que você adicionou nas questões (referência "u:ID")
-const imgSrc=u=>String(u).startsWith('gh:')?'./img/'+encodeURIComponent(String(u).slice(3)):String(u).startsWith('u:')?(uimg[u.slice(2)]||''):((window.IMGDATA&&window.IMGDATA[u])||u);
+const imgSrc=u=>String(u).startsWith('gh:')?(window.BCBR&&BCBR.imgPronta(String(u).slice(3))||'./img/'+encodeURIComponent(String(u).slice(3))):String(u).startsWith('u:')?(uimg[u.slice(2)]||''):((window.IMGDATA&&window.IMGDATA[u])||u);
 let cfg=normCfg(load('cbr_cfg',{}));
 // nomes que você deu às grandes áreas e aos temas (só o rótulo muda; as tags das questões ficam como estão)
 const dn=(d,v)=>cfg.nomes[d+'|'+v]||v;
@@ -868,7 +868,7 @@ document.addEventListener('keydown',e=>{
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),L=Object.keys(q.alts);
   if(k==='ArrowRight'){e.preventDefault();if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1);return}
   if(k==='ArrowLeft'){e.preventDefault();irPara(sess.i-1);return}
-  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.6),behavior:'smooth'});return}
+  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.2),behavior:'smooth'});return}
   if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();const c=sel?L.indexOf(sel):-1;
     escolher(L[k==='ArrowDown'?Math.min(c+1,L.length-1):c<0?L.length-1:Math.max(c-1,0)]);return}
   if(keyIs(e,'cut')&&sel){riscar(sel);return}

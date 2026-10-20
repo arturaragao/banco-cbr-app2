@@ -52,8 +52,8 @@ body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfo
 body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) .alt{padding:8px 10px;margin:5px 0;gap:8px}
 body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) .enun{margin-bottom:4px;line-height:1.38}
 body.emquiz:is(.lay-compacto,.lay-otimizado,.lay-grade,.lay-ajustada,.lay-compfoco) .gal{margin:6px 0}
-body.emquiz:is(.lay-compacto,.lay-grade) .gal .galm>img{max-height:42vh}
-body.emquiz.lay-compfoco .gal .galm>img{max-height:48vh}
+body.emquiz:is(.lay-compacto,.lay-grade) .gal .galm>img{max-height:34vh}
+body.emquiz.lay-compfoco .gal .galm>img{max-height:38vh}
 /* 2 lado a lado (PC/tablet) */
 @media(min-width:900px){
  body.emquiz:is(.lay-lado,.lay-otimizado) main{max-width:1280px}

@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.5.3"
+VERSAO = "1.5.4"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -15,7 +15,7 @@ def troca(a, b, n=1):
 
 # imagens do repositório privado (servidas pelo sw.js)
 troca("const imgSrc=u=>String(u).startsWith('u:')?",
-      "const imgSrc=u=>String(u).startsWith('gh:')?'./img/'+encodeURIComponent(String(u).slice(3)):String(u).startsWith('u:')?")
+      "const imgSrc=u=>String(u).startsWith('gh:')?(window.BCBR&&BCBR.imgPronta(String(u).slice(3))||'./img/'+encodeURIComponent(String(u).slice(3))):String(u).startsWith('u:')?")
 # número da questão = número no Notion
 troca("const posDe=q=>+q.id.slice(1);", "const posDe=q=>q.n??1e5;")
 troca("Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}", "Notion #${q.n??'—'}")
@@ -41,7 +41,7 @@ i0 = js.index("<h3>Peso das áreas na prova (%)</h3>"); i1 = js.index("</label>`
 js = js[:i0] + "${pesosUI()}" + js[i1:]
 # layouts + setas ↑/↓ rolam a página depois de responder
 troca("function render(){", "function render(){aplicaLayout();")
-troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.6),behavior:'smooth'});return}\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
+troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.2),behavior:'smooth'});return}\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
