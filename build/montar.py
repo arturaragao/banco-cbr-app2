@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.5.0"
+VERSAO = "1.5.2"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -73,5 +73,8 @@ css = open(f"{R}/build/extra.css", encoding="utf8").read()
 pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg">'
        '<meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes">')
 head = head.replace("<style>", pwa + "<style>", 1).replace("</style>", css + "</style>", 1)
+# versão pequena ao lado do título
+assert head.count("</svg>Banco CBR</div>") == 1
+head = head.replace("</svg>Banco CBR</div>", f'</svg>Banco CBR<small class="versao">v{VERSAO}</small></div>')
 open(f"{R}/index.html", "w", encoding="utf8").write(head + f'\n<script>window.BCBR_VERSAO="{VERSAO}"</script><script src="shim.js?v={VERSAO}"></script>\n</body></html>\n')
 print("ok: app.js", len(js), "bytes · index.html", VERSAO)

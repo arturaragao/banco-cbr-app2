@@ -1,3 +1,4 @@
+.versao{font-size:.62rem;font-weight:500;opacity:.6;margin-left:6px;letter-spacing:.02em;vertical-align:middle}
 .blist{border:1px solid var(--bd);border-radius:12px;overflow:hidden}
 .bq{border-bottom:1px solid var(--bd)}.bq:last-child{border-bottom:0}
 .bq>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:10px 12px}

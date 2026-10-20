@@ -1,4 +1,4 @@
-// Banco CBR app 1.5.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.5.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
