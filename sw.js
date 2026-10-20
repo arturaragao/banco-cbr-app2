@@ -1,6 +1,6 @@
 // Service worker do Banco CBR: guarda o app para abrir sem internet e serve as imagens (./img/<arquivo>)
 // lendo do repositório privado com a chave do aparelho. Imagem vista uma vez fica no aparelho.
-const VERSAO = "bcbr-v5";
+const VERSAO = "bcbr-v6";
 const APP = ["./", "./index.html", "./shim.js", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 const REPO = "arturaragao/banco-cbr-app";
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(APP)).catch(() => {})); self.skipWaiting(); });

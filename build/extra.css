@@ -71,3 +71,4 @@ body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galm>img{max-height:38vh}
 body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galt{display:none}
 body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galm{min-height:0}
 @media(min-width:900px){body.emquiz.lay-otimizado .gal .galt{display:flex}}
+.hiper{margin:8px 0;padding:10px 12px;border-radius:10px;border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);font-size:.92rem}

@@ -149,7 +149,7 @@ function _pvBase(){
 }
 function pesoVolume(q){
   const b=_pvBase(),dif={f:+(PARAM.peso_facil??6),m:+(PARAM.peso_media??3),d:+(PARAM.peso_dificil??0.15)};
-  const wd=q.classif?(dif[q._d]??dif.m):dif.m;
+  const wd=q.classif?(dif[q._d]??dif.m):dif.m*.8;
   const r=(I,k,ex)=>k&&I.m[k]?Math.pow(I.m[k]/I.me,ex):1;
   const wInc=Math.min(4,Math.max(.3,r(b.iA,b.kA(q),.5)*r(b.iT,b.kT(q),.5)*r(b.iS,b.kS(q),.25)));
   // erro: média bayesiana — subtema puxado para o tema, tema puxado para a área, área para 35%
@@ -161,7 +161,7 @@ function pesoVolume(q){
 }
 function pacoteVolume(n,filtro=()=>true){
   const vistas=new Set(all.map(l=>l.q)),maxS=+(PARAM.max_por_subtema??2),b=_pvBase();
-  const pool=Q.filter(q=>q.gab&&q._a!=='sem'&&!vistas.has(q.id)&&filtro(q)).map(q=>({q,w:Math.max(pesoVolume(q),1e-6)}));
+  const pool=Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!vistas.has(q.id)&&filtro(q)).map(q=>({q,w:Math.max(pesoVolume(q),1e-6)}));
   const out=[],cS={},cT={};
   while(out.length<n&&pool.length){
     pool.forEach(x=>{const s=b.kS(x.q),t=b.kT(x.q);x.wa=x.w*((cS[s]||0)>=maxS?.05:1)*Math.pow(.6,cT[t]||0)});
@@ -171,7 +171,12 @@ function pacoteVolume(n,filtro=()=>true){
   }
   return out;
 }
-function revisaoDoDia(){return modoProva()?pacoteVolume(cfg.diario):revisaoDoDiaOrig()}
+function revisaoDoDia(){
+  if(!modoProva())return revisaoDoDiaOrig();
+  const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
+  if(d!=null&&d>=0&&d<=fim){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
+  return pacoteVolume(n);
+}
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
 function simulado(et){
   if(!modoProva())return simuladoOrig(et);
@@ -185,7 +190,7 @@ function comecaFiltro(){
   iniciar(ids,'estudo');
 }
 function modoProvaUI(){
-  const n=Q.filter(q=>q.gab&&q._a!=='sem'&&!all.some(l=>l.q===q.id)).length;
+  const vv=new Set(all.map(l=>l.q)),n=Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!vv.has(q.id)).length;
   return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas (inclusive erradas) não voltam.</label>
   <p class="mut">Vale para a Revisão Inteligente, temas, simulados e pacotes do Estudar. ${n} questões novas disponíveis. Pesos no Manual: fácil ${PARAM.peso_facil??6} · média ${PARAM.peso_media??3} · difícil ${PARAM.peso_dificil??0.15}.</p>`;
 }
@@ -193,4 +198,43 @@ function setModoProva(on){
   const lin='@param modo_prova='+(on?1:0);
   metodo=/^@param\s+modo_prova\s*=.*$/m.test(metodo)?metodo.replace(/^@param\s+modo_prova\s*=.*$/m,lin):metodo+'\n'+lin;
   metoU=Date.now();saveL('cbr_metodo',{t:metodo,u:metoU});lerManual(metodo);persist('m:0');cfg.ri=null;persist('_est');render();
+}
+
+// ===== sugestões 1–5 (20/10/2026) =====
+// 1) erro vira flashcard automático (o conceito volta em repetição espaçada sem repetir a questão)
+const limpaTxt=s=>String(s||'').replace(/<[^>]+>/g,'').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
+function criaFlashErro(q){
+  let f='',v='';const P=q.claudeMd?iaParse(q.claudeMd):null;
+  if(P&&P.fl){[f,v]=P.fl}
+  else{const R=revItens(q);if(R.length){f=limpaTxt(R[0][0]);v=limpaTxt(R[0][1])}
+  else if(q.curso&&q.curso.ponto){f=`${(q.cl&&(q.cl[2]||q.cl[1]))||'Conceito'} — qual é o ponto-chave? (Q${q.n??''})`;v=limpaTxt(q.curso.ponto).slice(0,420)}}
+  if(!f||!v||cards.some(c=>!c.x&&(c.f===f||c.q===q.id)))return;
+  const c={id:'c'+Date.now().toString(36),f,v,tg:(tagStr(q)?tagStr(q)+'; ':'')+'erro',u:Date.now(),q:q.id};cards.push(c);persist('c:'+hk(c.id,32));
+  toast('Flashcard do erro criado');
+}
+function posResposta(q,l){if(!l.ok&&PARAM.flash_erro!==0)criaFlashErro(q)}
+// 2) errou com certeza = hipercorreção · 4) comentários recolhidos quando acertou com certeza
+function verCom(q){const r=sess&&sess.resp[q.id];return !(r&&r.ok&&r.conf==='certeza')||!!(sess.verCom&&sess.verCom[q.id])}
+function bannerResp(q,r){return r&&!r.ok&&r.conf==='certeza'?`<div class="hiper">⚠️ <b>Você errou com certeza.</b> É o tipo de erro que mais se corrige agora: leia os dois comentários com calma. Já virou flashcard.</div>`:''}
+function blocoFeedback(q,r,html){
+  if(verCom(q))return html;
+  return `<div class="row" style="margin-top:8px"><button class="b s" onclick="(sess.verCom??={})['${q.id}']=1;render()">Ver comentários</button><span class="mut" style="font-size:.82rem">acertou com certeza — siga para a próxima</span></div>`;
+}
+// 5) meta diária para cobrir todas as fáceis e médias até a prova (últimos 14 dias ficam para rever os erros)
+function _restantesFM(){const v=new Set(all.map(l=>l.q));return Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!v.has(q.id)&&(!q.classif||q._d!=='d')).length}
+function diasProva(){return cfg.prova?Math.ceil((new Date(cfg.prova+'T12:00')-Date.now())/DAY):null}
+function metaDia(){const d=diasProva(),fim=+(PARAM.revisao_final_dias??14);if(d==null||d<=0)return null;return Math.ceil(_restantesFM()/Math.max(1,d-fim))}
+function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(cfg.diario,m)):cfg.diario}
+function metaProvaCard(){
+  if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
+  if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;
+  const m=metaDia(),fase=d<=fim;
+  return `<div class="card"><span class="kick">Meta até a prova</span><p><b>${d} dias</b> até a prova · <b>${r}</b> questões fáceis e médias ainda não vistas.</p>
+   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta: <b>${m} por dia</b> para ver todas até ${fim} dias antes da prova (esses últimos dias ficam para rever os erros). A Revisão de hoje tem ${tamanhoRI()}.`}</p></div>`;
+}
+// 3) reta final: erradas fáceis/médias voltam (30%) nos últimos dias
+function pacoteErradas(k){
+  const ult={};log.forEach(l=>ult[l.q]=l);
+  const pool=Q.filter(q=>q.gab&&ult[q.id]&&!ult[q.id].ok&&q._d!=='d');
+  return sorteioPonderado(pool,q=>pesoVolume(q),k).map(q=>q.id);
 }

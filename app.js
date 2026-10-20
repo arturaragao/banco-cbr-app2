@@ -1,4 +1,4 @@
-// Banco CBR app 1.4.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.5.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -319,7 +319,7 @@ function temas(){
     const w=DIF[q._d].w;x.n++;x.tw+=w;if(l.ok)x.ok++;else x.ew+=w;x.last=Math.max(x.last,l.t)})});
   const tot=Q.filter(q=>q.gab).length||1;
   return Object.values(M).map(x=>{
-    const inc=x.qs.length/tot*100,erro=(x.ew+0.5)/(x.tw+1),dias=x.last?(now-x.last)/DAY:30;
+    const inc=(modoProva()?x.qs.reduce((a,q)=>a+({f:1,m:.6,d:.05}[q._d]??.6),0):x.qs.length)/tot*100,erro=(x.ew+0.5)/(x.tw+1),dias=x.last?(now-x.last)/DAY:30;
     const rec=1+Math.min(dias,30)/10;
     return {...x,inc,erro,dias,score:inc*(0.5+erro*1.5)*rec};
   }).sort((a,b)=>b.score-a.score);
@@ -386,7 +386,7 @@ function responder(esc_,conf){
   const ok=esc_===q.gab,ms=Date.now()-sess.tq;
   const l={q:q.id,t:Date.now(),ok,conf,ms,e:esc_,modo:sess.sim?'simulado':sess.modo};
   sess.resp[q.id]={esc:esc_,conf,ok,t:l.t};delete sess.selMap[q.id];
-  all.push(l);log.push(l);aplicaSrs(l);syncEst();persist(wkKey(l.t));
+  all.push(l);log.push(l);aplicaSrs(l);syncEst();persist(wkKey(l.t));posResposta(q,l);
   if(sess.sim&&sess.i<sess.ids.length-1)irPara(sess.i+1);else render();
 }
 function editar(){const q=cur();if(!sess.resp[q.id])return;const esc_=sess.resp[q.id].esc;anula(q.id);syncEst();persist();sess.selMap[q.id]=esc_;render();toast('Resposta desfeita. Escolha de novo.')}
@@ -450,7 +450,7 @@ function vHoje(){
      :`<p class="mut">60 questões sorteadas conforme o peso das áreas, sem feedback até o fim.</p><div class="row"><button class="b s" onclick="simulado('teórica')">Teórica · 3h</button><button class="b s" onclick="simulado('prática')">Teórico-prática · 3h30</button></div>`;
     return `<div class="card ${p.ok?'feito':''}" id="card_${t.k}"><div class="row" style="justify-content:space-between"><span class="kick">${extra?'Extra':'Hoje'}</span><span class="pill ${p.ok?'ok':''}">${p.ok?'Concluída':p.n+'/'+p.alvo}</span></div><h3>${t.nome}</h3>${barra(pct(p.n,p.alvo),p.ok?'g':'')}${corpo}</div>`};
   return `<div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:8px;margin-bottom:14px"><div><div class="kick">${DIAS[ti]}, ${new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long'})}</div><h1>${agendados.length?'Seu plano de hoje':'Hoje é dia livre'}</h1></div>${diasProva!=null?`<span class="pill">${diasProva} dias para a prova</span>`:''}</div>
-  ${chipsHoje(agendados)}
+  ${metaProvaCard()}${chipsHoje(agendados)}
   <div class="plan">${agendados.map(t=>card(t)).join('')||`<div class="card"><p class="mut">Nada agendado para hoje. Ajuste em Config > Agenda ou faça uma atividade extra abaixo.</p></div>`}</div>
   <div class="kpis" style="margin:16px 0"><div class="kpi"><b>${devidas}</b><span class="mut">revisões vencidas</span></div>
    <div class="kpi"><b>${hojeLog.length}</b><span class="mut">respondidas hoje${hojeLog.length?` (${pct(okH,hojeLog.length)}%)`:''}</span></div>
@@ -822,7 +822,7 @@ function vQuiz(){
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),cut=sess.cut[q.id]||[];
   const alts=Object.entries(q.alts).map(([l,tx])=>{
     let c='';if(fb){if(l===q.gab)c='ok';else if(l===r.esc)c='bad'}else if(sel===l)c='sel';
-    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
+    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb&&verCom(q)?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
   const imgs=galeria(q,'q',fb);
   const imgsC=fb?galeria(q,'c'):'';
   const last=sess.i>=sess.ids.length-1;
@@ -833,7 +833,7 @@ function vQuiz(){
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
   ${fb?`<div style="margin-top:10px"><b style="color:var(--${r.ok?'ok':'bad'})">${r.ok?'Acertou':'Errou · gabarito '+q.gab}</b> <span class="mut">(${r.conf})</span>
-   ${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}<div class="imgs">${imgsC}</div>
+   ${bannerResp(q,r)}${blocoFeedback(q,r,`${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}`)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
   </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
   ${fb?`<select title="Dificuldade desta questão (acerto global estimado ${q.acerto??'—'}%)" onchange="if(this.value)setDif('${q.id}',this.value)"><option value="">Dificuldade: ${DIF[q._d].nome}${q.acerto!=null?' ~'+q.acerto+'%':''}</option>${Object.entries(DIF).map(([k,v])=>`<option value="${k}">${v.nome}</option>`).join('')}</select>`:''}
@@ -1365,7 +1365,7 @@ function _pvBase(){
 }
 function pesoVolume(q){
   const b=_pvBase(),dif={f:+(PARAM.peso_facil??6),m:+(PARAM.peso_media??3),d:+(PARAM.peso_dificil??0.15)};
-  const wd=q.classif?(dif[q._d]??dif.m):dif.m;
+  const wd=q.classif?(dif[q._d]??dif.m):dif.m*.8;
   const r=(I,k,ex)=>k&&I.m[k]?Math.pow(I.m[k]/I.me,ex):1;
   const wInc=Math.min(4,Math.max(.3,r(b.iA,b.kA(q),.5)*r(b.iT,b.kT(q),.5)*r(b.iS,b.kS(q),.25)));
   // erro: média bayesiana — subtema puxado para o tema, tema puxado para a área, área para 35%
@@ -1377,7 +1377,7 @@ function pesoVolume(q){
 }
 function pacoteVolume(n,filtro=()=>true){
   const vistas=new Set(all.map(l=>l.q)),maxS=+(PARAM.max_por_subtema??2),b=_pvBase();
-  const pool=Q.filter(q=>q.gab&&q._a!=='sem'&&!vistas.has(q.id)&&filtro(q)).map(q=>({q,w:Math.max(pesoVolume(q),1e-6)}));
+  const pool=Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!vistas.has(q.id)&&filtro(q)).map(q=>({q,w:Math.max(pesoVolume(q),1e-6)}));
   const out=[],cS={},cT={};
   while(out.length<n&&pool.length){
     pool.forEach(x=>{const s=b.kS(x.q),t=b.kT(x.q);x.wa=x.w*((cS[s]||0)>=maxS?.05:1)*Math.pow(.6,cT[t]||0)});
@@ -1387,7 +1387,12 @@ function pacoteVolume(n,filtro=()=>true){
   }
   return out;
 }
-function revisaoDoDia(){return modoProva()?pacoteVolume(cfg.diario):revisaoDoDiaOrig()}
+function revisaoDoDia(){
+  if(!modoProva())return revisaoDoDiaOrig();
+  const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
+  if(d!=null&&d>=0&&d<=fim){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
+  return pacoteVolume(n);
+}
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
 function simulado(et){
   if(!modoProva())return simuladoOrig(et);
@@ -1401,7 +1406,7 @@ function comecaFiltro(){
   iniciar(ids,'estudo');
 }
 function modoProvaUI(){
-  const n=Q.filter(q=>q.gab&&q._a!=='sem'&&!all.some(l=>l.q===q.id)).length;
+  const vv=new Set(all.map(l=>l.q)),n=Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!vv.has(q.id)).length;
   return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas (inclusive erradas) não voltam.</label>
   <p class="mut">Vale para a Revisão Inteligente, temas, simulados e pacotes do Estudar. ${n} questões novas disponíveis. Pesos no Manual: fácil ${PARAM.peso_facil??6} · média ${PARAM.peso_media??3} · difícil ${PARAM.peso_dificil??0.15}.</p>`;
 }
@@ -1409,6 +1414,45 @@ function setModoProva(on){
   const lin='@param modo_prova='+(on?1:0);
   metodo=/^@param\s+modo_prova\s*=.*$/m.test(metodo)?metodo.replace(/^@param\s+modo_prova\s*=.*$/m,lin):metodo+'\n'+lin;
   metoU=Date.now();saveL('cbr_metodo',{t:metodo,u:metoU});lerManual(metodo);persist('m:0');cfg.ri=null;persist('_est');render();
+}
+
+// ===== sugestões 1–5 (20/10/2026) =====
+// 1) erro vira flashcard automático (o conceito volta em repetição espaçada sem repetir a questão)
+const limpaTxt=s=>String(s||'').replace(/<[^>]+>/g,'').replace(/\*\*/g,'').replace(/\s+/g,' ').trim();
+function criaFlashErro(q){
+  let f='',v='';const P=q.claudeMd?iaParse(q.claudeMd):null;
+  if(P&&P.fl){[f,v]=P.fl}
+  else{const R=revItens(q);if(R.length){f=limpaTxt(R[0][0]);v=limpaTxt(R[0][1])}
+  else if(q.curso&&q.curso.ponto){f=`${(q.cl&&(q.cl[2]||q.cl[1]))||'Conceito'} — qual é o ponto-chave? (Q${q.n??''})`;v=limpaTxt(q.curso.ponto).slice(0,420)}}
+  if(!f||!v||cards.some(c=>!c.x&&(c.f===f||c.q===q.id)))return;
+  const c={id:'c'+Date.now().toString(36),f,v,tg:(tagStr(q)?tagStr(q)+'; ':'')+'erro',u:Date.now(),q:q.id};cards.push(c);persist('c:'+hk(c.id,32));
+  toast('Flashcard do erro criado');
+}
+function posResposta(q,l){if(!l.ok&&PARAM.flash_erro!==0)criaFlashErro(q)}
+// 2) errou com certeza = hipercorreção · 4) comentários recolhidos quando acertou com certeza
+function verCom(q){const r=sess&&sess.resp[q.id];return !(r&&r.ok&&r.conf==='certeza')||!!(sess.verCom&&sess.verCom[q.id])}
+function bannerResp(q,r){return r&&!r.ok&&r.conf==='certeza'?`<div class="hiper">⚠️ <b>Você errou com certeza.</b> É o tipo de erro que mais se corrige agora: leia os dois comentários com calma. Já virou flashcard.</div>`:''}
+function blocoFeedback(q,r,html){
+  if(verCom(q))return html;
+  return `<div class="row" style="margin-top:8px"><button class="b s" onclick="(sess.verCom??={})['${q.id}']=1;render()">Ver comentários</button><span class="mut" style="font-size:.82rem">acertou com certeza — siga para a próxima</span></div>`;
+}
+// 5) meta diária para cobrir todas as fáceis e médias até a prova (últimos 14 dias ficam para rever os erros)
+function _restantesFM(){const v=new Set(all.map(l=>l.q));return Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!v.has(q.id)&&(!q.classif||q._d!=='d')).length}
+function diasProva(){return cfg.prova?Math.ceil((new Date(cfg.prova+'T12:00')-Date.now())/DAY):null}
+function metaDia(){const d=diasProva(),fim=+(PARAM.revisao_final_dias??14);if(d==null||d<=0)return null;return Math.ceil(_restantesFM()/Math.max(1,d-fim))}
+function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(cfg.diario,m)):cfg.diario}
+function metaProvaCard(){
+  if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
+  if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;
+  const m=metaDia(),fase=d<=fim;
+  return `<div class="card"><span class="kick">Meta até a prova</span><p><b>${d} dias</b> até a prova · <b>${r}</b> questões fáceis e médias ainda não vistas.</p>
+   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta: <b>${m} por dia</b> para ver todas até ${fim} dias antes da prova (esses últimos dias ficam para rever os erros). A Revisão de hoje tem ${tamanhoRI()}.`}</p></div>`;
+}
+// 3) reta final: erradas fáceis/médias voltam (30%) nos últimos dias
+function pacoteErradas(k){
+  const ult={};log.forEach(l=>ult[l.q]=l);
+  const pool=Q.filter(q=>q.gab&&ult[q.id]&&!ult[q.id].ok&&q._d!=='d');
+  return sorteioPonderado(pool,q=>pesoVolume(q),k).map(q=>q.id);
 }
 
 
