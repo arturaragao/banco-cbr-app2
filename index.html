@@ -200,6 +200,82 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 .sm-wc .sm-tx{overflow-wrap:break-word;word-break:normal;hyphens:auto;font-size:.8rem}
 .sm-frl{flex-wrap:wrap}
 @media(max-width:640px){.sm-pan select{flex:1 1 100%}.sm-frl .b{flex:1 1 100%}}
+
+/* ===== calendário v3 (21/10/2026, opção A + lista C) ===== */
+.sm-calh h3{min-width:0;font:800 1.35rem var(--fd)}
+.sm-est{all:unset;cursor:pointer;font:800 1.35rem var(--fd);color:#fff;border-left:2px solid var(--bd);padding:0 10px}
+:root[data-theme="light"] .sm-est{color:var(--tx)}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .sm-est{color:var(--tx)}}
+.sm-est.vazio{font-size:.85rem;color:var(--mut)}
+.sm-cel{min-height:118px;padding:6px 7px;gap:3px;background:var(--bg)}
+.sm-cel.c0,.sm-cel.c1,.sm-cel.c2,.sm-cel.c3{background:var(--bg)}
+.sm-cel.off{background:transparent;border-style:solid;border-color:color-mix(in srgb,var(--bd) 70%,transparent)}
+.sm-cel.off>*{opacity:.55}
+.sm-cel .top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sm-cel .n{min-width:24px;height:24px;display:inline-grid;place-items:center;border-radius:50%;font:700 .9rem var(--fb)}
+.sm-cel.hoje .n{background:var(--pri);color:#fff}
+.sm-cel.hoje{border:2px solid var(--pri)}
+.sm-cel.fer .n,.sm-li .fer{color:var(--warn)}
+.sm-nt{font:800 .66rem var(--fb);letter-spacing:.04em;padding:1px 7px;border-radius:5px;border:1px solid}
+.sm-nt.br{color:var(--ok);border-color:var(--ok);background:color-mix(in srgb,var(--ok) 18%,transparent)}
+.sm-nt.hsi{color:var(--bad);border-color:var(--bad);background:color-mix(in srgb,var(--bad) 18%,transparent)}
+.sm-fe{font:700 .72rem var(--fb);color:var(--warn);line-height:1.2}
+.sm-tm{font:700 .84rem/1.2 var(--fb);overflow-wrap:anywhere}
+.sm-fo{font-size:.74rem;line-height:1.2;color:var(--pri-tx);overflow-wrap:anywhere}
+.sm-rs{font-size:.68rem;line-height:1.2;color:var(--mut);overflow-wrap:anywhere}
+.sm-bt{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:4px;flex-wrap:wrap}
+.sm-cel .q,.sm-li .q{font:800 .82rem var(--fb);font-variant-numeric:tabular-nums}
+.q small{font-weight:600;opacity:.7}
+.q.c1{color:var(--bad)}.q.c2{color:var(--warn)}.q.c3{color:var(--ok)}.q.c0{color:var(--mut)}.q.fut{color:var(--mut);font-weight:500}
+.sm-cel .dots,.sm-li .dots{margin-top:0;display:flex;gap:3px;flex-wrap:wrap}
+.sm-cel .dots i,.sm-li .dots i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--pri-tx)}
+.sm-cel .dots i.ok,.sm-li .dots i.ok{background:var(--pri-tx)}
+.sm-cel .dots i.late,.sm-li .dots i.late{background:var(--bad);border-color:var(--bad)}
+.sm-leg{display:none}
+.sm-dica{margin:8px 0 0;font-size:.78rem}
+.sm-htm{font:800 1.1rem var(--fd)}
+.sm-campos input{flex:1 1 180px;min-width:0}
+/* lista */
+.sm-lista{display:flex;flex-direction:column}
+.sm-lh{display:flex;align-items:center;justify-content:space-between;margin:12px 0 4px;font:800 .72rem var(--fb);text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.sm-tagb.on2{color:var(--pri-tx);border:1px solid var(--pri)}
+.sm-li{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;padding:8px 6px;border-bottom:1px solid var(--bd)}
+.sm-li.hoje{background:color-mix(in srgb,var(--pri) 12%,transparent);border:1px solid var(--pri);border-radius:10px}
+.sm-li.sel{outline:2px solid var(--pri-tx)}
+.sm-li.off>*{opacity:.55}
+.sm-li.rf{box-shadow:inset 3px 0 0 var(--bad)}
+.sm-li .ld{width:36px;flex:none;text-align:center}.sm-li .ld b{display:block;font:800 1.15rem var(--fd)}.sm-li .ld small{font:700 .64rem var(--fb);color:var(--mut);text-transform:uppercase}
+.sm-li.hoje .ld b{color:var(--pri-tx)}
+.sm-li .lc{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.sm-li .lt{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.sm-li .lb{display:flex;gap:10px;align-items:center}
+.sm-li .sm-tm{font-size:.92rem}
+/* celular: mesma grade do PC, letra menor, tudo visível */
+@media(max-width:640px){
+ .sm-cal{padding:8px!important}
+ .sm-lin{grid-template-columns:18px repeat(7,minmax(0,1fr));gap:2px;margin-bottom:2px}
+ .sm-sem{border-radius:5px}.sm-sem b{font-size:.5rem;writing-mode:vertical-rl;transform:rotate(180deg)}
+ .sm-lin.cab span{font-size:.6rem}
+ .sm-cel{min-height:82px;padding:2px 2px 3px;gap:1px;border-radius:6px}
+ .sm-cel .top{gap:2px}
+ .sm-cel .n{min-width:17px;height:17px;font-size:.66rem}
+ .sm-nt{font-size:.47rem;padding:0 2px;border-radius:3px;letter-spacing:0}
+ .sm-pv2{font-size:.45rem}
+ .sm-fe{font-size:.5rem}
+ .sm-tm{font-size:.56rem;line-height:1.12;hyphens:auto}
+ .sm-fo{font-size:.5rem;line-height:1.12}
+ .sm-rs{font-size:.48rem;line-height:1.12}
+ .sm-cel .q{font-size:.58rem}.sm-cel .q small{font-size:.5rem}
+ .sm-bt{gap:1px}
+ .sm-cel .dots{gap:2px}.sm-cel .dots i{width:5px;height:5px;border-width:1px}
+ .sm-calh{gap:5px}.sm-calh h3,.sm-est{font-size:1rem}.sm-est{padding:0 6px}
+ .sm-calh .sm-seg button{padding:5px 8px;font-size:.78rem}
+ .sm-sh{display:none!important}
+}
+.q.c0,.q.c1,.q.c2,.q.c3{background:none!important}
+.sm-ags{align-items:center}
+.sm-tm,.sm-fo,.sm-rs{overflow-wrap:break-word;word-break:normal;hyphens:auto}
+@media(max-width:640px){.sm-tm{font-size:.53rem;letter-spacing:-.01em}.sm-cel{padding:2px 1px 3px 2px}}
 </style></head><body>
 <title>Banco CBR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -423,12 +499,12 @@ kbd{background:rgba(255,255,255,.2);border-radius:5px;padding:0 6px;font:600 .72
 .marcos{display:flex;flex-wrap:wrap;gap:8px}.marco{font:600 .82rem var(--fb);border:1px dashed var(--bd);border-radius:99px;padding:5px 12px;color:var(--mut)}.marco.on{border:1px solid color-mix(in srgb,var(--warn) 60%,var(--bd));color:var(--tx);background:color-mix(in srgb,var(--warn) 14%,var(--card))}.marco.on{}
 .pnw{border:1px dashed color-mix(in srgb,var(--pri) 45%,var(--bd));border-radius:16px;padding:8px;margin-bottom:14px}.pnw .card{margin-bottom:0}.pnbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 6px 8px}.pnbar span{display:flex;gap:6px}.pnbar button{padding:5px 12px;font-size:.82rem}.pnc{pointer-events:none;opacity:.85;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 </style>
-<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.7.0</small></div>
+<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.8.0</small></div>
 <div class="hr"><span id="sync" class="local"><i></i><span>Só neste aparelho</span></span><button class="tg" id="tg" onclick="ciclaTema()"></button></div></div>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="toast"></div>
 <div id="zoom" hidden><div id="zbar"><button onclick="zStep(-1)" aria-label="Imagem anterior">‹</button><span id="zinfo"></span><button onclick="zStep(1)" aria-label="Próxima imagem">›</button><button onclick="zScale(1/1.4)" aria-label="Diminuir">−</button><button onclick="zScale(1.4)" aria-label="Aumentar">+</button><button onclick="zFit()">Ajustar</button><button onclick="zClose()">Fechar</button></div><div id="zst"><img id="zimg" alt="" draggable="false"></div></div>
 
-<script>window.BCBR_VERSAO="1.7.0"</script><script src="shim.js?v=1.7.0"></script>
+<script>window.BCBR_VERSAO="1.8.0"</script><script src="shim.js?v=1.8.0"></script>
 </body></html>
