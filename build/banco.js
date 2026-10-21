@@ -238,7 +238,7 @@ function metaProvaCard(){
   if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;
   const m=metaDia(),fase=d<=fim;
   return `<div class="card"><span class="kick">Meta até a prova</span><p><b>${d} dias</b> até a prova · <b>${r}</b> questões fáceis e médias ainda não vistas.</p>
-   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta: <b>${m} por dia de estudo</b> (sáb, dom e sobreaviso não contam) para ver todas até ${fim} dias antes da prova (esses últimos dias ficam para rever os erros). A Revisão de hoje tem ${tamanhoRI()}.`}</p></div>`;
+   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta: <b>${m} por dia de estudo</b> (sáb, dom e feriado sem plantão BR não contam) para ver todas até ${fim} dias antes da prova (esses últimos dias ficam para rever os erros). A Revisão de hoje tem ${tamanhoRI()}.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
 }
 // 3) reta final: erradas fáceis/médias voltam (30%) nos últimos dias
 function pacoteErradas(k){
