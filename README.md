@@ -7,5 +7,6 @@ Documentação do projeto: `CLAUDE.md` do repositório privado `banco-cbr-app`.
 ## Como funciona
 - `index.html` + `app.js` são **gerados** por `python build/montar.py` a partir do código do artefato (`fonte/`) com as trocas do app (`build/montar.py`, `build/banco.js`, `build/extra.css`). Não editar `app.js` à mão.
 - `shim.js`: lê as questões e grava o progresso no repositório privado (`progresso/<doc>.json`), IA pelo Gemini.
+- `build/semana.js` + `build/semana.css`: aba **Semana** (plano da semana, ex-artefato "Minha Semana"); dados em `semana/atual.json` do repo privado.
 - `sw.js`: deixa o app abrir sem internet e serve as imagens do repositório privado (`./img/<arquivo>`).
 - Endereço: https://arturaragao.github.io/banco-cbr-app2/

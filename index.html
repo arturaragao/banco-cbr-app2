@@ -86,6 +86,71 @@ body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galt{display:none}
 body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galm{min-height:0}
 @media(min-width:900px){body.emquiz.lay-otimizado .gal .galt{display:flex}}
 .hiper{margin:8px 0;padding:10px 12px;border-radius:10px;border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);font-size:.92rem}
+/* aba Semana (build/semana.js) */
+.sm{display:flex;flex-direction:column;gap:14px}
+.sm .card{margin:0}
+.sm-dia{padding:0!important;gap:0!important;overflow:hidden}
+.sm-dia.hoje{border-color:var(--pri);box-shadow:0 0 0 1px var(--pri)}
+.sm-dia.passou .sm-dn{color:var(--mut)}
+.sm-head{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:baseline;gap:10px;padding:13px 16px;cursor:pointer;flex-wrap:wrap}
+.sm-head:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
+.sm-dn{font:700 1.05rem var(--fd)}
+.sm-ag{color:var(--mut);font-size:.85rem;flex:1;min-width:0}
+.sm-ct,.sm-q{font:600 .78rem var(--fb);color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sm-ct.g{color:var(--ok)}
+.sm-q{background:var(--bg);border:1px solid var(--bd);border-radius:99px;padding:1px 8px}
+.sm-pill{font:700 .68rem var(--fb);text-transform:uppercase;letter-spacing:.06em;background:var(--pri);color:var(--on-pri);padding:2px 8px;border-radius:99px}
+.sm-body{padding:0 16px 14px;display:flex;flex-direction:column;gap:12px}
+.sm-grp{display:flex;flex-direction:column;gap:2px}
+.sm-lbl{font:700 .68rem var(--fb);text-transform:uppercase;letter-spacing:.08em;color:var(--pri-tx)}
+.sm-grp.sm-ferramenta .sm-lbl{color:var(--warn)}
+.sm-row{display:flex;align-items:flex-start;gap:2px;margin:0 -8px;border-radius:8px}
+.sm-row:hover{background:var(--bg)}
+.sm-it{flex:1;min-width:0;display:flex;flex-wrap:nowrap;gap:10px;align-items:flex-start;padding:7px 8px;cursor:pointer}
+.sm-it input{width:19px;height:19px;margin:1px 0 0;flex:none;accent-color:var(--pri)}
+.sm-grp.sm-ferramenta .sm-it input{accent-color:var(--warn)}
+.sm-tx{flex:1;min-width:0;overflow-wrap:anywhere}
+.sm-row.ok .sm-tx,.sm-it.ok .sm-tx{color:var(--mut);text-decoration:line-through;text-decoration-color:var(--bd)}
+.sm-tag{display:inline-block;font:600 .7rem var(--fb);color:var(--mut);border:1px solid var(--bd);border-radius:99px;padding:0 6px;white-space:nowrap;text-decoration:none}
+.sm-tag.g{color:var(--ok);border-color:var(--ok)}
+.sm-edb{all:unset;flex:none;color:var(--mut);font-size:15px;line-height:1;padding:9px 8px;cursor:pointer;border-radius:6px}
+.sm-edb:hover{color:var(--tx)}
+.sm-edb:focus-visible,.sm-chip:focus-visible,.sm-tagb:focus-visible{outline:2px solid var(--pri)}
+.sm-ed{display:flex;flex-direction:column;gap:10px;padding:12px;margin:2px -8px 6px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}
+.sm-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sm-chip{all:unset;font:600 .78rem var(--fb);padding:4px 10px;border:1px solid var(--bd);border-radius:99px;cursor:pointer;background:var(--card);color:var(--tx);font-variant-numeric:tabular-nums}
+.sm-chip[aria-pressed="true"]{background:var(--pri);border-color:var(--pri);color:var(--on-pri)}
+.sm-seg{display:flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.sm-seg button{all:unset;font:500 .85rem var(--fb);padding:6px 10px;cursor:pointer;color:var(--mut)}
+.sm-seg button[aria-pressed="true"]{background:var(--card);color:var(--tx);font-weight:700}
+button.b.sm-ghost{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+button.b.sm-ghost[aria-pressed="true"]{color:var(--pri-tx);border-color:var(--pri)}
+button.b.sm-danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+button.b.sm-del{background:var(--bad);color:#fff}
+.sm-conf{color:var(--bad);font-size:.88rem}
+.sm-add{display:flex;flex-direction:column;gap:8px}
+.sm-err{color:var(--bad);font-size:.85rem;margin:0}
+.sm-prova{flex-direction:row!important;align-items:center;gap:16px!important;flex-wrap:wrap}
+.sm-big{display:flex;flex-direction:column;align-items:center;min-width:84px}
+.sm-big b{font:800 2.2rem/1 var(--fd);color:var(--pri-tx);font-variant-numeric:tabular-nums}
+.sm-big span{font-size:.72rem;color:var(--mut);text-align:center}
+.sm-pv{flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px}
+.sm-pv p{margin:0}
+.sm-date{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:1px 4px}
+.sm-fr{display:flex;flex-direction:column;gap:6px}
+.sm-frl{display:flex;align-items:center;gap:10px}
+.sm-frl span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.sm-notas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sm-notas li{display:flex;gap:8px;align-items:center;font-size:.9rem;padding:6px 10px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;flex-wrap:wrap}
+.sm-notas time{font:600 .75rem var(--fb);color:var(--mut)}
+.sm-tagb{all:unset;font:600 .7rem var(--fb);color:var(--mut);border:1px dashed var(--bd);border-radius:99px;padding:1px 8px;cursor:pointer}
+.sm-tagb.on{color:var(--bad);border:1px solid var(--bad);background:var(--badbg)}
+.sm-bars{display:flex;gap:6px;align-items:flex-end;height:96px}
+.sm-bars div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:2px}
+.sm-bars i{display:block;width:100%;max-width:34px;background:var(--pri);border-radius:4px 4px 0 0;min-height:2px}
+.sm-bars span,.sm-bars small{font-size:.7rem;color:var(--mut);font-variant-numeric:tabular-nums}
+.sm-add .row>input{flex:1 1 100%!important}
+.sm-add select{flex:1;min-width:0}
 </style></head><body>
 <title>Banco CBR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -309,12 +374,12 @@ kbd{background:rgba(255,255,255,.2);border-radius:5px;padding:0 6px;font:600 .72
 .marcos{display:flex;flex-wrap:wrap;gap:8px}.marco{font:600 .82rem var(--fb);border:1px dashed var(--bd);border-radius:99px;padding:5px 12px;color:var(--mut)}.marco.on{border:1px solid color-mix(in srgb,var(--warn) 60%,var(--bd));color:var(--tx);background:color-mix(in srgb,var(--warn) 14%,var(--card))}.marco.on{}
 .pnw{border:1px dashed color-mix(in srgb,var(--pri) 45%,var(--bd));border-radius:16px;padding:8px;margin-bottom:14px}.pnw .card{margin-bottom:0}.pnbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 6px 8px}.pnbar span{display:flex;gap:6px}.pnbar button{padding:5px 12px;font-size:.82rem}.pnc{pointer-events:none;opacity:.85;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 </style>
-<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.5.4</small></div>
+<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.6.0</small></div>
 <div class="hr"><span id="sync" class="local"><i></i><span>Só neste aparelho</span></span><button class="tg" id="tg" onclick="ciclaTema()"></button></div></div>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="toast"></div>
 <div id="zoom" hidden><div id="zbar"><button onclick="zStep(-1)" aria-label="Imagem anterior">‹</button><span id="zinfo"></span><button onclick="zStep(1)" aria-label="Próxima imagem">›</button><button onclick="zScale(1/1.4)" aria-label="Diminuir">−</button><button onclick="zScale(1.4)" aria-label="Aumentar">+</button><button onclick="zFit()">Ajustar</button><button onclick="zClose()">Fechar</button></div><div id="zst"><img id="zimg" alt="" draggable="false"></div></div>
 
-<script>window.BCBR_VERSAO="1.5.4"</script><script src="shim.js?v=1.5.4"></script>
+<script>window.BCBR_VERSAO="1.6.0"</script><script src="shim.js?v=1.6.0"></script>
 </body></html>

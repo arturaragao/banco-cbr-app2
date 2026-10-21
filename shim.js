@@ -40,6 +40,7 @@
   const raw = (sha) => fetch(`${API}/repos/${REPO}/git/blobs/${sha}`, { headers: { Authorization: "Bearer " + tok(), Accept: "application/vnd.github.raw" } })
     .then((r) => { if (!r.ok) throw new Error("GitHub " + r.status); return r.text(); });
   const b64 = (s) => btoa(unescape(encodeURIComponent(s)));
+  Object.assign(window.BCBR, { api, raw, b64 });   // usados pela aba Semana (build/semana.js)
 
   // ---------- cache simples em IndexedDB ----------
   const idb = new Promise((ok, no) => { const r = indexedDB.open("bcbr", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
