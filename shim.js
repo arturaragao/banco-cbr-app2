@@ -62,7 +62,7 @@
       imgs: (u.imgs || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       imgsCom: (u.imgsCom || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       acerto: u.acerto ?? null, ar: u.ar || undefined, cl: u.cl || [], dif: u.dif || null,
-      curso: u.curso || null, claudeMd: u.claude_md || "", chegou: u.chegou || null, classif: u.classif || null, origem: u.origem || null, legendas: u.legendas || [], legendasCom: u.legendasCom || [],
+      curso: u.curso || null, claudeMd: u.claude_md_suspeito ? "" : (u.claude_md || ""), chegou: u.chegou || null, classif: u.classif || null, origem: u.origem || null, legendas: u.legendas || [], legendasCom: u.legendasCom || [],
     }));
   }
   async function carregarDados() {
