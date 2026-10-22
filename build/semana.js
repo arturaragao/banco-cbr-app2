@@ -317,7 +317,7 @@ function smGrupos(its){
 }
 function smAddLinha(dia){
   const add=SM.add[dia];
-  return `<div class="sm-add c1"><div class="row"><input id="sm_add_${dia}" placeholder="Adicionar item" value="${smVal('sm_add_'+dia)}" oninput="SM.dr[this.id]=this.value" onkeydown="if(event.key==='Enter')smAdd('${dia}')" style="flex:1;min-width:0">
+  return `<div class="sm-add sm-c1"><div class="row"><input id="sm_add_${dia}" placeholder="Adicionar item" value="${smVal('sm_add_'+dia)}" oninput="SM.dr[this.id]=this.value" onkeydown="if(event.key==='Enter')smAdd('${dia}')" style="flex:1;min-width:0">
      <select id="sm_area_${dia}" aria-label="Tipo">${smOpcoes()}</select>
      ${dia==='sem'?'':`<button class="b s sm-ghost" aria-pressed="${!!add}" onclick="smAddDias('${dia}')">+ dias</button>`}<button class="b s" onclick="smAdd('${dia}')">+</button></div>
      ${add?smChips(add,x=>`smAddChip('${dia}','${x}')`,smSemana(dia)):''}</div>`;
@@ -337,7 +337,7 @@ function smHojeGrande(){
 // célula "Sem data" (tarefas com dia:'sem'), acima do calendário; marcável, editável e navegável pelo teclado como as de hoje
 function smSemData(){
   const its=smItensDe('sem');
-  return `<div class="card sm-sd"><div class="sm-hh"><span class="kick">Sem data${its.length?` · ${its.filter(t=>t.feito).length}/${its.length}`:''}</span>${its.length?'':'<span class="mut" style="font-size:.85rem">tarefas sem dia marcado ficam aqui</span>'}</div>
+  return `<div class="card sm-sd"><div class="sm-hh"><span class="kick">Tarefas${its.length?` · ${its.filter(t=>t.feito).length}/${its.length}`:''}</span></div>
    ${smGrupos(its)}${smAddLinha('sem')}</div>`;
 }
 function smPainelDia(iso){

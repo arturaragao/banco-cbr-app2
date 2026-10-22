@@ -225,11 +225,11 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 .sm-hoje1 .sm-lbl,.sm-sd .sm-lbl{line-height:1.1;margin-top:2px}
 .sm-htm{font:700 .95rem var(--fd)}
 .sm-hh .sm-fo{margin:0}
-.sm-add.c1{gap:4px;margin-top:2px}
-.sm-add.c1 .row{gap:6px;flex-wrap:wrap}
-.sm-add.c1 .row>input{flex:1 1 160px!important;padding:5px 8px;font-size:.9rem}
-.sm-add.c1 .row>select{flex:0 1 auto;max-width:44%;padding:4px 6px;font-size:.85rem}
-.sm-add.c1 .b{padding:4px 10px}
+.sm-add.sm-c1{gap:4px;margin-top:4px}
+.sm-add.sm-c1 .row{gap:6px;flex-wrap:nowrap;align-items:center}
+.sm-add.sm-c1 .row>input{flex:1 1 auto!important;min-width:0;padding:5px 10px;font-size:.9rem}
+.sm-add.sm-c1 .row>select{flex:0 0 auto;width:auto;max-width:34%;padding:4px 6px;font-size:.85rem}
+.sm-add.sm-c1 .b{flex:0 0 auto;padding:4px 10px}
 .sm-sd{padding:10px 14px!important;border-style:dashed!important}
 .sm-ch{padding:10px 14px!important}
 .sm-ch .sm-gs{column-gap:20px}
