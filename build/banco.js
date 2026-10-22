@@ -91,15 +91,15 @@ function galInner(q,t){
   const L=galLista(q,t),k=q.id+'_'+t;if(!L.length)return'';
   let i=gIdx[k]||0;if(i>=L.length)i=0;const x=L[i],n=L.length;
   return `<div class="galm">${n>1?`<button class="galb" aria-label="Imagem anterior" onclick="galVai('${q.id}','${t}',-1)">‹</button>`:''}
-    <img src="${imgSrc(x.u)}" onclick="zoom('${x.u}')" alt="Imagem ${i+1} de ${n}" loading="lazy">
+    <img src="${imgSrc(x.u)}" data-u="${x.u}" onclick="zoom('${x.u}')" alt="Imagem ${i+1} de ${n}" fetchpriority="high">
     ${n>1?`<button class="galb dir" aria-label="Próxima imagem" onclick="galVai('${q.id}','${t}',1)">›</button><span class="galn">${i+1}/${n}</span>`:''}</div>
     ${x.leg&&gLeg[k]!==false?`<div class="gall md">${md(x.leg)}</div>`:''}
-    ${n>1?`<div class="galt">${L.map((y,j)=>`<img src="${imgSrc(y.u)}" class="${j===i?'on':''}" onclick="galVai('${q.id}','${t}',0,${j})" alt="Miniatura ${j+1}" loading="lazy">`).join('')}</div>`:''}`;
+    ${n>1?`<div class="galt">${L.map((y,j)=>`<img src="${imgSrc(y.u)}" data-u="${y.u}" class="${j===i?'on':''}" onclick="galVai('${q.id}','${t}',0,${j})" alt="Miniatura ${j+1}">`).join('')}</div>`:''}`;
 }
 function galeria(q,t,leg=true){gLeg[q.id+'_'+t]=leg;const h=galInner(q,t);return h?`<div class="gal" id="gal_${q.id}_${t}">${h}</div>`:''}
 function galVai(id,t,d,abs){const q=QID[id],n=galLista(q,t).length,k=id+'_'+t;
   gIdx[k]=abs!=null?abs:((gIdx[k]||0)+d+n)%n;
-  document.querySelectorAll('#gal_'+CSS.escape(k)).forEach(el=>el.innerHTML=galInner(q,t))}
+  document.querySelectorAll('#gal_'+CSS.escape(k)).forEach(el=>{const v=qGuarda(el);el.innerHTML=galInner(q,t);qReusa(el,v)})}
 
 // ===== peso das áreas automático pela incidência do banco =====
 let _inc=null,_incN=-1;

@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.11.0"
+VERSAO = "1.12.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -41,7 +41,7 @@ i0 = js.index("<h3>Peso das áreas na prova (%)</h3>"); i1 = js.index("</label>`
 js = js[:i0] + "${pesosUI()}" + js[i1:]
 # layouts + setas ↑/↓ rolam a página depois de responder
 troca("function render(){", "function render(){aplicaLayout();")
-troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.2),behavior:'smooth'});return}\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
+troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp'))return;   // depois de responder: rolagem nativa do navegador, igual ao Chrome (22/10/2026)\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
@@ -75,11 +75,19 @@ troca("const TABS=[['hoje','Hoje'],", "const TABS=[['hoje','Hoje'],['semana','Se
 troca("const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));", "const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));if(o.length&&!o.includes('semana'))o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');")
 troca("fc:vFc,fcstudy:vFcStudy}[tela];", "fc:vFc,fcstudy:vFcStudy,semana:vSemana}[tela];")
 troca("  ${metaProvaCard()}${chipsHoje(agendados)}", "  ${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}")
+# aba Questões à direita da Semana: último bloco em andamento + troca de bloco + atalhos (22/10/2026)
+troca("['semana','Semana'],", "['semana','Semana'],['questoes','Questões'],")
+troca("o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');", "o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');if(o.length&&!o.includes('questoes'))o.splice(o.indexOf('semana')+1,0,'questoes');")
+troca("quiz:vQuiz,", "quiz:vQuizQ,questoes:vQuestoes,")
+troca("function go(t,s){tela=t;", "function go(t,s){if(t==='questoes'&&qAbre())return;tela=t;")
+troca("const ativa=tela==='quiz'||tela==='fim'?'':", "const ativa=tela==='quiz'?'questoes':tela==='fim'?'':")
+troca("$('#app').innerHTML=f();", "qPinta(f());")
+js = js + "\n\n" + open(f"{R}/build/questoes.js", encoding="utf8").read()
 js = open(f"{R}/build/semana.js", encoding="utf8").read() + "\n\n" + js   # antes do código do app: SM existe quando o app desenha a 1ª tela
 
 open(f"{R}/app.js", "w", encoding="utf8").write(f"// Banco CBR app {VERSAO} — gerado por build/montar.py a partir do artefato (não editar à mão)\n" + js)
 
-css = open(f"{R}/build/extra.css", encoding="utf8").read() + open(f"{R}/build/semana.css", encoding="utf8").read()
+css = open(f"{R}/build/extra.css", encoding="utf8").read() + open(f"{R}/build/semana.css", encoding="utf8").read() + open(f"{R}/build/questoes.css", encoding="utf8").read()
 pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png">'
        '<meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes">')
 head = head.replace("<style>", pwa + "<style>", 1).replace("</style>", css + "</style>", 1)

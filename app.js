@@ -1,4 +1,4 @@
-// Banco CBR app 1.11.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.12.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
 // Dados: semana/plano.json no repo privado banco-cbr-app (mesma chave do app). Formato v2:
 //  {v:2, regras, subtitulo, dias:{"AAAA-MM-DD":{agenda,tipo?,meta?}}, tarefas:[{id,dia,texto,area,feito,feitoEm,ordem,grupo?,auto?,adiado?}], notas:[...]}
@@ -917,7 +917,7 @@ function proxima(){if(sess.i>=sess.ids.length-1){terminar();return}irPara(sess.i
 function terminar(){clearInterval(tmr);sess.fim=true;if(sess.modo==='estudo'&&sess.estId){cfg.ests=cfg.ests.filter(x=>x.id!==sess.estId);persist('_est')}go('fim')}
 
 // ===== abas: segurar e arrastar para reordenar =====
-function tabsOrdenadas(){const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));if(o.length&&!o.includes('semana'))o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');base.forEach(k=>{if(!o.includes(k))o.push(k)});return o.map(k=>TABS.find(t=>t[0]===k))}
+function tabsOrdenadas(){const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));if(o.length&&!o.includes('semana'))o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');if(o.length&&!o.includes('questoes'))o.splice(o.indexOf('semana')+1,0,'questoes');base.forEach(k=>{if(!o.includes(k))o.push(k)});return o.map(k=>TABS.find(t=>t[0]===k))}
 (function(){const n=$('#nav');let d=null,sem=false;
   const ini=()=>{d.on=true;d.b.classList.add('drag');d.rects=[...n.querySelectorAll('button')].map(x=>x.getBoundingClientRect());d.idx=[...n.querySelectorAll('button')].indexOf(d.b);d.t=d.idx};
   n.addEventListener('pointerdown',e=>{const b=e.target.closest('button[data-k]');if(!b)return;d={b,x0:e.clientX,on:false,touch:e.pointerType!=='mouse',h:null};
@@ -933,13 +933,13 @@ function tabsOrdenadas(){const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=
 })();
 
 // ===== telas =====
-const TABS=[['hoje','Hoje'],['semana','Semana'],['estudar','Estudar'],['fc','Flashcards'],['painel','Painel'],['banco','Banco'],['config','Config']];
-function go(t,s){tela=t;sub=s??null;render();scrollTo(0,0)}
+const TABS=[['hoje','Hoje'],['semana','Semana'],['questoes','Questões'],['estudar','Estudar'],['fc','Flashcards'],['painel','Painel'],['banco','Banco'],['config','Config']];
+function go(t,s){if(t==='questoes'&&qAbre())return;tela=t;sub=s??null;render();scrollTo(0,0)}
 function render(){aplicaLayout();
-  const ativa=tela==='quiz'||tela==='fim'?'':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
+  const ativa=tela==='quiz'?'questoes':tela==='fim'?'':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
   $('#nav').innerHTML=tabsOrdenadas().map(([k,n])=>`<button data-k="${k}" class="${ativa===k?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
-  const f={hoje:vHoje,agenda:vAgenda,rt:vRT,estudar:vEstudar,painel:vPainel,banco:vBanco,config:vConfig,quiz:vQuiz,fim:vFim,fc:vFc,fcstudy:vFcStudy,semana:vSemana}[tela];
-  $('#app').innerHTML=f();
+  const f={hoje:vHoje,agenda:vAgenda,rt:vRT,estudar:vEstudar,painel:vPainel,banco:vBanco,config:vConfig,quiz:vQuizQ,questoes:vQuestoes,fim:vFim,fc:vFc,fcstudy:vFcStudy,semana:vSemana}[tela];
+  qPinta(f());
   if(tela==='quiz'&&sess?.sim)tick();
 }
 const pct=(a,b)=>b?Math.round(a/b*100):0;
@@ -1391,7 +1391,7 @@ document.addEventListener('keydown',e=>{
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),L=Object.keys(q.alts);
   if(k==='ArrowRight'){e.preventDefault();if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1);return}
   if(k==='ArrowLeft'){e.preventDefault();irPara(sess.i-1);return}
-  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?1:-1)*Math.round(innerHeight*0.2),behavior:'smooth'});return}
+  if(fb&&(k==='ArrowDown'||k==='ArrowUp'))return;   // depois de responder: rolagem nativa do navegador, igual ao Chrome (22/10/2026)
   if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();const c=sel?L.indexOf(sel):-1;
     escolher(L[k==='ArrowDown'?Math.min(c+1,L.length-1):c<0?L.length-1:Math.max(c-1,0)]);return}
   if(keyIs(e,'cut')&&sel){riscar(sel);return}
@@ -1830,15 +1830,15 @@ function galInner(q,t){
   const L=galLista(q,t),k=q.id+'_'+t;if(!L.length)return'';
   let i=gIdx[k]||0;if(i>=L.length)i=0;const x=L[i],n=L.length;
   return `<div class="galm">${n>1?`<button class="galb" aria-label="Imagem anterior" onclick="galVai('${q.id}','${t}',-1)">‹</button>`:''}
-    <img src="${imgSrc(x.u)}" onclick="zoom('${x.u}')" alt="Imagem ${i+1} de ${n}" loading="lazy">
+    <img src="${imgSrc(x.u)}" data-u="${x.u}" onclick="zoom('${x.u}')" alt="Imagem ${i+1} de ${n}" fetchpriority="high">
     ${n>1?`<button class="galb dir" aria-label="Próxima imagem" onclick="galVai('${q.id}','${t}',1)">›</button><span class="galn">${i+1}/${n}</span>`:''}</div>
     ${x.leg&&gLeg[k]!==false?`<div class="gall md">${md(x.leg)}</div>`:''}
-    ${n>1?`<div class="galt">${L.map((y,j)=>`<img src="${imgSrc(y.u)}" class="${j===i?'on':''}" onclick="galVai('${q.id}','${t}',0,${j})" alt="Miniatura ${j+1}" loading="lazy">`).join('')}</div>`:''}`;
+    ${n>1?`<div class="galt">${L.map((y,j)=>`<img src="${imgSrc(y.u)}" data-u="${y.u}" class="${j===i?'on':''}" onclick="galVai('${q.id}','${t}',0,${j})" alt="Miniatura ${j+1}">`).join('')}</div>`:''}`;
 }
 function galeria(q,t,leg=true){gLeg[q.id+'_'+t]=leg;const h=galInner(q,t);return h?`<div class="gal" id="gal_${q.id}_${t}">${h}</div>`:''}
 function galVai(id,t,d,abs){const q=QID[id],n=galLista(q,t).length,k=id+'_'+t;
   gIdx[k]=abs!=null?abs:((gIdx[k]||0)+d+n)%n;
-  document.querySelectorAll('#gal_'+CSS.escape(k)).forEach(el=>el.innerHTML=galInner(q,t))}
+  document.querySelectorAll('#gal_'+CSS.escape(k)).forEach(el=>{const v=qGuarda(el);el.innerHTML=galInner(q,t);qReusa(el,v)})}
 
 // ===== peso das áreas automático pela incidência do banco =====
 let _inc=null,_incN=-1;
@@ -2052,3 +2052,105 @@ function importar(){try{const d=JSON.parse($("#bk").value);all=(d.log||[]).map(l
 function setPeso(id,v){if(v==='')delete cfg.pesos[id];else cfg.pesos[id]=+v;persist('_est')}
 
 aplicaTema();render();iniciaSync();
+
+
+// ===== aba Questões (pedido do Artur, 22/10/2026) =====
+// Abre o último bloco em andamento (revisão do dia ou estudo salvo) já na próxima questão a fazer;
+// no topo da questão, um seletor troca para outro bloco em aberto.
+function qChave(){if(!sess||sess.fim)return null;return sess.estId||(sess.modo==='hoje'?'ri':'atual')}
+function qBlocos(){
+  const L=[];
+  try{const ids=riHoje(),h=hoje0(),f=new Set();let u=0;
+    log.forEach(l=>{if(l.t>=h&&l.modo==='hoje'&&ids.includes(l.q)){f.add(l.q);u=Math.max(u,l.t)}});
+    if(ids.length&&f.size<ids.length)L.push({k:'ri',nome:'Revisão do dia',feitas:f.size,n:ids.length,u})}catch(e){}
+  (cfg.ests||[]).forEach(e=>{const ids=e.ids.filter(i=>QID[i]&&QID[i].gab),f=ids.filter(i=>(e.resp||{})[i]).length;
+    if(ids.length&&f<ids.length)L.push({k:e.id,nome:'Estudo',feitas:f,n:ids.length,u:e.u||e.t0||0})});
+  return L.sort((a,b)=>b.u-a.u);
+}
+// índice da próxima questão sem resposta, a partir da atual (dá a volta)
+function qProxIdx(){const n=sess.ids.length;for(let j=0;j<n;j++){const i=(sess.i+j)%n;if(!sess.resp[sess.ids[i]])return i}return sess.i}
+function qCarrega(k){
+  if(sess&&!sess.fim&&sess.modo==='estudo')salvaEst();
+  if(k==='ri'){iniciaRI();return}
+  retomaEst(k);if(!sess||sess.estId!==k)return;
+  const nx=qProxIdx();if(nx!==sess.i){sess.i=nx;sess.tq=Date.now();salvaEst();render();scrollTo(0,0)}
+}
+// chamado por go('questoes'): devolve true quando já levou para a questão
+function qAbre(){
+  if(sess&&!sess.fim){go('quiz');return true}
+  const L=qBlocos();if(!L.length)return false;
+  qCarrega(L[0].k);return tela==='quiz';
+}
+function qTroca(k){if(k)qCarrega(k)}
+function vQuestoes(){
+  return `<div class="card"><h2>Questões</h2><p class="mut">Nenhum bloco de questões em aberto agora.</p>
+  <div class="row"><button class="b" onclick="go('estudar')">Montar um estudo</button><button class="b s" onclick="go('hoje')">Ir para Hoje</button></div></div>`;
+}
+const qDt=u=>u?' · '+new Date(u).toLocaleString('pt-BR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+function qBarra(){
+  if(!sess||sess.sim||sess.fim)return'';
+  const at=qChave(),L=qBlocos(),outros=L.filter(b=>b.k!==at);if(!outros.length)return'';
+  const eu=L.find(b=>b.k===at),nome=eu?`${eu.nome} · ${eu.feitas}/${eu.n}`:'Bloco atual';
+  return `<div class="qblocos"><span class="mut">Bloco:</span><select aria-label="Trocar de bloco de questões" onchange="qTroca(this.value);this.blur()"><option value="">${esc(nome)}</option>${outros.map(b=>`<option value="${b.k}">→ ${b.nome} · ${b.feitas}/${b.n}${qDt(b.u)}</option>`).join('')}</select></div>`;
+}
+function qAtalhos(){
+  if(!sess||sess.qEdit)return'';
+  const K=n=>`<kbd>${esc(keyLab(n))}</kbd>`,it=(k,t)=>`<span>${k} ${t}</span>`;
+  const alts=['a1','a2','a3','a4','a5'].map(K).join('');
+  return `<div class="qatalhos" aria-label="Atalhos do teclado">
+  ${it('<kbd>←</kbd><kbd>→</kbd>','questão anterior/próxima')}
+  ${it('<kbd>↑</kbd><kbd>↓</kbd>','escolhe a alternativa (depois de responder: rola a página)')}
+  ${it(alts,'alternativas A–E')}
+  ${it(K('cert')+K('duv')+K('chu'),'certeza / dúvida / chute (<kbd>Enter</kbd> = certeza)')}
+  ${it(K('cut'),'riscar alternativa')}
+  ${it(K('next')+'<kbd>Espaço</kbd>','próxima (depois de responder)')}
+  ${it(K('edit'),'editar resposta')}
+  ${it(K('ia'),'CCQ e resumo com IA')}
+  ${it('<kbd>I</kbd>','seleciona a 1ª imagem › de novo abre › de novo fecha')}
+  ${it('<kbd>←</kbd><kbd>→</kbd>','com imagem selecionada: troca a imagem (<kbd>Esc</kbd> solta)')}
+  ${it('<kbd>+</kbd><kbd>−</kbd><kbd>0</kbd>','imagem aberta: aumenta / diminui / ajusta')}
+  </div>`;
+}
+function vQuizQ(){const h=vQuiz();if(tela!=='quiz'||!sess||sess.qEdit)return h;return qBarra()+h+qAtalhos()}
+
+// ===== imagens: teclado (I + setas) =====
+const GS={id:null,on:false,t:'q'};
+function qGalTipo(q){const fb=!!sess.resp[q.id]&&!sess.sim;return galLista(q,'q').length?'q':fb&&galLista(q,'c').length?'c':null}
+function qMarcaGal(){const q=tela==='quiz'&&sess&&!sess.fim?cur():null;
+  document.querySelectorAll('#app .gal').forEach(el=>el.classList.toggle('gsel',!!q&&GS.on&&GS.id===q.id&&el.id==='gal_'+q.id+'_'+GS.t))}
+window.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
+  if(typeof capKey!=='undefined'&&capKey)return;
+  if(typeof QA!=='undefined'&&QA.on)return;
+  const isI=e.key==='i'||e.key==='I',z=document.getElementById('zoom');
+  if(z&&!z.hidden){if(isI){e.preventDefault();e.stopImmediatePropagation();zClose()}return}
+  if(tela!=='quiz'||!sess||sess.fim||sess.qEdit)return;
+  const q=cur();if(!q)return;
+  if(GS.id!==q.id){GS.id=q.id;GS.on=false}
+  if(isI&&KG.quiz.some(n=>KEY(n).toLowerCase()==='i'))return;   // tecla I já usada num atalho personalizado
+  if(isI){const tp=qGalTipo(q);if(!tp)return;e.preventDefault();e.stopImmediatePropagation();
+    if(!GS.on){GS.on=true;GS.t=tp;galVai(q.id,tp,0,0);qMarcaGal();
+      const el=document.getElementById('gal_'+q.id+'_'+tp);el&&el.scrollIntoView({block:'nearest'})}
+    else{const L=galLista(q,GS.t),x=L[gIdx[q.id+'_'+GS.t]||0];if(x)zoom(x.u)}
+    return}
+  if(!GS.on)return;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();e.stopImmediatePropagation();galVai(q.id,GS.t,e.key==='ArrowRight'?1:-1);qMarcaGal();return}
+  if(e.key==='Escape'){GS.on=false;qMarcaGal();return}
+  if((e.key==='ArrowUp'||e.key==='ArrowDown')&&!(sess.resp[q.id]&&!sess.sim)){GS.on=false;qMarcaGal()}   // foco volta às alternativas
+},true);
+
+// ===== imagens sem piscar: a cada redesenho reaproveita as <img> já carregadas (mesma imagem = mesmo elemento) =====
+function qGuarda(root){const v={};root.querySelectorAll('img[data-u]').forEach(im=>{if(im.complete&&im.naturalWidth)(v[im.dataset.u]??=[]).push(im)});return v}
+function qReusa(root,v){root.querySelectorAll('img[data-u]').forEach(im=>{const o=(v[im.dataset.u]||[]).shift();if(!o)return;
+  [...o.attributes].forEach(a=>{if(a.name!=='src'&&!im.hasAttribute(a.name))o.removeAttribute(a.name)});
+  [...im.attributes].forEach(a=>{if(a.name!=='src')o.setAttribute(a.name,a.value)});im.replaceWith(o)})}
+function qPinta(html){const app=$('#app'),v=qGuarda(app);app.innerHTML=html;qReusa(app,v);qMarcaGal();qPreCarrega()}
+// pré-carrega as imagens da questão atual e das 3 seguintes (ficam prontas na memória)
+const qPre=new Map();
+function qPreCarrega(){
+  if(tela!=='quiz'||!sess||!window.BCBR||!BCBR.imgDireto)return;
+  for(let d=0;d<=3;d++){const q=QID[sess.ids[sess.i+d]];if(!q)continue;
+    [...(q.imgs||[]),...(q.imgsCom||[])].forEach(u=>{u=String(u);if(!u.startsWith('gh:'))return;const n=u.slice(3);if(qPre.has(n))return;
+      qPre.set(n,null);BCBR.imgDireto(n).then(src=>{const im=new Image();im.src=src;qPre.set(n,im);if(im.decode)im.decode().catch(()=>{})}).catch(()=>qPre.delete(n))})}
+}
