@@ -505,3 +505,17 @@ window.addEventListener('keydown',e=>{
 function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoje'||tela==='semana';
   if(!b){b=document.createElement('button');b.id='qa_fab';b.className='qa-fab';b.title='Nova tarefa (Alt+A)';b.setAttribute('aria-label','Nova tarefa (Alt+A)');b.textContent='+';b.onclick=qaAbre;document.body.appendChild(b)}
   b.style.display=ver?'':'none'}
+
+// Tab = próxima aba (à direita), Shift+Tab = anterior (à esquerda), em volta. Pedido do Artur, 22/10/2026.
+// (Alt+Tab não chega ao navegador: o Windows usa para trocar de janela.) Não age ao digitar num campo,
+// com o zoom aberto, na tela de Nova tarefa (Alt+A) nem durante uma questão (lá o teclado responde a questão).
+window.addEventListener('keydown',e=>{
+  if(e.key!=='Tab'||e.ctrlKey||e.metaKey||e.altKey)return;
+  if((typeof QA!=='undefined'&&QA.on)||tela==='quiz')return;
+  const t=e.target;if(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable)return;
+  const z=document.getElementById('zoom');if(z&&!z.hidden)return;
+  const o=tabsOrdenadas().map(x=>x[0]);if(!o.length)return;
+  const ativa=tela==='fim'?'estudar':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
+  let i=o.indexOf(ativa);if(i<0)i=0;
+  e.preventDefault();go(o[(i+(e.shiftKey?-1:1)+o.length)%o.length]);
+});
