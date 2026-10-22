@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.10.0"
+VERSAO = "1.10.1"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -50,7 +50,10 @@ troca("function questoesTema(t){", "function questoesTemaOrig(t){")
 troca("function simulado(et){", "function simuladoOrig(et){")
 troca("function novasArea(id){", "function novasAreaOrig(id){")
 troca("function comecaFiltro(){", "function comecaFiltroOrig(){")
-troca("cfg.ri.v!==4", "cfg.ri.v!==5"); troca("cfg.ri={d:dKey(Date.now()),v:4,", "cfg.ri={d:dKey(Date.now()),v:5,")
+troca("cfg.ri.v!==4", "cfg.ri.v!==6"); troca("cfg.ri={d:dKey(Date.now()),v:4,", "cfg.ri={d:dKey(Date.now()),v:6,")
+# cartão da RI: texto e contador seguem a lista de verdade (22/10/2026)
+troca("ALVO={ri:()=>cfg.diario,", "ALVO={ri:()=>modoProva()?riHoje().length:cfg.diario,")
+troca("`<p class=\"mut\">${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.</p>", "`<p class=\"mut\">${riDesc(devidas)}</p>")
 js = js.replace("${layoutUI()}${pesosUI()}", "${modoProvaUI()}${layoutUI()}${pesosUI()}", 1)
 # sugestões 1–5
 troca("all.push(l);log.push(l);aplicaSrs(l);syncEst();persist(wkKey(l.t));", "all.push(l);log.push(l);aplicaSrs(l);syncEst();persist(wkKey(l.t));posResposta(q,l);")
@@ -71,7 +74,7 @@ js = js[:ini] + open(f"{R}/build/banco.js", encoding="utf8").read() + "\n\n" + j
 troca("const TABS=[['hoje','Hoje'],", "const TABS=[['hoje','Hoje'],['semana','Semana'],")
 troca("const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));", "const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));if(o.length&&!o.includes('semana'))o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');")
 troca("fc:vFc,fcstudy:vFcStudy}[tela];", "fc:vFc,fcstudy:vFcStudy,semana:vSemana}[tela];")
-troca("  ${metaProvaCard()}${chipsHoje(agendados)}", "  ${instalarCard()}${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}")
+troca("  ${metaProvaCard()}${chipsHoje(agendados)}", "  ${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}")
 js = open(f"{R}/build/semana.js", encoding="utf8").read() + "\n\n" + js   # antes do código do app: SM existe quando o app desenha a 1ª tela
 
 open(f"{R}/app.js", "w", encoding="utf8").write(f"// Banco CBR app {VERSAO} — gerado por build/montar.py a partir do artefato (não editar à mão)\n" + js)

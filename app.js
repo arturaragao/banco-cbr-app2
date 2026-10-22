@@ -1,4 +1,4 @@
-// Banco CBR app 1.10.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.10.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
 // Dados: semana/plano.json no repo privado banco-cbr-app (mesma chave do app). Formato v2:
 //  {v:2, regras, subtitulo, dias:{"AAAA-MM-DD":{agenda,tipo?,meta?}}, tarefas:[{id,dia,texto,area,feito,feitoEm,ordem,grupo?,auto?,adiado?}], notas:[...]}
@@ -785,7 +785,7 @@ function sorteioPonderado(cands,w,k){
 const embaralha=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const dKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 function riHoje(){ // a lista só muda à 00:00
-  if(!cfg.ri||cfg.ri.v!==5||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:5,ids:revisaoDoDia()};persist('_est')}
+  if(!cfg.ri||cfg.ri.v!==6||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:6,ids:revisaoDoDia()};persist('_est')}
   return cfg.ri.ids;
 }
 function iniciaRI(){
@@ -937,7 +937,7 @@ const idxHoje=()=>(new Date().getDay()+6)%7;
 const CK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
 
 // progresso por tipo em um dia (di = deslocamento em ms desde segunda da semana atual)
-const MODO={ri:'hoje',rt:'rt',ps:'simulado'},ALVO={ri:()=>cfg.diario,rt:()=>10,ps:()=>30};
+const MODO={ri:'hoje',rt:'rt',ps:'simulado'},ALVO={ri:()=>modoProva()?riHoje().length:cfg.diario,rt:()=>10,ps:()=>30};
 function progDia(k,ini){
   if(k==='et'){const n=cfg.etDone[dKey(ini)]?1:0;return {n,alvo:1,ok:!!n}}
  const n=log.filter(l=>l.t>=ini&&l.t<ini+DAY&&l.modo===MODO[k]).length;return {n,alvo:ALVO[k](),ok:n>=ALVO[k]()}}
@@ -954,12 +954,12 @@ function vHoje(){
   const agendados=TIPOS.filter(t=>cfg.agenda[t.k][ti]),extras=TIPOS.filter(t=>!cfg.agenda[t.k][ti]);
   const tm=temas()[0];
   const card=(t,extra)=>{const p=progDia(t.k,hoje);
-    const corpo=t.k==='et'?etCorpo():t.k==='ri'?`<p class="mut">${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.</p><div class="row"><button class="b" onclick="iniciaRI()">${p.n?'Continuar':'Começar'}</button></div>`
+    const corpo=t.k==='et'?etCorpo():t.k==='ri'?`<p class="mut">${riDesc(devidas)}</p><div class="row"><button class="b" onclick="iniciaRI()">${p.n?'Continuar':'Começar'}</button></div>`
      :t.k==='rt'?`<p class="mut">${tm?`Tema sugerido: <b style="color:var(--tx)">${esc(tm.t)}</b> (${Math.round(tm.inc)}% do banco, ${Math.round(tm.erro*100)}% de erro ponderado, ${tm.last?'visto há '+Math.round(tm.dias)+' d':'nunca visto'}).`:'Sem temas ainda.'}</p><div class="row"><button class="b" onclick="temaSel=null;go('rt')">Resumo + 10 questões</button></div>`
      :`<p class="mut">60 questões sorteadas conforme o peso das áreas, sem feedback até o fim.</p><div class="row"><button class="b s" onclick="simulado('teórica')">Teórica · 3h</button><button class="b s" onclick="simulado('prática')">Teórico-prática · 3h30</button></div>`;
     return `<div class="card ${p.ok?'feito':''}" id="card_${t.k}"><div class="row" style="justify-content:space-between"><span class="kick">${extra?'Extra':'Hoje'}</span><span class="pill ${p.ok?'ok':''}">${p.ok?'Concluída':p.n+'/'+p.alvo}</span></div><h3>${t.nome}</h3>${barra(pct(p.n,p.alvo),p.ok?'g':'')}${corpo}</div>`};
   return `<div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:8px;margin-bottom:14px"><div><div class="kick">${DIAS[ti]}, ${new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long'})}</div><h1>${agendados.length?'Seu plano de hoje':'Hoje é dia livre'}</h1></div>${diasProva!=null?`<span class="pill">${diasProva} dias para a prova</span>`:''}</div>
-  ${instalarCard()}${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}
+  ${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}
   <div class="plan">${agendados.map(t=>card(t)).join('')||`<div class="card"><p class="mut">Nada agendado para hoje. Ajuste em Config > Agenda ou faça uma atividade extra abaixo.</p></div>`}</div>
   <div class="kpis" style="margin:16px 0"><div class="kpi"><b>${devidas}</b><span class="mut">revisões vencidas</span></div>
    <div class="kpi"><b>${hojeLog.length}</b><span class="mut">respondidas hoje${hojeLog.length?` (${pct(okH,hojeLog.length)}%)`:''}</span></div>
@@ -1899,9 +1899,15 @@ function pacoteVolume(n,filtro=()=>true){
   }
   return out;
 }
-// instalar como app: só aparece quando o navegador oferece (ainda não instalado)
-function instalarCard(){return window.BCBR_INSTALAR?`<div class="card row" style="justify-content:space-between"><span>📲 <b>Instalar o Banco CBR como app</b> (ícone na tela inicial)</span><button class="b" onclick="instalarApp()">Instalar</button></div>`:''}
-async function instalarApp(){const e=window.BCBR_INSTALAR;if(!e)return;e.prompt();try{await e.userChoice}catch(x){}window.BCBR_INSTALAR=null;render()}
+// texto do cartão da Revisão Inteligente = o que a lista de hoje tem de fato
+function riDesc(devidas){
+  if(!modoProva())return `${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.`;
+  const ids=riHoje(),ini=hoje0(),vistas=new Set(log.filter(l=>l.t<ini).map(l=>l.q)),rep=ids.filter(i=>vistas.has(i)).length,nov=ids.length-rep;
+  const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q.classif?q._d:'m']=(cnt[q.classif?q._d:'m']||0)+1});
+  const reta=d!=null&&d>=0&&d<=fim;
+  return `<b>${nov} questões novas</b>${reta?'':' (a meta de hoje)'}${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
+   `${cnt.f} fáceis · ${cnt.m} médias${cnt.d?' · '+cnt.d+' difícil'+(cnt.d>1?'eis':''):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
+}
 // repetidas eventuais (pedido do Artur, 22/10/2026): ~1 a cada 25, no máx. 2 por RI — só erradas COM CERTEZA ou erradas FÁCEIS, última resposta errada há 5+ dias
 function pacoteRepeteRaro(n){
   const ult={};log.forEach(l=>ult[l.q]=l);const lim=Date.now()-(+(PARAM.repete_dias??5))*DAY,cada=+(PARAM.repete_cada??25);
