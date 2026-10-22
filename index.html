@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg"><meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.versao{font-size:.62rem;font-weight:500;opacity:.6;margin-left:6px;letter-spacing:.02em;vertical-align:middle}
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.versao{font-size:.62rem;font-weight:500;opacity:.6;margin-left:6px;letter-spacing:.02em;vertical-align:middle}
 .blist{border:1px solid var(--bd);border-radius:12px;overflow:hidden}
 .bq{border-bottom:1px solid var(--bd)}.bq:last-child{border-bottom:0}
 .bq>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:10px 12px}
@@ -280,6 +280,19 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 .sm-mh{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;align-items:center}
 @media(max-width:640px){.sm-mh{grid-template-columns:1fr}}
 .sm-prit{margin-top:10px;font-size:.88rem;overflow-x:auto}.sm-prit .mdt{overflow-x:auto}.sm-prit table{font-size:.8rem;border-collapse:collapse}.sm-prit td,.sm-prit th{border:1px solid var(--bd);padding:4px 6px;vertical-align:top}
+/* adicionar tarefa rápido (Alt+A) */
+.qa-fundo{position:fixed;inset:0;background:rgba(2,6,23,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:8vh 16px 16px}
+.qa-caixa{background:var(--card,#1e293b);color:var(--tx,inherit);border:1px solid var(--line,#334155);border-radius:14px;padding:14px;width:min(460px,100%);max-height:84vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.qa-passos{display:flex;gap:6px;flex-wrap:wrap}.qa-p{font-size:.78rem;padding:3px 9px;border-radius:99px;border:1px solid var(--line,#334155);opacity:.6}
+.qa-p.on{opacity:1;border-color:#38bdf8;color:#38bdf8;font-weight:700}.qa-p.ok{opacity:.9;color:#22c55e;border-color:#22c55e}
+.qa-in{width:100%;font-size:1.05rem;padding:10px;box-sizing:border-box}.qa-tx{font-weight:600}
+.qa-ops{display:flex;flex-direction:column;gap:6px}.qa-op{text-align:left;padding:10px 12px;border-radius:10px;border:2px solid var(--line,#334155);background:transparent;color:inherit;font-size:1rem;cursor:pointer}
+.qa-op.on{border-color:#38bdf8;background:rgba(56,189,248,.12)}
+.qa-dias{overflow:auto;max-height:46vh;display:flex;flex-direction:column;gap:3px;padding-right:4px}.qa-sem{font-size:.72rem;text-transform:uppercase;opacity:.6;margin-top:6px}
+.qa-dia{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:2px solid transparent;cursor:pointer}.qa-dia.des{opacity:.55}
+.qa-dia.cur{border-color:#38bdf8}.qa-dia.on{background:rgba(34,197,94,.15)}.qa-ck{width:18px;height:18px;border-radius:5px;border:1px solid var(--line,#64748b);display:inline-flex;align-items:center;justify-content:center;font-size:.8rem;color:#22c55e}
+.qa-dica{font-size:.78rem;opacity:.75;border-top:1px solid var(--line,#334155);padding-top:8px}.qa-dica kbd{font:inherit;font-size:.72rem;padding:1px 5px;border:1px solid var(--line,#64748b);border-radius:4px;margin:0 1px}
+.qa-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:52px;height:52px;border-radius:50%;border:0;background:#38bdf8;color:#0f172a;font-size:28px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.35);z-index:900;cursor:pointer}
 </style></head><body>
 <title>Banco CBR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -503,12 +516,12 @@ kbd{background:rgba(255,255,255,.2);border-radius:5px;padding:0 6px;font:600 .72
 .marcos{display:flex;flex-wrap:wrap;gap:8px}.marco{font:600 .82rem var(--fb);border:1px dashed var(--bd);border-radius:99px;padding:5px 12px;color:var(--mut)}.marco.on{border:1px solid color-mix(in srgb,var(--warn) 60%,var(--bd));color:var(--tx);background:color-mix(in srgb,var(--warn) 14%,var(--card))}.marco.on{}
 .pnw{border:1px dashed color-mix(in srgb,var(--pri) 45%,var(--bd));border-radius:16px;padding:8px;margin-bottom:14px}.pnw .card{margin-bottom:0}.pnbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 6px 8px}.pnbar span{display:flex;gap:6px}.pnbar button{padding:5px 12px;font-size:.82rem}.pnc{pointer-events:none;opacity:.85;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 </style>
-<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.9.0</small></div>
+<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.10.0</small></div>
 <div class="hr"><span id="sync" class="local"><i></i><span>Só neste aparelho</span></span><button class="tg" id="tg" onclick="ciclaTema()"></button></div></div>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="toast"></div>
 <div id="zoom" hidden><div id="zbar"><button onclick="zStep(-1)" aria-label="Imagem anterior">‹</button><span id="zinfo"></span><button onclick="zStep(1)" aria-label="Próxima imagem">›</button><button onclick="zScale(1/1.4)" aria-label="Diminuir">−</button><button onclick="zScale(1.4)" aria-label="Aumentar">+</button><button onclick="zFit()">Ajustar</button><button onclick="zClose()">Fechar</button></div><div id="zst"><img id="zimg" alt="" draggable="false"></div></div>
 
-<script>window.BCBR_VERSAO="1.9.0"</script><script src="shim.js?v=1.9.0"></script>
+<script>window.BCBR_VERSAO="1.10.0"</script><script src="shim.js?v=1.10.0"></script>
 </body></html>

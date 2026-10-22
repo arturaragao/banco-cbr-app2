@@ -451,3 +451,57 @@ function smMetaHoje(){
      :`<div class="sm-ring" style="background:var(--bd)"><div><b>${q.n}</b><span>questões</span></div></div><span class="mut">${tp==='descanso'?'dia de descanso — sem meta':'sobreaviso — sem meta hoje'}</span>`}</div>
    <div class="sm-hp">${dd!=null?`<span class="sm-bign">${dd}</span><span class="mut">dias até a prova</span>`:''}${rit!=null?`<span class="mut">ritmo: <b style="color:${rit>=90?'var(--ok)':rit>=60?'var(--warn)':'var(--bad)'}">${rit>=90?'no caminho':rit>=60?'um pouco abaixo':'abaixo'}</b> (${rit}% da meta nos últimos 5 dias de estudo)</span>`:''}<span class="mut">${_restantesFM()} fáceis/médias novas</span>${r?`<span class="mut">reta final (rever erros) a partir de ${smRotL(r)}</span>`:''}</div></div>`;
 }
+
+// ===== ADICIONAR TAREFA RÁPIDO — Alt+A nas abas Hoje e Semana (pedido do Artur, 22/10/2026) =====
+// 1 Tarefa (Enter) › 2 Tipo: Estudo/Ferramenta (↑↓; Enter = só hoje · → = escolher dias) › 3 Dias (↑↓←→ anda, A marca, Enter adiciona). Esc volta um passo.
+const QA={on:false,passo:1,texto:'',area:'estudo',dias:new Set(),cur:0,lista:[]};
+function qaAbre(){
+  if(!SM.d){toast('O calendário ainda não carregou. Tente de novo em instantes.');return}
+  const hj=smHoje();Object.assign(QA,{on:true,passo:1,texto:'',area:'estudo',dias:new Set([hj]),cur:1,lista:Array.from({length:21},(_,i)=>smMais(hj,i))});qaDesenha();
+}
+function qaFecha(){QA.on=false;const el=document.getElementById('qa');if(el)el.remove()}
+function qaVai(p){if(p===2&&!QA.texto.trim()){toast('Escreva a tarefa primeiro');return}QA.passo=p;qaDesenha()}
+function qaAdd(){
+  const hj=smHoje(),dias=QA.dias.size?[...QA.dias].sort():[hj],t=QA.texto.trim();if(!t)return;
+  smPoe(smNovos(dias,t,QA.area),'novo item');qaFecha();
+  toast((QA.area==='estudo'?'Estudo':'Ferramenta')+' adicionada '+(dias.length===1&&dias[0]===hj?'a hoje':dias.length===1?'em '+smRotL(dias[0]):'em '+dias.length+' dias'));
+}
+function qaMarca(iso){QA.dias.has(iso)?QA.dias.delete(iso):QA.dias.add(iso);qaDesenha()}
+function qaDesenha(){
+  let el=document.getElementById('qa');
+  if(!el){el=document.createElement('div');el.id='qa';el.className='qa-fundo';el.onclick=e=>{if(e.target===el)qaFecha()};document.body.appendChild(el)}
+  const p=QA.passo,hj=smHoje(),pas=(n,t)=>`<span class="qa-p ${p===n?'on':p>n?'ok':''}">${p>n?'✓':n} ${t}</span>`;
+  const tipo=[['estudo','📚 Estudo'],['ferramenta','🛠️ Ferramenta']].map(([a,n])=>`<button class="qa-op ${QA.area===a?'on':''}" onclick="QA.area='${a}';qaDesenha()">${n}</button>`).join('');
+  let corpo,dica;
+  if(p===1){corpo=`<input id="qa_in" class="qa-in" placeholder="Ex.: revisar RM de joelho" value="${esc(QA.texto)}" oninput="QA.texto=this.value" autocomplete="off">`;
+    dica='<kbd>Enter</kbd> próximo · <kbd>Esc</kbd> fechar'}
+  else if(p===2){corpo=`<div class="qa-tx">“${esc(QA.texto.trim())}”</div><div class="qa-ops">${tipo}</div>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="QA.dias=new Set(['${hj}']);qaAdd()">Adicionar só hoje</button><button class="b s sm-ghost" onclick="qaVai(3)">Escolher mais dias →</button></div>`;
+    dica='<kbd>↑</kbd><kbd>↓</kbd> escolhe · <kbd>Enter</kbd> adiciona <b>só hoje</b> · <kbd>→</kbd> mais dias · <kbd>Esc</kbd> volta'}
+  else{let sem='';corpo=`<div class="qa-tx">“${esc(QA.texto.trim())}” · ${QA.area==='estudo'?'📚 Estudo':'🛠️ Ferramenta'}</div><div class="qa-dias">${QA.lista.map((d,i)=>{
+      const s=smNumSem(d),cab=s!==sem?`<div class="qa-sem">Semana ${s}</div>`:'';sem=s;const tp=smTipo(d),noi=smNoite(d);
+      return cab+`<div class="qa-dia ${QA.dias.has(d)?'on':''} ${i===QA.cur?'cur':''} ${tp!=='estudo'?'des':''}" id="qa_d${i}" onclick="QA.cur=${i};qaMarca('${d}')"><span class="qa-ck">${QA.dias.has(d)?'✓':''}</span>${smRotL(d)}${d===hj?' <b>· hoje</b>':''}<span class="mut">${noi?' · '+noi:''}${tp!=='estudo'?' · '+tp:''}</span></div>`}).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="qaAdd()">Adicionar em ${QA.dias.size||1} dia${(QA.dias.size||1)>1?'s':''}</button><button class="b s sm-ghost" onclick="qaVai(2)">← voltar</button></div>`;
+    dica='<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> anda · <kbd>A</kbd> marca/desmarca · <kbd>Enter</kbd> adiciona · <kbd>Esc</kbd> volta'}
+  el.innerHTML=`<div class="qa-caixa" role="dialog" aria-label="Adicionar tarefa"><div class="row" style="justify-content:space-between"><b>➕ Nova tarefa</b><button class="b s sm-ghost" onclick="qaFecha()" aria-label="Fechar">✕</button></div>
+    <div class="qa-passos">${pas(1,'Tarefa')}${pas(2,'Tipo')}${pas(3,'Dias')}</div>${corpo}${p===1?`<div class="row" style="margin-top:10px"><button class="b" onclick="qaVai(2)">Próximo →</button></div>`:''}<div class="qa-dica">${dica}</div></div>`;
+  if(p===1){const i=document.getElementById('qa_in');i.focus();i.setSelectionRange(i.value.length,i.value.length)}
+  else{document.activeElement&&document.activeElement.blur();const c=document.getElementById('qa_d'+QA.cur);c&&c.scrollIntoView({block:'nearest'})}
+}
+window.addEventListener('keydown',e=>{
+  if(!QA.on){if(e.altKey&&!e.ctrlKey&&e.code==='KeyA'&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
+  const k=e.key,p=QA.passo;e.stopImmediatePropagation();
+  const usa=()=>e.preventDefault();
+  if(p===1){if(k==='Enter'){usa();qaVai(2)}else if(k==='Escape'){usa();qaFecha()}return}
+  if(p===2){usa();if(k==='ArrowUp'||k==='ArrowDown'){QA.area=QA.area==='estudo'?'ferramenta':'estudo';qaDesenha()}
+    else if(k==='Enter'){QA.dias=new Set([smHoje()]);qaAdd()}else if(k==='ArrowRight')qaVai(3);else if(k==='Escape'||k==='ArrowLeft')qaVai(1);return}
+  usa();const n=QA.lista.length;
+  if(k==='ArrowDown'||k==='ArrowRight'){QA.cur=Math.min(n-1,QA.cur+1);qaDesenha()}
+  else if(k==='ArrowUp'||k==='ArrowLeft'){QA.cur=Math.max(0,QA.cur-1);qaDesenha()}
+  else if((k==='a'||k==='A'||k===' ')&&!e.altKey)qaMarca(QA.lista[QA.cur]);
+  else if(k==='Enter')qaAdd();else if(k==='Escape')qaVai(2);
+},true);
+// botão flutuante "+" (celular e mouse) nas abas Hoje e Semana — chamado a cada render
+function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoje'||tela==='semana';
+  if(!b){b=document.createElement('button');b.id='qa_fab';b.className='qa-fab';b.title='Nova tarefa (Alt+A)';b.setAttribute('aria-label','Nova tarefa (Alt+A)');b.textContent='+';b.onclick=qaAbre;document.body.appendChild(b)}
+  b.style.display=ver?'':'none'}

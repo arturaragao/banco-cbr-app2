@@ -192,3 +192,16 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 .sm-mh{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px;align-items:center}
 @media(max-width:640px){.sm-mh{grid-template-columns:1fr}}
 .sm-prit{margin-top:10px;font-size:.88rem;overflow-x:auto}.sm-prit .mdt{overflow-x:auto}.sm-prit table{font-size:.8rem;border-collapse:collapse}.sm-prit td,.sm-prit th{border:1px solid var(--bd);padding:4px 6px;vertical-align:top}
+/* adicionar tarefa rápido (Alt+A) */
+.qa-fundo{position:fixed;inset:0;background:rgba(2,6,23,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:8vh 16px 16px}
+.qa-caixa{background:var(--card,#1e293b);color:var(--tx,inherit);border:1px solid var(--line,#334155);border-radius:14px;padding:14px;width:min(460px,100%);max-height:84vh;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.qa-passos{display:flex;gap:6px;flex-wrap:wrap}.qa-p{font-size:.78rem;padding:3px 9px;border-radius:99px;border:1px solid var(--line,#334155);opacity:.6}
+.qa-p.on{opacity:1;border-color:#38bdf8;color:#38bdf8;font-weight:700}.qa-p.ok{opacity:.9;color:#22c55e;border-color:#22c55e}
+.qa-in{width:100%;font-size:1.05rem;padding:10px;box-sizing:border-box}.qa-tx{font-weight:600}
+.qa-ops{display:flex;flex-direction:column;gap:6px}.qa-op{text-align:left;padding:10px 12px;border-radius:10px;border:2px solid var(--line,#334155);background:transparent;color:inherit;font-size:1rem;cursor:pointer}
+.qa-op.on{border-color:#38bdf8;background:rgba(56,189,248,.12)}
+.qa-dias{overflow:auto;max-height:46vh;display:flex;flex-direction:column;gap:3px;padding-right:4px}.qa-sem{font-size:.72rem;text-transform:uppercase;opacity:.6;margin-top:6px}
+.qa-dia{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:2px solid transparent;cursor:pointer}.qa-dia.des{opacity:.55}
+.qa-dia.cur{border-color:#38bdf8}.qa-dia.on{background:rgba(34,197,94,.15)}.qa-ck{width:18px;height:18px;border-radius:5px;border:1px solid var(--line,#64748b);display:inline-flex;align-items:center;justify-content:center;font-size:.8rem;color:#22c55e}
+.qa-dica{font-size:.78rem;opacity:.75;border-top:1px solid var(--line,#334155);padding-top:8px}.qa-dica kbd{font:inherit;font-size:.72rem;padding:1px 5px;border:1px solid var(--line,#64748b);border-radius:4px;margin:0 1px}
+.qa-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:52px;height:52px;border-radius:50%;border:0;background:#38bdf8;color:#0f172a;font-size:28px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.35);z-index:900;cursor:pointer}

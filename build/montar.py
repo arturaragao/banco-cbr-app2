@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.9.0"
+VERSAO = "1.10.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -71,13 +71,13 @@ js = js[:ini] + open(f"{R}/build/banco.js", encoding="utf8").read() + "\n\n" + j
 troca("const TABS=[['hoje','Hoje'],", "const TABS=[['hoje','Hoje'],['semana','Semana'],")
 troca("const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));", "const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));if(o.length&&!o.includes('semana'))o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');")
 troca("fc:vFc,fcstudy:vFcStudy}[tela];", "fc:vFc,fcstudy:vFcStudy,semana:vSemana}[tela];")
-troca("  ${metaProvaCard()}${chipsHoje(agendados)}", "  ${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}")
+troca("  ${metaProvaCard()}${chipsHoje(agendados)}", "  ${instalarCard()}${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}")
 js = open(f"{R}/build/semana.js", encoding="utf8").read() + "\n\n" + js   # antes do código do app: SM existe quando o app desenha a 1ª tela
 
 open(f"{R}/app.js", "w", encoding="utf8").write(f"// Banco CBR app {VERSAO} — gerado por build/montar.py a partir do artefato (não editar à mão)\n" + js)
 
 css = open(f"{R}/build/extra.css", encoding="utf8").read() + open(f"{R}/build/semana.css", encoding="utf8").read()
-pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg">'
+pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png">'
        '<meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes">')
 head = head.replace("<style>", pwa + "<style>", 1).replace("</style>", css + "</style>", 1)
 # versão pequena ao lado do título

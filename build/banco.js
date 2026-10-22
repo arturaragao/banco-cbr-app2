@@ -118,7 +118,7 @@ function pesosUI(){
 
 // ===== layouts da tela da questão =====
 const LAYOUTS=[['compacto','Compacto (padrão) — abas em cima, painel de questões em faixa acima da questão'],['compfoco','Compacto + Foco — igual, sem cabeçalho (botão ⤢ Foco na questão)'],['otimizado','Otimizado — combina os outros conforme a tela'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
-function aplicaLayout(){
+function aplicaLayout(){if(typeof qaBotao==="function")qaBotao();
   const b=document.body,l=cfg.layout||'compacto';
   b.classList.toggle('emquiz',tela==='quiz');
   LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
@@ -174,11 +174,21 @@ function pacoteVolume(n,filtro=()=>true){
   }
   return out;
 }
+// instalar como app: só aparece quando o navegador oferece (ainda não instalado)
+function instalarCard(){return window.BCBR_INSTALAR?`<div class="card row" style="justify-content:space-between"><span>📲 <b>Instalar o Banco CBR como app</b> (ícone na tela inicial)</span><button class="b" onclick="instalarApp()">Instalar</button></div>`:''}
+async function instalarApp(){const e=window.BCBR_INSTALAR;if(!e)return;e.prompt();try{await e.userChoice}catch(x){}window.BCBR_INSTALAR=null;render()}
+// repetidas eventuais (pedido do Artur, 22/10/2026): ~1 a cada 25, no máx. 2 por RI — só erradas COM CERTEZA ou erradas FÁCEIS, última resposta errada há 5+ dias
+function pacoteRepeteRaro(n){
+  const ult={};log.forEach(l=>ult[l.q]=l);const lim=Date.now()-(+(PARAM.repete_dias??5))*DAY,cada=+(PARAM.repete_cada??25);
+  const pool=Q.filter(q=>{const l=ult[q.id];return q.gab&&l&&!l.ok&&l.t<lim&&(l.conf==='certeza'||(q.classif&&q._d==='f'))});
+  let k=Math.floor(n/cada);if(Math.random()<n/cada-k)k++;k=Math.min(2,k,pool.length);
+  return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k).map(q=>q.id):[];
+}
 function revisaoDoDia(){
   if(!modoProva())return revisaoDoDiaOrig();
   const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
   if(d!=null&&d>=0&&d<=fim){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
-  return pacoteVolume(n);
+  const r=pacoteRepeteRaro(n);return r.length?embaralha([...pacoteVolume(n),...r]):pacoteVolume(n);   // repetidas vêm a mais: as novas seguem a meta
 }
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
 function simulado(et){
@@ -194,7 +204,7 @@ function comecaFiltro(){
 }
 function modoProvaUI(){
   const vv=new Set(all.map(l=>l.q)),n=Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!vv.has(q.id)).length;
-  return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas (inclusive erradas) não voltam.</label>
+  return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas não voltam — só, de vez em quando (~1 a cada 25, máx. 2 por dia), uma errada com certeza ou errada fácil.</label>
   <p class="mut">Vale para a Revisão Inteligente, temas, simulados e pacotes do Estudar. ${n} questões novas disponíveis. Pesos no Manual: fácil ${PARAM.peso_facil??6} · média ${PARAM.peso_media??3} · difícil ${PARAM.peso_dificil??0.15}.</p>`;
 }
 function setModoProva(on){
@@ -232,7 +242,7 @@ function _restantesInicioDia(){const hj=dKey(Date.now()),ant=new Set(),hoje=new 
 // meta = o que falta ÷ dias de estudo até a reta final (calendário: sáb/dom e sobreaviso HSI não contam; plantão na Ecomax conta)
 function metaDia(){const d=diasProva(),fim=+(PARAM.revisao_final_dias??14);if(d==null||d<=0)return null;
   const dias=typeof smDiasEstudoRestantes==='function'&&SM.d?smDiasEstudoRestantes():null;return Math.ceil(_restantesInicioDia()/Math.max(1,dias??(d-fim)))}
-function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(cfg.diario,m)):cfg.diario}
+function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
 function metaProvaCard(){
   if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
   if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;

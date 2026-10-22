@@ -1,4 +1,4 @@
-// Banco CBR app 1.9.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.10.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
 // Dados: semana/plano.json no repo privado banco-cbr-app (mesma chave do app). Formato v2:
 //  {v:2, regras, subtitulo, dias:{"AAAA-MM-DD":{agenda,tipo?,meta?}}, tarefas:[{id,dia,texto,area,feito,feitoEm,ordem,grupo?,auto?,adiado?}], notas:[...]}
@@ -453,6 +453,60 @@ function smMetaHoje(){
    <div class="sm-hp">${dd!=null?`<span class="sm-bign">${dd}</span><span class="mut">dias até a prova</span>`:''}${rit!=null?`<span class="mut">ritmo: <b style="color:${rit>=90?'var(--ok)':rit>=60?'var(--warn)':'var(--bad)'}">${rit>=90?'no caminho':rit>=60?'um pouco abaixo':'abaixo'}</b> (${rit}% da meta nos últimos 5 dias de estudo)</span>`:''}<span class="mut">${_restantesFM()} fáceis/médias novas</span>${r?`<span class="mut">reta final (rever erros) a partir de ${smRotL(r)}</span>`:''}</div></div>`;
 }
 
+// ===== ADICIONAR TAREFA RÁPIDO — Alt+A nas abas Hoje e Semana (pedido do Artur, 22/10/2026) =====
+// 1 Tarefa (Enter) › 2 Tipo: Estudo/Ferramenta (↑↓; Enter = só hoje · → = escolher dias) › 3 Dias (↑↓←→ anda, A marca, Enter adiciona). Esc volta um passo.
+const QA={on:false,passo:1,texto:'',area:'estudo',dias:new Set(),cur:0,lista:[]};
+function qaAbre(){
+  if(!SM.d){toast('O calendário ainda não carregou. Tente de novo em instantes.');return}
+  const hj=smHoje();Object.assign(QA,{on:true,passo:1,texto:'',area:'estudo',dias:new Set([hj]),cur:1,lista:Array.from({length:21},(_,i)=>smMais(hj,i))});qaDesenha();
+}
+function qaFecha(){QA.on=false;const el=document.getElementById('qa');if(el)el.remove()}
+function qaVai(p){if(p===2&&!QA.texto.trim()){toast('Escreva a tarefa primeiro');return}QA.passo=p;qaDesenha()}
+function qaAdd(){
+  const hj=smHoje(),dias=QA.dias.size?[...QA.dias].sort():[hj],t=QA.texto.trim();if(!t)return;
+  smPoe(smNovos(dias,t,QA.area),'novo item');qaFecha();
+  toast((QA.area==='estudo'?'Estudo':'Ferramenta')+' adicionada '+(dias.length===1&&dias[0]===hj?'a hoje':dias.length===1?'em '+smRotL(dias[0]):'em '+dias.length+' dias'));
+}
+function qaMarca(iso){QA.dias.has(iso)?QA.dias.delete(iso):QA.dias.add(iso);qaDesenha()}
+function qaDesenha(){
+  let el=document.getElementById('qa');
+  if(!el){el=document.createElement('div');el.id='qa';el.className='qa-fundo';el.onclick=e=>{if(e.target===el)qaFecha()};document.body.appendChild(el)}
+  const p=QA.passo,hj=smHoje(),pas=(n,t)=>`<span class="qa-p ${p===n?'on':p>n?'ok':''}">${p>n?'✓':n} ${t}</span>`;
+  const tipo=[['estudo','📚 Estudo'],['ferramenta','🛠️ Ferramenta']].map(([a,n])=>`<button class="qa-op ${QA.area===a?'on':''}" onclick="QA.area='${a}';qaDesenha()">${n}</button>`).join('');
+  let corpo,dica;
+  if(p===1){corpo=`<input id="qa_in" class="qa-in" placeholder="Ex.: revisar RM de joelho" value="${esc(QA.texto)}" oninput="QA.texto=this.value" autocomplete="off">`;
+    dica='<kbd>Enter</kbd> próximo · <kbd>Esc</kbd> fechar'}
+  else if(p===2){corpo=`<div class="qa-tx">“${esc(QA.texto.trim())}”</div><div class="qa-ops">${tipo}</div>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="QA.dias=new Set(['${hj}']);qaAdd()">Adicionar só hoje</button><button class="b s sm-ghost" onclick="qaVai(3)">Escolher mais dias →</button></div>`;
+    dica='<kbd>↑</kbd><kbd>↓</kbd> escolhe · <kbd>Enter</kbd> adiciona <b>só hoje</b> · <kbd>→</kbd> mais dias · <kbd>Esc</kbd> volta'}
+  else{let sem='';corpo=`<div class="qa-tx">“${esc(QA.texto.trim())}” · ${QA.area==='estudo'?'📚 Estudo':'🛠️ Ferramenta'}</div><div class="qa-dias">${QA.lista.map((d,i)=>{
+      const s=smNumSem(d),cab=s!==sem?`<div class="qa-sem">Semana ${s}</div>`:'';sem=s;const tp=smTipo(d),noi=smNoite(d);
+      return cab+`<div class="qa-dia ${QA.dias.has(d)?'on':''} ${i===QA.cur?'cur':''} ${tp!=='estudo'?'des':''}" id="qa_d${i}" onclick="QA.cur=${i};qaMarca('${d}')"><span class="qa-ck">${QA.dias.has(d)?'✓':''}</span>${smRotL(d)}${d===hj?' <b>· hoje</b>':''}<span class="mut">${noi?' · '+noi:''}${tp!=='estudo'?' · '+tp:''}</span></div>`}).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="b" onclick="qaAdd()">Adicionar em ${QA.dias.size||1} dia${(QA.dias.size||1)>1?'s':''}</button><button class="b s sm-ghost" onclick="qaVai(2)">← voltar</button></div>`;
+    dica='<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> anda · <kbd>A</kbd> marca/desmarca · <kbd>Enter</kbd> adiciona · <kbd>Esc</kbd> volta'}
+  el.innerHTML=`<div class="qa-caixa" role="dialog" aria-label="Adicionar tarefa"><div class="row" style="justify-content:space-between"><b>➕ Nova tarefa</b><button class="b s sm-ghost" onclick="qaFecha()" aria-label="Fechar">✕</button></div>
+    <div class="qa-passos">${pas(1,'Tarefa')}${pas(2,'Tipo')}${pas(3,'Dias')}</div>${corpo}${p===1?`<div class="row" style="margin-top:10px"><button class="b" onclick="qaVai(2)">Próximo →</button></div>`:''}<div class="qa-dica">${dica}</div></div>`;
+  if(p===1){const i=document.getElementById('qa_in');i.focus();i.setSelectionRange(i.value.length,i.value.length)}
+  else{document.activeElement&&document.activeElement.blur();const c=document.getElementById('qa_d'+QA.cur);c&&c.scrollIntoView({block:'nearest'})}
+}
+window.addEventListener('keydown',e=>{
+  if(!QA.on){if(e.altKey&&!e.ctrlKey&&e.code==='KeyA'&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
+  const k=e.key,p=QA.passo;e.stopImmediatePropagation();
+  const usa=()=>e.preventDefault();
+  if(p===1){if(k==='Enter'){usa();qaVai(2)}else if(k==='Escape'){usa();qaFecha()}return}
+  if(p===2){usa();if(k==='ArrowUp'||k==='ArrowDown'){QA.area=QA.area==='estudo'?'ferramenta':'estudo';qaDesenha()}
+    else if(k==='Enter'){QA.dias=new Set([smHoje()]);qaAdd()}else if(k==='ArrowRight')qaVai(3);else if(k==='Escape'||k==='ArrowLeft')qaVai(1);return}
+  usa();const n=QA.lista.length;
+  if(k==='ArrowDown'||k==='ArrowRight'){QA.cur=Math.min(n-1,QA.cur+1);qaDesenha()}
+  else if(k==='ArrowUp'||k==='ArrowLeft'){QA.cur=Math.max(0,QA.cur-1);qaDesenha()}
+  else if((k==='a'||k==='A'||k===' ')&&!e.altKey)qaMarca(QA.lista[QA.cur]);
+  else if(k==='Enter')qaAdd();else if(k==='Escape')qaVai(2);
+},true);
+// botão flutuante "+" (celular e mouse) nas abas Hoje e Semana — chamado a cada render
+function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoje'||tela==='semana';
+  if(!b){b=document.createElement('button');b.id='qa_fab';b.className='qa-fab';b.title='Nova tarefa (Alt+A)';b.setAttribute('aria-label','Nova tarefa (Alt+A)');b.textContent='+';b.onclick=qaAbre;document.body.appendChild(b)}
+  b.style.display=ver?'':'none'}
+
 
 
 // ===== util =====
@@ -905,7 +959,7 @@ function vHoje(){
      :`<p class="mut">60 questões sorteadas conforme o peso das áreas, sem feedback até o fim.</p><div class="row"><button class="b s" onclick="simulado('teórica')">Teórica · 3h</button><button class="b s" onclick="simulado('prática')">Teórico-prática · 3h30</button></div>`;
     return `<div class="card ${p.ok?'feito':''}" id="card_${t.k}"><div class="row" style="justify-content:space-between"><span class="kick">${extra?'Extra':'Hoje'}</span><span class="pill ${p.ok?'ok':''}">${p.ok?'Concluída':p.n+'/'+p.alvo}</span></div><h3>${t.nome}</h3>${barra(pct(p.n,p.alvo),p.ok?'g':'')}${corpo}</div>`};
   return `<div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:8px;margin-bottom:14px"><div><div class="kick">${DIAS[ti]}, ${new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long'})}</div><h1>${agendados.length?'Seu plano de hoje':'Hoje é dia livre'}</h1></div>${diasProva!=null?`<span class="pill">${diasProva} dias para a prova</span>`:''}</div>
-  ${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}
+  ${instalarCard()}${smCardHoje()}${metaProvaCard()}${chipsHoje(agendados)}
   <div class="plan">${agendados.map(t=>card(t)).join('')||`<div class="card"><p class="mut">Nada agendado para hoje. Ajuste em Config > Agenda ou faça uma atividade extra abaixo.</p></div>`}</div>
   <div class="kpis" style="margin:16px 0"><div class="kpi"><b>${devidas}</b><span class="mut">revisões vencidas</span></div>
    <div class="kpi"><b>${hojeLog.length}</b><span class="mut">respondidas hoje${hojeLog.length?` (${pct(okH,hojeLog.length)}%)`:''}</span></div>
@@ -1789,7 +1843,7 @@ function pesosUI(){
 
 // ===== layouts da tela da questão =====
 const LAYOUTS=[['compacto','Compacto (padrão) — abas em cima, painel de questões em faixa acima da questão'],['compfoco','Compacto + Foco — igual, sem cabeçalho (botão ⤢ Foco na questão)'],['otimizado','Otimizado — combina os outros conforme a tela'],['lado','2 · Lado a lado — imagem fixa à esquerda (PC/tablet)'],['foco','3 · Foco — tela cheia, sem cabeçalho nem painel'],['grade','4 · Alternativas em grade — curtas em 2 colunas'],['ajustada','5 · Imagem ajustada à tela — imagem ocupa só o espaço que sobra'],['original','Original do artefato']];
-function aplicaLayout(){
+function aplicaLayout(){if(typeof qaBotao==="function")qaBotao();
   const b=document.body,l=cfg.layout||'compacto';
   b.classList.toggle('emquiz',tela==='quiz');
   LAYOUTS.forEach(([k])=>b.classList.toggle('lay-'+k,k===l));
@@ -1845,11 +1899,21 @@ function pacoteVolume(n,filtro=()=>true){
   }
   return out;
 }
+// instalar como app: só aparece quando o navegador oferece (ainda não instalado)
+function instalarCard(){return window.BCBR_INSTALAR?`<div class="card row" style="justify-content:space-between"><span>📲 <b>Instalar o Banco CBR como app</b> (ícone na tela inicial)</span><button class="b" onclick="instalarApp()">Instalar</button></div>`:''}
+async function instalarApp(){const e=window.BCBR_INSTALAR;if(!e)return;e.prompt();try{await e.userChoice}catch(x){}window.BCBR_INSTALAR=null;render()}
+// repetidas eventuais (pedido do Artur, 22/10/2026): ~1 a cada 25, no máx. 2 por RI — só erradas COM CERTEZA ou erradas FÁCEIS, última resposta errada há 5+ dias
+function pacoteRepeteRaro(n){
+  const ult={};log.forEach(l=>ult[l.q]=l);const lim=Date.now()-(+(PARAM.repete_dias??5))*DAY,cada=+(PARAM.repete_cada??25);
+  const pool=Q.filter(q=>{const l=ult[q.id];return q.gab&&l&&!l.ok&&l.t<lim&&(l.conf==='certeza'||(q.classif&&q._d==='f'))});
+  let k=Math.floor(n/cada);if(Math.random()<n/cada-k)k++;k=Math.min(2,k,pool.length);
+  return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k).map(q=>q.id):[];
+}
 function revisaoDoDia(){
   if(!modoProva())return revisaoDoDiaOrig();
   const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
   if(d!=null&&d>=0&&d<=fim){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
-  return pacoteVolume(n);
+  const r=pacoteRepeteRaro(n);return r.length?embaralha([...pacoteVolume(n),...r]):pacoteVolume(n);   // repetidas vêm a mais: as novas seguem a meta
 }
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
 function simulado(et){
@@ -1865,7 +1929,7 @@ function comecaFiltro(){
 }
 function modoProvaUI(){
   const vv=new Set(all.map(l=>l.q)),n=Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!vv.has(q.id)).length;
-  return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas (inclusive erradas) não voltam.</label>
+  return `<h3>Modo pré-prova</h3><label class="check" style="display:block;margin:6px 0"><input type="checkbox" ${modoProva()?'checked':''} onchange="setModoProva(this.checked)"> <b>Máximo de questões novas até a prova</b> — fáceis e médias primeiro (difíceis quase nunca), áreas/temas mais incidentes e os que você mais erra; questões já respondidas não voltam — só, de vez em quando (~1 a cada 25, máx. 2 por dia), uma errada com certeza ou errada fácil.</label>
   <p class="mut">Vale para a Revisão Inteligente, temas, simulados e pacotes do Estudar. ${n} questões novas disponíveis. Pesos no Manual: fácil ${PARAM.peso_facil??6} · média ${PARAM.peso_media??3} · difícil ${PARAM.peso_dificil??0.15}.</p>`;
 }
 function setModoProva(on){
@@ -1903,7 +1967,7 @@ function _restantesInicioDia(){const hj=dKey(Date.now()),ant=new Set(),hoje=new 
 // meta = o que falta ÷ dias de estudo até a reta final (calendário: sáb/dom e sobreaviso HSI não contam; plantão na Ecomax conta)
 function metaDia(){const d=diasProva(),fim=+(PARAM.revisao_final_dias??14);if(d==null||d<=0)return null;
   const dias=typeof smDiasEstudoRestantes==='function'&&SM.d?smDiasEstudoRestantes():null;return Math.ceil(_restantesInicioDia()/Math.max(1,dias??(d-fim)))}
-function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(cfg.diario,m)):cfg.diario}
+function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
 function metaProvaCard(){
   if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
   if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;

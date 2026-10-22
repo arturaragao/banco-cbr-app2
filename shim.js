@@ -193,6 +193,10 @@
   }, true);
   window.BCBR.imgDireto = imgDireto;
 
+  // ---------- instalar como app (Android/PC) ----------
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.BCBR_INSTALAR = e; if (typeof render === "function") try { render(); } catch (x) {} });
+  window.addEventListener("appinstalled", () => { window.BCBR_INSTALAR = null; if (typeof render === "function") try { render(); } catch (x) {} });
+
   // ---------- início ----------
   async function iniciar() {
     if ("serviceWorker" in navigator) { try { await navigator.serviceWorker.register("./sw.js"); await passarChaveSW(); } catch (e) {} }
