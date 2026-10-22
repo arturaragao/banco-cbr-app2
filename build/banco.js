@@ -179,7 +179,7 @@ function riDesc(devidas){
   if(!modoProva())return `${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.`;
   const ids=riHoje(),ini=hoje0(),vistas=new Set(log.filter(l=>l.t<ini).map(l=>l.q)),rep=ids.filter(i=>vistas.has(i)).length,nov=ids.length-rep;
   const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q.classif?q._d:'m']=(cnt[q.classif?q._d:'m']||0)+1});
-  const reta=d!=null&&d>=0&&d<=fim;
+  const reta=emReta();
   return `<b>${nov} questões novas</b>${reta?'':' (a meta de hoje)'}${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
    `${cnt.f} fáceis · ${cnt.m} médias${cnt.d?' · '+cnt.d+(cnt.d>1?' difíceis':' difícil'):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
 }
@@ -193,7 +193,7 @@ function pacoteRepeteRaro(n){
 function revisaoDoDia(){
   if(!modoProva())return revisaoDoDiaOrig();
   const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
-  if(d!=null&&d>=0&&d<=fim){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
+  if(emReta()){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
   const r=pacoteRepeteRaro(n);return r.length?embaralha([...pacoteVolume(n),...r]):pacoteVolume(n);   // repetidas vêm a mais: as novas seguem a meta
 }
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
@@ -245,16 +245,21 @@ function diasProva(){return cfg.prova?Math.ceil((new Date(cfg.prova+'T12:00')-Da
 // questões fáceis/médias ainda não vistas no começo de hoje (a meta não cai ao longo do dia)
 function _restantesInicioDia(){const hj=dKey(Date.now()),ant=new Set(),hoje=new Set();all.forEach(l=>{if(dKey(l.t)<hj)ant.add(l.q);else hoje.add(l.q)});
   return _restantesFM()+[...hoje].filter(id=>!ant.has(id)&&QID[id]&&QID[id].gab&&!(QID[id].classif&&QID[id]._a==='sem')&&(!QID[id].classif||QID[id]._d!=='d')).length}
-// meta = o que falta ÷ dias de estudo até a reta final (calendário: sáb/dom e sobreaviso HSI não contam; plantão na Ecomax conta)
-function metaDia(){const d=diasProva(),fim=+(PARAM.revisao_final_dias??14);if(d==null||d<=0)return null;
-  const dias=typeof smDiasEstudoRestantes==='function'&&SM.d?smDiasEstudoRestantes():null;return Math.ceil(_restantesInicioDia()/Math.max(1,dias??(d-fim)))}
-function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
+// UMA meta só (22/10/2026): meta de HOJE = tamanho da Revisão do dia (novas da meta + erradas para rever), congelada à 00:00;
+// dias futuros = metaDia() = fáceis/médias não vistas ÷ dias de estudo (calendário) de hoje até a véspera da reta final.
+// Sem o calendário carregado não há meta (nada de dias corridos); a RI feita sem calendário é refeita quando ele chega (riRefaz).
+function emReta(){const r=typeof smRetaIni==='function'?smRetaIni():null;return !!r&&smHoje()>=r}
+function metaDia(){const d=diasProva();if(d==null||d<=0||emReta())return null;
+  if(!(typeof smDiasEstudoRestantes==='function'&&SM.d))return null;return Math.ceil(_restantesInicioDia()/Math.max(1,smDiasEstudoRestantes()))}
+function tamanhoRI(){if(emReta())return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
+function metaHoje(){return modoProva()?riHoje().length:cfg.diario}
+function riRefaz(){return !!(cfg.ri&&!cfg.ri.cal&&modoProva()&&typeof SM!=='undefined'&&SM.d&&!log.some(l=>l.t>=hoje0()&&l.modo==='hoje'))}
 function metaProvaCard(){
   if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
   if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;
-  const m=metaDia(),fase=d<=fim;
+  const fase=emReta(),mh=metaHoje();
   return `<div class="card"><span class="kick">Meta até a prova</span><p><b>${d} dias</b> até a prova · <b>${r}</b> questões fáceis e médias ainda não vistas.</p>
-   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta: <b>${m} por dia de estudo</b> (sáb, dom e feriado sem plantão BR não contam) para ver todas até ${fim} dias antes da prova (esses últimos dias ficam para rever os erros). A Revisão de hoje tem ${tamanhoRI()}.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
+   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta de hoje: <b>${mh} questões</b> = a Revisão do dia. Calculada à meia-noite: questões fáceis e médias ainda não vistas no banco ÷ dias de estudo até ${fim} dias antes da prova (sáb, dom e feriado sem plantão BR não contam; os últimos ${fim} dias ficam para rever os erros), mais as poucas erradas que voltam.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
 }
 // 3) reta final: erradas fáceis/médias voltam (30%) nos últimos dias
 function pacoteErradas(k){

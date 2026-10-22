@@ -82,7 +82,8 @@ function smMetaDe(iso){
   if(p&&iso>=p)return 0;
   if(iso<hj)return smDia(iso).meta??cfg.diario;
   if(r&&iso>=r)return cfg.diario;
-  return (iso===hj?smDia(iso).meta:null)??(metaDia()||cfg.diario);
+  if(iso===hj)return metaHoje();   // = tamanho da Revisão do dia (uma meta só em todo o app)
+  return metaDia()||cfg.diario;
 }
 function smQ(dia){let n=0,ok=0;log.forEach(l=>{if(dKey(l.t)===dia){n++;if(l.ok)ok++}});return{n,ok}}
 const smMeta=t=>{if((t.area||'estudo')!=='estudo')return 0;const s=String(t.texto),m=s.match(/(\d+)\s*quest/i);return m?+m[1]:/quest/i.test(s)&&t.dia!=='proxima'?smMetaDe(t.dia):0};
@@ -90,7 +91,7 @@ function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta
   if(!SM.d)return;const hj=smHoje(),marcar=[];
   SM.d.tarefas.forEach(t=>{const m=smMeta(t);if(!m||t.feito||t.dia>hj||SM.auto.has(t.id))return;if(smQ(t.dia).n>=m){SM.auto.add(t.id);marcar.push(t.id)}});
   if(marcar.length)smMudar(d=>d.tarefas.forEach(t=>{if(marcar.includes(t.id)&&!t.feito){t.feito=true;t.auto=true;t.feitoEm=new Date().toISOString()}}),'questões do dia (automático)');
-  if(smTipo(hj)==='estudo'&&smDia(hj).meta==null&&!SM.auto.has('meta'+hj)){const m=metaDia();if(m){SM.auto.add('meta'+hj);smMudar(d=>{d.dias[hj]=d.dias[hj]||{};if(d.dias[hj].meta==null)d.dias[hj].meta=m},'meta do dia')}}
+  if(smTipo(hj)==='estudo'&&!SM.auto.has('meta'+hj)){const m=metaHoje();if(m){SM.auto.add('meta'+hj);if(smDia(hj).meta!==m)smMudar(d=>{d.dias[hj]=d.dias[hj]||{};d.dias[hj].meta=m},'meta do dia')}}
 }
 function smCor(iso){
   const hj=smHoje();if(iso>hj||smTipo(iso)!=='estudo')return'';
@@ -489,7 +490,7 @@ function qaDesenha(){
   else{document.activeElement&&document.activeElement.blur();const c=document.getElementById('qa_d'+QA.cur);c&&c.scrollIntoView({block:'nearest'})}
 }
 window.addEventListener('keydown',e=>{
-  if(!QA.on){if(e.altKey&&!e.ctrlKey&&e.code==='KeyA'&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
+  if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
   const k=e.key,p=QA.passo;e.stopImmediatePropagation();
   const usa=()=>e.preventDefault();
   if(p===1){if(k==='Enter'){usa();qaVai(2)}else if(k==='Escape'){usa();qaFecha()}return}
@@ -508,14 +509,40 @@ function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoj
 
 // Tab = próxima aba (à direita), Shift+Tab = anterior (à esquerda), em volta. Pedido do Artur, 22/10/2026.
 // (Alt+Tab não chega ao navegador: o Windows usa para trocar de janela.) Não age ao digitar num campo,
-// com o zoom aberto, na tela de Nova tarefa (Alt+A) nem durante uma questão (lá o teclado responde a questão).
+// com o zoom aberto nem na tela de Nova tarefa (Alt+A). Na questão também troca de aba (pedido do Artur, 22/10/2026).
 window.addEventListener('keydown',e=>{
   if(e.key!=='Tab'||e.ctrlKey||e.metaKey||e.altKey)return;
-  if((typeof QA!=='undefined'&&QA.on)||tela==='quiz')return;
+  if(typeof QA!=='undefined'&&QA.on)return;
   const t=e.target;if(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable)return;
   const z=document.getElementById('zoom');if(z&&!z.hidden)return;
   const o=tabsOrdenadas().map(x=>x[0]);if(!o.length)return;
-  const ativa=tela==='fim'?'estudar':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
+  const ativa=tela==='quiz'?'questoes':tela==='fim'?'estudar':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
   let i=o.indexOf(ativa);if(i<0)i=0;
   e.preventDefault();go(o[(i+(e.shiftKey?-1:1)+o.length)%o.length]);
 });
+
+
+// Teclado na aba Semana (pedido do Artur, 22/10/2026): ao abrir, o cartão "Hoje" já vem selecionado;
+// ↑/↓ andam pelas tarefas de hoje, Enter conclui/desmarca, F apaga (só deste dia), Esc solta.
+const SMK={on:false,i:-1};
+function smkIni(){SMK.on=true;SMK.i=-1}
+function smkLista(){const hj=smHoje(),its=smItensDe(hj);return ['estudo','ferramenta'].flatMap(a=>its.filter(t=>(t.area||'estudo')===a))}
+function smkPinta(){if(tela!=='semana')return;const c=document.querySelector('#app .sm-hoje1');if(!c)return;
+  c.classList.toggle('kbsel',SMK.on);const rs=[...c.querySelectorAll('.sm-grp .sm-row')];
+  rs.forEach((r,i)=>r.classList.toggle('kbsel',SMK.on&&i===SMK.i));
+  const r=rs[SMK.i];if(SMK.on&&r)r.scrollIntoView({block:'nearest'})}
+window.addEventListener('keydown',e=>{
+  if(tela!=='semana'||!SMK.on||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(typeof QA!=='undefined'&&QA.on)return;
+  const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
+  const z=document.getElementById('zoom');if(z&&!z.hidden)return;
+  const L=smkLista(),n=L.length,k=e.key;
+  if(k==='ArrowDown'||k==='ArrowUp'){if(!n)return;e.preventDefault();SMK.i=k==='ArrowDown'?Math.min(n-1,SMK.i+1):Math.max(0,SMK.i-1);smkPinta();return}
+  if(k==='Escape'){SMK.on=false;smkPinta();return}
+  const x=L[SMK.i];if(!x)return;
+  if(k==='Enter'){e.preventDefault();if(x.pri)smPriCheck(x.dia,!x.feito);else smCheck(x.id,!x.feito);return}
+  if(keyIs(e,'smdel')){e.preventDefault();if(x.pri){toast('Esse item vem da lista de prioridades; não dá para apagar aqui.');return}
+    smMudar(d=>{d.tarefas=d.tarefas.filter(y=>y.id!==x.id)},'excluiu item');SMK.i=Math.min(SMK.i,n-2);toast('Item apagado')}
+});
+// clique fora do cartão de hoje solta a seleção do teclado
+document.addEventListener('pointerdown',e=>{if(tela==='semana'&&SMK.on&&!e.target.closest('.sm-hoje1')){SMK.on=false;smkPinta()}},true);

@@ -43,53 +43,71 @@ function qAtalhos(){
   const alts=['a1','a2','a3','a4','a5'].map(K).join('');
   return `<div class="qatalhos" aria-label="Atalhos do teclado">
   ${it('<kbd>←</kbd><kbd>→</kbd>','questão anterior/próxima')}
-  ${it('<kbd>↑</kbd><kbd>↓</kbd>','escolhe a alternativa (depois de responder: rola a página)')}
+  ${it('<kbd>↑</kbd><kbd>↓</kbd>','alternativas (dá a volta; ↑ na A vai para a imagem) · depois de responder: rola a página')}
   ${it(alts,'alternativas A–E')}
   ${it(K('cert')+K('duv')+K('chu'),'certeza / dúvida / chute (<kbd>Enter</kbd> = certeza)')}
   ${it(K('cut'),'riscar alternativa')}
   ${it(K('next')+'<kbd>Espaço</kbd>','próxima (depois de responder)')}
   ${it(K('edit'),'editar resposta')}
   ${it(K('ia'),'CCQ e resumo com IA')}
-  ${it('<kbd>I</kbd>','seleciona a 1ª imagem › de novo abre › de novo fecha')}
-  ${it('<kbd>←</kbd><kbd>→</kbd>','com imagem selecionada: troca a imagem (<kbd>Esc</kbd> solta)')}
-  ${it('<kbd>+</kbd><kbd>−</kbd><kbd>0</kbd>','imagem aberta: aumenta / diminui / ajusta')}
+  ${it(K('img'),'seleciona a 1ª imagem › de novo abre › de novo fecha')}
+  ${it('<kbd>←</kbd><kbd>→</kbd>','com imagem selecionada: troca a imagem (<kbd>↓</kbd> ou <kbd>Esc</kbd> volta)')}
+  ${it(K('zin')+K('zout')+K('zfit'),'imagem aberta: aumenta / diminui / ajusta')}
+  ${it('<kbd>Tab</kbd><kbd>Shift+Tab</kbd>','próxima / aba anterior')}
   </div>`;
 }
 function vQuizQ(){const h=vQuiz();if(tela!=='quiz'||!sess||sess.qEdit)return h;return qBarra()+h+qAtalhos()}
 
-// ===== imagens: teclado (I + setas) =====
+// ===== imagens: teclado (G + setas) — 22/10/2026 =====
+// G seleciona a 1ª imagem › G abre › G fecha. Com imagem selecionada, ←/→ trocam a imagem e ↓ volta à alternativa A.
+// Sem imagem selecionada: ↑ na alternativa A sobe para a 1ª imagem (se houver; senão vai para a última alternativa); ↓ na última volta à A.
 const GS={id:null,on:false,t:'q'};
 function qGalTipo(q){const fb=!!sess.resp[q.id]&&!sess.sim;return galLista(q,'q').length?'q':fb&&galLista(q,'c').length?'c':null}
 function qMarcaGal(){const q=tela==='quiz'&&sess&&!sess.fim?cur():null;
   document.querySelectorAll('#app .gal').forEach(el=>el.classList.toggle('gsel',!!q&&GS.on&&GS.id===q.id&&el.id==='gal_'+q.id+'_'+GS.t))}
+function qSelImg(q,tp){GS.on=true;GS.t=tp;galVai(q.id,tp,0,0);qMarcaGal();const el=document.getElementById('gal_'+q.id+'_'+tp);el&&el.scrollIntoView({block:'nearest',behavior:'smooth'})}
 window.addEventListener('keydown',e=>{
   if(e.ctrlKey||e.metaKey||e.altKey)return;
   const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
   if(typeof capKey!=='undefined'&&capKey)return;
   if(typeof QA!=='undefined'&&QA.on)return;
-  const isI=e.key==='i'||e.key==='I',z=document.getElementById('zoom');
-  if(z&&!z.hidden){if(isI){e.preventDefault();e.stopImmediatePropagation();zClose()}return}
+  const isG=keyIs(e,'img'),z=document.getElementById('zoom'),k=e.key;
+  if(z&&!z.hidden){if(isG){e.preventDefault();e.stopImmediatePropagation();zClose()}return}
   if(tela!=='quiz'||!sess||sess.fim||sess.qEdit)return;
   const q=cur();if(!q)return;
   if(GS.id!==q.id){GS.id=q.id;GS.on=false}
-  if(isI&&KG.quiz.some(n=>KEY(n).toLowerCase()==='i'))return;   // tecla I já usada num atalho personalizado
-  if(isI){const tp=qGalTipo(q);if(!tp)return;e.preventDefault();e.stopImmediatePropagation();
-    if(!GS.on){GS.on=true;GS.t=tp;galVai(q.id,tp,0,0);qMarcaGal();
-      const el=document.getElementById('gal_'+q.id+'_'+tp);el&&el.scrollIntoView({block:'nearest'})}
-    else{const L=galLista(q,GS.t),x=L[gIdx[q.id+'_'+GS.t]||0];if(x)zoom(x.u)}
+  const fb=!!sess.resp[q.id]&&!sess.sim,tp=qGalTipo(q);
+  const para=()=>{e.preventDefault();e.stopImmediatePropagation()};
+  if(isG){if(!tp)return;para();
+    if(!GS.on)qSelImg(q,tp);else{const x=galLista(q,GS.t)[gIdx[q.id+'_'+GS.t]||0];if(x)zoom(x.u)}
     return}
-  if(!GS.on)return;
-  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();e.stopImmediatePropagation();galVai(q.id,GS.t,e.key==='ArrowRight'?1:-1);qMarcaGal();return}
-  if(e.key==='Escape'){GS.on=false;qMarcaGal();return}
-  if((e.key==='ArrowUp'||e.key==='ArrowDown')&&!(sess.resp[q.id]&&!sess.sim)){GS.on=false;qMarcaGal()}   // foco volta às alternativas
+  if(GS.on&&(k==='ArrowLeft'||k==='ArrowRight')){para();galVai(q.id,GS.t,k==='ArrowRight'?1:-1);qMarcaGal();return}
+  if(GS.on&&k==='Escape'){GS.on=false;qMarcaGal();return}
+  if(fb||(k!=='ArrowUp'&&k!=='ArrowDown'))return;   // depois de responder ↑/↓ rolam a página (handler do app)
+  para();const L=Object.keys(q.alts),n=L.length,c=L.indexOf(selAtual());
+  if(GS.on){if(k==='ArrowDown'){GS.on=false;qMarcaGal();escolher(L[0])}return}
+  if(k==='ArrowDown'){escolher(L[(c+1)%n]);return}
+  if(c===0&&tp){qSelImg(q,tp);return}
+  escolher(L[c<=0?n-1:c-1]);
 },true);
+
+// ===== rolagem pelas setas: suave como a roda do mouse; passo em Config › Atalhos (cfg.passoSeta, padrão 120 px) =====
+const QR={alvo:null,raf:0};
+function qRola(dir){
+  const passo=+cfg.passoSeta||120,max=document.documentElement.scrollHeight-innerHeight;
+  if(QR.alvo==null||!QR.raf)QR.alvo=scrollY;
+  QR.alvo=Math.max(0,Math.min(max,QR.alvo+dir*passo));
+  if(!QR.raf){const anda=()=>{const d=QR.alvo-scrollY;if(Math.abs(d)<1){scrollTo(0,QR.alvo);QR.raf=0;return}
+    scrollTo(0,scrollY+d*0.2);QR.raf=requestAnimationFrame(anda)};QR.raf=requestAnimationFrame(anda)}
+}
+addEventListener('wheel',()=>{if(QR.raf){cancelAnimationFrame(QR.raf);QR.raf=0}},{passive:true});
 
 // ===== imagens sem piscar: a cada redesenho reaproveita as <img> já carregadas (mesma imagem = mesmo elemento) =====
 function qGuarda(root){const v={};root.querySelectorAll('img[data-u]').forEach(im=>{if(im.complete&&im.naturalWidth)(v[im.dataset.u]??=[]).push(im)});return v}
 function qReusa(root,v){root.querySelectorAll('img[data-u]').forEach(im=>{const o=(v[im.dataset.u]||[]).shift();if(!o)return;
   [...o.attributes].forEach(a=>{if(a.name!=='src'&&!im.hasAttribute(a.name))o.removeAttribute(a.name)});
   [...im.attributes].forEach(a=>{if(a.name!=='src')o.setAttribute(a.name,a.value)});im.replaceWith(o)})}
-function qPinta(html){const app=$('#app'),v=qGuarda(app);app.innerHTML=html;qReusa(app,v);qMarcaGal();qPreCarrega()}
+function qPinta(html){const app=$('#app'),v=qGuarda(app);app.innerHTML=html;qReusa(app,v);qMarcaGal();qPreCarrega();if(typeof smkPinta==='function')smkPinta()}
 // pré-carrega as imagens da questão atual e das 3 seguintes (ficam prontas na memória)
 const qPre=new Map();
 function qPreCarrega(){

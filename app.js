@@ -1,4 +1,4 @@
-// Banco CBR app 1.12.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.13.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
 // Dados: semana/plano.json no repo privado banco-cbr-app (mesma chave do app). Formato v2:
 //  {v:2, regras, subtitulo, dias:{"AAAA-MM-DD":{agenda,tipo?,meta?}}, tarefas:[{id,dia,texto,area,feito,feitoEm,ordem,grupo?,auto?,adiado?}], notas:[...]}
@@ -83,7 +83,8 @@ function smMetaDe(iso){
   if(p&&iso>=p)return 0;
   if(iso<hj)return smDia(iso).meta??cfg.diario;
   if(r&&iso>=r)return cfg.diario;
-  return (iso===hj?smDia(iso).meta:null)??(metaDia()||cfg.diario);
+  if(iso===hj)return metaHoje();   // = tamanho da Revisão do dia (uma meta só em todo o app)
+  return metaDia()||cfg.diario;
 }
 function smQ(dia){let n=0,ok=0;log.forEach(l=>{if(dKey(l.t)===dia){n++;if(l.ok)ok++}});return{n,ok}}
 const smMeta=t=>{if((t.area||'estudo')!=='estudo')return 0;const s=String(t.texto),m=s.match(/(\d+)\s*quest/i);return m?+m[1]:/quest/i.test(s)&&t.dia!=='proxima'?smMetaDe(t.dia):0};
@@ -91,7 +92,7 @@ function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta
   if(!SM.d)return;const hj=smHoje(),marcar=[];
   SM.d.tarefas.forEach(t=>{const m=smMeta(t);if(!m||t.feito||t.dia>hj||SM.auto.has(t.id))return;if(smQ(t.dia).n>=m){SM.auto.add(t.id);marcar.push(t.id)}});
   if(marcar.length)smMudar(d=>d.tarefas.forEach(t=>{if(marcar.includes(t.id)&&!t.feito){t.feito=true;t.auto=true;t.feitoEm=new Date().toISOString()}}),'questões do dia (automático)');
-  if(smTipo(hj)==='estudo'&&smDia(hj).meta==null&&!SM.auto.has('meta'+hj)){const m=metaDia();if(m){SM.auto.add('meta'+hj);smMudar(d=>{d.dias[hj]=d.dias[hj]||{};if(d.dias[hj].meta==null)d.dias[hj].meta=m},'meta do dia')}}
+  if(smTipo(hj)==='estudo'&&!SM.auto.has('meta'+hj)){const m=metaHoje();if(m){SM.auto.add('meta'+hj);if(smDia(hj).meta!==m)smMudar(d=>{d.dias[hj]=d.dias[hj]||{};d.dias[hj].meta=m},'meta do dia')}}
 }
 function smCor(iso){
   const hj=smHoje();if(iso>hj||smTipo(iso)!=='estudo')return'';
@@ -490,7 +491,7 @@ function qaDesenha(){
   else{document.activeElement&&document.activeElement.blur();const c=document.getElementById('qa_d'+QA.cur);c&&c.scrollIntoView({block:'nearest'})}
 }
 window.addEventListener('keydown',e=>{
-  if(!QA.on){if(e.altKey&&!e.ctrlKey&&e.code==='KeyA'&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
+  if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
   const k=e.key,p=QA.passo;e.stopImmediatePropagation();
   const usa=()=>e.preventDefault();
   if(p===1){if(k==='Enter'){usa();qaVai(2)}else if(k==='Escape'){usa();qaFecha()}return}
@@ -509,17 +510,43 @@ function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoj
 
 // Tab = próxima aba (à direita), Shift+Tab = anterior (à esquerda), em volta. Pedido do Artur, 22/10/2026.
 // (Alt+Tab não chega ao navegador: o Windows usa para trocar de janela.) Não age ao digitar num campo,
-// com o zoom aberto, na tela de Nova tarefa (Alt+A) nem durante uma questão (lá o teclado responde a questão).
+// com o zoom aberto nem na tela de Nova tarefa (Alt+A). Na questão também troca de aba (pedido do Artur, 22/10/2026).
 window.addEventListener('keydown',e=>{
   if(e.key!=='Tab'||e.ctrlKey||e.metaKey||e.altKey)return;
-  if((typeof QA!=='undefined'&&QA.on)||tela==='quiz')return;
+  if(typeof QA!=='undefined'&&QA.on)return;
   const t=e.target;if(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable)return;
   const z=document.getElementById('zoom');if(z&&!z.hidden)return;
   const o=tabsOrdenadas().map(x=>x[0]);if(!o.length)return;
-  const ativa=tela==='fim'?'estudar':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
+  const ativa=tela==='quiz'?'questoes':tela==='fim'?'estudar':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
   let i=o.indexOf(ativa);if(i<0)i=0;
   e.preventDefault();go(o[(i+(e.shiftKey?-1:1)+o.length)%o.length]);
 });
+
+
+// Teclado na aba Semana (pedido do Artur, 22/10/2026): ao abrir, o cartão "Hoje" já vem selecionado;
+// ↑/↓ andam pelas tarefas de hoje, Enter conclui/desmarca, F apaga (só deste dia), Esc solta.
+const SMK={on:false,i:-1};
+function smkIni(){SMK.on=true;SMK.i=-1}
+function smkLista(){const hj=smHoje(),its=smItensDe(hj);return ['estudo','ferramenta'].flatMap(a=>its.filter(t=>(t.area||'estudo')===a))}
+function smkPinta(){if(tela!=='semana')return;const c=document.querySelector('#app .sm-hoje1');if(!c)return;
+  c.classList.toggle('kbsel',SMK.on);const rs=[...c.querySelectorAll('.sm-grp .sm-row')];
+  rs.forEach((r,i)=>r.classList.toggle('kbsel',SMK.on&&i===SMK.i));
+  const r=rs[SMK.i];if(SMK.on&&r)r.scrollIntoView({block:'nearest'})}
+window.addEventListener('keydown',e=>{
+  if(tela!=='semana'||!SMK.on||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(typeof QA!=='undefined'&&QA.on)return;
+  const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
+  const z=document.getElementById('zoom');if(z&&!z.hidden)return;
+  const L=smkLista(),n=L.length,k=e.key;
+  if(k==='ArrowDown'||k==='ArrowUp'){if(!n)return;e.preventDefault();SMK.i=k==='ArrowDown'?Math.min(n-1,SMK.i+1):Math.max(0,SMK.i-1);smkPinta();return}
+  if(k==='Escape'){SMK.on=false;smkPinta();return}
+  const x=L[SMK.i];if(!x)return;
+  if(k==='Enter'){e.preventDefault();if(x.pri)smPriCheck(x.dia,!x.feito);else smCheck(x.id,!x.feito);return}
+  if(keyIs(e,'smdel')){e.preventDefault();if(x.pri){toast('Esse item vem da lista de prioridades; não dá para apagar aqui.');return}
+    smMudar(d=>{d.tarefas=d.tarefas.filter(y=>y.id!==x.id)},'excluiu item');SMK.i=Math.min(SMK.i,n-2);toast('Item apagado')}
+});
+// clique fora do cartão de hoje solta a seleção do teclado
+document.addEventListener('pointerdown',e=>{if(tela==='semana'&&SMK.on&&!e.target.closest('.sm-hoje1')){SMK.on=false;smkPinta()}},true);
 
 
 
@@ -799,7 +826,7 @@ function sorteioPonderado(cands,w,k){
 const embaralha=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const dKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 function riHoje(){ // a lista só muda à 00:00
-  if(!cfg.ri||cfg.ri.v!==6||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:6,ids:revisaoDoDia()};persist('_est')}
+  if(!cfg.ri||cfg.ri.v!==6||riRefaz()||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:6,cal:!!(typeof SM!=='undefined'&&SM.d),ids:revisaoDoDia()};persist('_est')}
   return cfg.ri.ids;
 }
 function iniciaRI(){
@@ -934,7 +961,7 @@ function tabsOrdenadas(){const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=
 
 // ===== telas =====
 const TABS=[['hoje','Hoje'],['semana','Semana'],['questoes','Questões'],['estudar','Estudar'],['fc','Flashcards'],['painel','Painel'],['banco','Banco'],['config','Config']];
-function go(t,s){if(t==='questoes'&&qAbre())return;tela=t;sub=s??null;render();scrollTo(0,0)}
+function go(t,s){if(t==='questoes'&&qAbre())return;if(t==='semana')smkIni();tela=t;sub=s??null;render();scrollTo(0,0)}
 function render(){aplicaLayout();
   const ativa=tela==='quiz'?'questoes':tela==='fim'?'':tela==='rt'?'hoje':tela==='fcstudy'?'fc':tela;
   $('#nav').innerHTML=tabsOrdenadas().map(([k,n])=>`<button data-k="${k}" class="${ativa===k?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
@@ -951,7 +978,7 @@ const idxHoje=()=>(new Date().getDay()+6)%7;
 const CK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
 
 // progresso por tipo em um dia (di = deslocamento em ms desde segunda da semana atual)
-const MODO={ri:'hoje',rt:'rt',ps:'simulado'},ALVO={ri:()=>modoProva()?riHoje().length:cfg.diario,rt:()=>10,ps:()=>30};
+const MODO={ri:'hoje',rt:'rt',ps:'simulado'},ALVO={ri:()=>metaHoje(),rt:()=>10,ps:()=>30};
 function progDia(k,ini){
   if(k==='et'){const n=cfg.etDone[dKey(ini)]?1:0;return {n,alvo:1,ok:!!n}}
  const n=log.filter(l=>l.t>=ini&&l.t<ini+DAY&&l.modo===MODO[k]).length;return {n,alvo:ALVO[k](),ok:n>=ALVO[k]()}}
@@ -1163,24 +1190,37 @@ function comecaFiltroOrig(){
 }
 
 // ---- atalhos configuráveis ----
-const KEYDEF={a1:'1',a2:'2',a3:'3',a4:'4',a5:'5',cert:'a',duv:'s',chu:'d',cut:'f',edit:'e',ia:'c',next:'Enter',fcshow:' ',fc1:'1',fc2:'2',fc3:'3',fc4:'4',fcundo:'z'};
-const KEYLAB={a1:'Alternativa A',a2:'Alternativa B',a3:'Alternativa C',a4:'Alternativa D',a5:'Alternativa E',cert:'Certeza',duv:'Dúvida',chu:'Chute',cut:'Riscar alternativa',edit:'Editar resposta',ia:'CCQ e resumo com o Claude',next:'Próxima questão',fcshow:'Mostrar resposta (cartão)',fc1:'Cartão: Errei',fc2:'Cartão: Difícil',fc3:'Cartão: Bom',fc4:'Cartão: Fácil',fcundo:'Cartão: desfazer'};
-const KG={quiz:['a1','a2','a3','a4','a5','cert','duv','chu','cut','edit','ia','next'],fc:['fcshow','fc1','fc2','fc3','fc4','fcundo']};
+const KEYDEF={a1:'1',a2:'2',a3:'3',a4:'4',a5:'5',cert:'a',duv:'s',chu:'d',cut:'f',edit:'e',ia:'c',next:'Enter',img:'g',fcshow:' ',fc1:'1',fc2:'2',fc3:'3',fc4:'4',fcundo:'z',znext:'ArrowRight',zprev:'ArrowLeft',zin:'+',zout:'-',zfit:'0',qa:'a',smdel:'f'};
+const KEYLAB={a1:'Alternativa A',a2:'Alternativa B',a3:'Alternativa C',a4:'Alternativa D',a5:'Alternativa E',cert:'Certeza',duv:'Dúvida',chu:'Chute',cut:'Riscar alternativa',edit:'Editar resposta',ia:'CCQ e resumo com o Claude',next:'Próxima questão',img:'Selecionar / abrir / fechar imagem',fcshow:'Mostrar resposta (cartão)',fc1:'Cartão: Errei',fc2:'Cartão: Difícil',fc3:'Cartão: Bom',fc4:'Cartão: Fácil',fcundo:'Cartão: desfazer',znext:'Próxima imagem',zprev:'Imagem anterior',zin:'Aumentar (zoom)',zout:'Diminuir (zoom)',zfit:'Ajustar à tela',qa:'Nova tarefa (usa Alt + a letra)',smdel:'Apagar a tarefa selecionada'};
+// grupos de conflito (uma tecla não repete dentro do grupo)
+const KG={quiz:['a1','a2','a3','a4','a5','cert','duv','chu','cut','edit','ia','next','img'],fc:['fcshow','fc1','fc2','fc3','fc4','fcundo'],zoom:['zprev','znext','zin','zout','zfit'],hoje:['qa'],sem:['smdel']};
+// abas da tela Atalhos: seções = [título, grupo configurável, [[tecla fixa, descrição]]]
+const ATABS=[
+ ['geral','Geral',[['Navegação entre abas',null,[['Tab','Próxima aba'],['Shift+Tab','Aba anterior']]]]],
+ ['hoje','Hoje / Semana',[['Nova tarefa (Hoje e Semana)','hoje',[['Alt + tecla','Abre "Nova tarefa". Dentro dela: ↑ ↓ ← → andam, A ou Espaço marcam o dia, Enter avança/adiciona, Esc volta/fecha']]],['Aba Semana','sem',[['↑ / ↓','Anda nas tarefas de hoje'],['Enter','Conclui / desmarca a tarefa'],['Esc','Solta a seleção']]]]],
+ ['questao','Questão',[['Atalhos das questões','quiz',[['← / →','Questão anterior / próxima'],['↑ / ↓','Troca a alternativa (depois de responder: rola a página)'],['Espaço','Próxima questão (depois de responder)'],['Enter','Confirma como Certeza'],['Esc','Solta a imagem selecionada'],['← / → com imagem selecionada','Troca a imagem']]]]],
+ ['imagem','Imagem aberta',[['Imagem aberta (zoom)','zoom',[['Esc','Fecha a imagem'],['=','Também aumenta (quando o aumentar é +)'],['Tecla de imagem (aba Questão)','Também fecha']]]]],
+ ['fc','Flashcards',[['Atalhos dos flashcards','fc',[]]]]
+];
+let atTab='geral';
 const KEY=n=>(cfg.keys&&cfg.keys[n])||KEYDEF[n];
 const keyIs=(e,n)=>{const k=KEY(n);return e.key===k||(k.length===1&&e.key.toLowerCase()===k.toLowerCase())};
-const keyLab=n=>{const k=KEY(n);return k===' '?'Espaço':k.length===1?k.toUpperCase():k.replace('Arrow','Seta ')};
+const keyLab=n=>{const k=KEY(n);return k===' '?'Espaço':k.length===1?k.toUpperCase():({ArrowRight:'→',ArrowLeft:'←',ArrowUp:'↑',ArrowDown:'↓'})[k]||k};
 let capKey=null;
 function capStart(n){capKey=n;render()}
 function capturaTecla(e){
   const k=e.key;if(['Shift','Control','Alt','Meta','CapsLock'].includes(k))return;
   e.preventDefault();
   if(k==='Escape'){capKey=null;render();return}
-  const g=KG.quiz.includes(capKey)?KG.quiz:KG.fc,nk=k.length===1?k.toLowerCase():k;
+  if(k==='Tab'){toast('Tab é reservado para trocar de aba.');return}
+  if(capKey==='qa'&&!/^[a-z0-9]$/i.test(k)){toast('Para Nova tarefa use uma letra ou número (com Alt).');return}
+  const g=Object.values(KG).find(x=>x.includes(capKey))||[],nk=k.length===1?k.toLowerCase():k;
   const clash=g.find(n=>n!==capKey&&KEY(n).toLowerCase()===nk.toLowerCase());
   if(clash){toast('Essa tecla já é usada em "'+KEYLAB[clash]+'".');return}
-  cfg.keys[capKey]=nk;capKey=null;persist('_est');render();
+  cfg.keys=cfg.keys||{};cfg.keys[capKey]=nk;capKey=null;persist('_est');render();
 }
-function resetKeys(){cfg.keys={};persist('_est');render();toast('Atalhos restaurados')}
+function resetKeys(){cfg.keys={};delete cfg.passoSeta;persist('_est');render();toast('Atalhos restaurados')}
+function setPasso(v){cfg.passoSeta=Math.max(40,Math.min(400,Math.round(+v)||120));persist('_est');render()}
 
 // ---- resumo com o Claude ----
 let iaBusy=null;
@@ -1383,7 +1423,7 @@ function zScale(f,px,py){const r=$('#zst').getBoundingClientRect();px??=0;py??=0
 })();
 document.addEventListener('keydown',e=>{
   if(capKey){capturaTecla(e);return}
-  if(!$('#zoom').hidden){if(e.key==='Escape')zClose();else if(e.key==='ArrowRight')zStep(1);else if(e.key==='ArrowLeft')zStep(-1);else if(e.key==='+'||e.key==='=')zScale(1.4);else if(e.key==='-')zScale(1/1.4);else if(e.key==='0')zFit();return}
+  if(!$('#zoom').hidden){if(e.key==='Escape')zClose();else if(keyIs(e,'znext'))zStep(1);else if(keyIs(e,'zprev'))zStep(-1);else if(keyIs(e,'zin')||(KEY('zin')==='+'&&e.key==='='))zScale(1.4);else if(keyIs(e,'zout'))zScale(1/1.4);else if(keyIs(e,'zfit'))zFit();return}
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.target.isContentEditable||e.ctrlKey||e.metaKey||e.altKey)return;
   const k=e.key;
   if(tela==='fcstudy'){fcKey(e);return}
@@ -1391,7 +1431,7 @@ document.addEventListener('keydown',e=>{
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),L=Object.keys(q.alts);
   if(k==='ArrowRight'){e.preventDefault();if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1);return}
   if(k==='ArrowLeft'){e.preventDefault();irPara(sess.i-1);return}
-  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?40:-40),behavior:e.repeat?'instant':'smooth'});return}   // depois de responder: passo do Chrome (40px), sempre na página (22/10/2026)
+  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();qRola(k==='ArrowDown'?1:-1);return}   // depois de responder: rolagem suave da página (build/questoes.js)
   if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();const c=sel?L.indexOf(sel):-1;
     escolher(L[k==='ArrowDown'?Math.min(c+1,L.length-1):c<0?L.length-1:Math.max(c-1,0)]);return}
   if(keyIs(e,'cut')&&sel){riscar(sel);return}
@@ -1918,7 +1958,7 @@ function riDesc(devidas){
   if(!modoProva())return `${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.`;
   const ids=riHoje(),ini=hoje0(),vistas=new Set(log.filter(l=>l.t<ini).map(l=>l.q)),rep=ids.filter(i=>vistas.has(i)).length,nov=ids.length-rep;
   const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q.classif?q._d:'m']=(cnt[q.classif?q._d:'m']||0)+1});
-  const reta=d!=null&&d>=0&&d<=fim;
+  const reta=emReta();
   return `<b>${nov} questões novas</b>${reta?'':' (a meta de hoje)'}${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
    `${cnt.f} fáceis · ${cnt.m} médias${cnt.d?' · '+cnt.d+(cnt.d>1?' difíceis':' difícil'):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
 }
@@ -1932,7 +1972,7 @@ function pacoteRepeteRaro(n){
 function revisaoDoDia(){
   if(!modoProva())return revisaoDoDiaOrig();
   const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
-  if(d!=null&&d>=0&&d<=fim){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
+  if(emReta()){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
   const r=pacoteRepeteRaro(n);return r.length?embaralha([...pacoteVolume(n),...r]):pacoteVolume(n);   // repetidas vêm a mais: as novas seguem a meta
 }
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
@@ -1984,16 +2024,21 @@ function diasProva(){return cfg.prova?Math.ceil((new Date(cfg.prova+'T12:00')-Da
 // questões fáceis/médias ainda não vistas no começo de hoje (a meta não cai ao longo do dia)
 function _restantesInicioDia(){const hj=dKey(Date.now()),ant=new Set(),hoje=new Set();all.forEach(l=>{if(dKey(l.t)<hj)ant.add(l.q);else hoje.add(l.q)});
   return _restantesFM()+[...hoje].filter(id=>!ant.has(id)&&QID[id]&&QID[id].gab&&!(QID[id].classif&&QID[id]._a==='sem')&&(!QID[id].classif||QID[id]._d!=='d')).length}
-// meta = o que falta ÷ dias de estudo até a reta final (calendário: sáb/dom e sobreaviso HSI não contam; plantão na Ecomax conta)
-function metaDia(){const d=diasProva(),fim=+(PARAM.revisao_final_dias??14);if(d==null||d<=0)return null;
-  const dias=typeof smDiasEstudoRestantes==='function'&&SM.d?smDiasEstudoRestantes():null;return Math.ceil(_restantesInicioDia()/Math.max(1,dias??(d-fim)))}
-function tamanhoRI(){const d=diasProva();if(d!=null&&d<=+(PARAM.revisao_final_dias??14))return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
+// UMA meta só (22/10/2026): meta de HOJE = tamanho da Revisão do dia (novas da meta + erradas para rever), congelada à 00:00;
+// dias futuros = metaDia() = fáceis/médias não vistas ÷ dias de estudo (calendário) de hoje até a véspera da reta final.
+// Sem o calendário carregado não há meta (nada de dias corridos); a RI feita sem calendário é refeita quando ele chega (riRefaz).
+function emReta(){const r=typeof smRetaIni==='function'?smRetaIni():null;return !!r&&smHoje()>=r}
+function metaDia(){const d=diasProva();if(d==null||d<=0||emReta())return null;
+  if(!(typeof smDiasEstudoRestantes==='function'&&SM.d))return null;return Math.ceil(_restantesInicioDia()/Math.max(1,smDiasEstudoRestantes()))}
+function tamanhoRI(){if(emReta())return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
+function metaHoje(){return modoProva()?riHoje().length:cfg.diario}
+function riRefaz(){return !!(cfg.ri&&!cfg.ri.cal&&modoProva()&&typeof SM!=='undefined'&&SM.d&&!log.some(l=>l.t>=hoje0()&&l.modo==='hoje'))}
 function metaProvaCard(){
   if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
   if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;
-  const m=metaDia(),fase=d<=fim;
+  const fase=emReta(),mh=metaHoje();
   return `<div class="card"><span class="kick">Meta até a prova</span><p><b>${d} dias</b> até a prova · <b>${r}</b> questões fáceis e médias ainda não vistas.</p>
-   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta: <b>${m} por dia de estudo</b> (sáb, dom e feriado sem plantão BR não contam) para ver todas até ${fim} dias antes da prova (esses últimos dias ficam para rever os erros). A Revisão de hoje tem ${tamanhoRI()}.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
+   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta de hoje: <b>${mh} questões</b> = a Revisão do dia. Calculada à meia-noite: questões fáceis e médias ainda não vistas no banco ÷ dias de estudo até ${fim} dias antes da prova (sáb, dom e feriado sem plantão BR não contam; os últimos ${fim} dias ficam para rever os erros), mais as poucas erradas que voltam.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
 }
 // 3) reta final: erradas fáceis/médias voltam (30%) nos últimos dias
 function pacoteErradas(k){
@@ -2020,8 +2065,13 @@ function cfgGeral(){
   ${modoProvaUI()}${layoutUI()}${pesosUI()}</div>`;
 }
 function cfgAtalhos(){
-  const grupo=(t,ns)=>`<div class="card"><h2>${t}</h2><div class="tw"><table>${ns.map(n=>`<tr><td>${KEYLAB[n]}</td><td style="text-align:right"><button class="b ${capKey===n?'':'s'}" style="min-width:150px" onclick="capStart('${n}')">${capKey===n?'Pressione uma tecla…':keyLab(n)}</button></td></tr>`).join('')}</table></div></div>`;
-  return grupo('Atalhos das questões',KG.quiz)+grupo('Atalhos dos flashcards',KG.fc)+`<div class="card"><p class="mut">Clique no botão e pressione a nova tecla (Esc cancela). Fixos: ↑ ↓ trocam a alternativa, ← → trocam de questão, Enter confirma como Certeza e Esc fecha a imagem.</p><button class="b s" onclick="resetKeys()">Restaurar padrão</button></div>`;
+  const linhaCfg=n=>`<tr><td>${KEYLAB[n]}</td><td style="text-align:right"><button class="b ${capKey===n?'':'s'}" style="min-width:150px" onclick="capStart('${n}')">${capKey===n?'Pressione uma tecla…':(n==='qa'?'Alt + ':'')+keyLab(n)}</button></td></tr>`;
+  const linhaFix=([k,d])=>`<tr><td>${d}</td><td style="text-align:right"><kbd>${k}</kbd> <span class="mut">fixo</span></td></tr>`;
+  const tabs=`<div class="subtabs">${ATABS.map(([k,n])=>`<button class="${atTab===k?'on':''}" onclick="atTab='${k}';capKey=null;render()">${n}</button>`).join('')}</div>`;
+  const [,,secs]=ATABS.find(x=>x[0]===atTab)||ATABS[0];
+  const corpo=secs.map(([t,g,fix])=>`<div class="card"><h2>${t}</h2><div class="tw"><table>${(g?KG[g].map(linhaCfg):[]).join('')}${fix.map(linhaFix).join('')}</table></div></div>`).join('');
+  const passo=atTab==='geral'?`<div class="card"><h2>Rolagem pelas setas</h2><p class="row"><label>Passo da rolagem pelas setas (px) <input type="number" min="40" max="400" step="10" value="${+cfg.passoSeta||120}" onchange="setPasso(this.value)" style="width:90px"></label></p><p class="mut">Vale para ↑ / ↓ depois de responder a questão (40 a 400; padrão 120).</p></div>`:'';
+  return tabs+corpo+passo+`<div class="card"><p class="mut">Clique no botão e pressione a nova tecla (Esc cancela). Teclas marcadas "fixo" não mudam.</p><button class="b s" onclick="resetKeys()">Restaurar padrão</button></div>`;
 }
 function cfgSync(){
   return `<div class="card"><h3>Sincronização</h3><p class="mut">${DB?'Seu progresso é salvo automaticamente no GitHub (banco-cbr-app) e aparece igual em todos os aparelhos.':'A sincronização não está disponível nesta janela. O progresso fica só neste navegador; use o backup abaixo.'}</p>
@@ -2099,53 +2149,71 @@ function qAtalhos(){
   const alts=['a1','a2','a3','a4','a5'].map(K).join('');
   return `<div class="qatalhos" aria-label="Atalhos do teclado">
   ${it('<kbd>←</kbd><kbd>→</kbd>','questão anterior/próxima')}
-  ${it('<kbd>↑</kbd><kbd>↓</kbd>','escolhe a alternativa (depois de responder: rola a página)')}
+  ${it('<kbd>↑</kbd><kbd>↓</kbd>','alternativas (dá a volta; ↑ na A vai para a imagem) · depois de responder: rola a página')}
   ${it(alts,'alternativas A–E')}
   ${it(K('cert')+K('duv')+K('chu'),'certeza / dúvida / chute (<kbd>Enter</kbd> = certeza)')}
   ${it(K('cut'),'riscar alternativa')}
   ${it(K('next')+'<kbd>Espaço</kbd>','próxima (depois de responder)')}
   ${it(K('edit'),'editar resposta')}
   ${it(K('ia'),'CCQ e resumo com IA')}
-  ${it('<kbd>I</kbd>','seleciona a 1ª imagem › de novo abre › de novo fecha')}
-  ${it('<kbd>←</kbd><kbd>→</kbd>','com imagem selecionada: troca a imagem (<kbd>Esc</kbd> solta)')}
-  ${it('<kbd>+</kbd><kbd>−</kbd><kbd>0</kbd>','imagem aberta: aumenta / diminui / ajusta')}
+  ${it(K('img'),'seleciona a 1ª imagem › de novo abre › de novo fecha')}
+  ${it('<kbd>←</kbd><kbd>→</kbd>','com imagem selecionada: troca a imagem (<kbd>↓</kbd> ou <kbd>Esc</kbd> volta)')}
+  ${it(K('zin')+K('zout')+K('zfit'),'imagem aberta: aumenta / diminui / ajusta')}
+  ${it('<kbd>Tab</kbd><kbd>Shift+Tab</kbd>','próxima / aba anterior')}
   </div>`;
 }
 function vQuizQ(){const h=vQuiz();if(tela!=='quiz'||!sess||sess.qEdit)return h;return qBarra()+h+qAtalhos()}
 
-// ===== imagens: teclado (I + setas) =====
+// ===== imagens: teclado (G + setas) — 22/10/2026 =====
+// G seleciona a 1ª imagem › G abre › G fecha. Com imagem selecionada, ←/→ trocam a imagem e ↓ volta à alternativa A.
+// Sem imagem selecionada: ↑ na alternativa A sobe para a 1ª imagem (se houver; senão vai para a última alternativa); ↓ na última volta à A.
 const GS={id:null,on:false,t:'q'};
 function qGalTipo(q){const fb=!!sess.resp[q.id]&&!sess.sim;return galLista(q,'q').length?'q':fb&&galLista(q,'c').length?'c':null}
 function qMarcaGal(){const q=tela==='quiz'&&sess&&!sess.fim?cur():null;
   document.querySelectorAll('#app .gal').forEach(el=>el.classList.toggle('gsel',!!q&&GS.on&&GS.id===q.id&&el.id==='gal_'+q.id+'_'+GS.t))}
+function qSelImg(q,tp){GS.on=true;GS.t=tp;galVai(q.id,tp,0,0);qMarcaGal();const el=document.getElementById('gal_'+q.id+'_'+tp);el&&el.scrollIntoView({block:'nearest',behavior:'smooth'})}
 window.addEventListener('keydown',e=>{
   if(e.ctrlKey||e.metaKey||e.altKey)return;
   const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
   if(typeof capKey!=='undefined'&&capKey)return;
   if(typeof QA!=='undefined'&&QA.on)return;
-  const isI=e.key==='i'||e.key==='I',z=document.getElementById('zoom');
-  if(z&&!z.hidden){if(isI){e.preventDefault();e.stopImmediatePropagation();zClose()}return}
+  const isG=keyIs(e,'img'),z=document.getElementById('zoom'),k=e.key;
+  if(z&&!z.hidden){if(isG){e.preventDefault();e.stopImmediatePropagation();zClose()}return}
   if(tela!=='quiz'||!sess||sess.fim||sess.qEdit)return;
   const q=cur();if(!q)return;
   if(GS.id!==q.id){GS.id=q.id;GS.on=false}
-  if(isI&&KG.quiz.some(n=>KEY(n).toLowerCase()==='i'))return;   // tecla I já usada num atalho personalizado
-  if(isI){const tp=qGalTipo(q);if(!tp)return;e.preventDefault();e.stopImmediatePropagation();
-    if(!GS.on){GS.on=true;GS.t=tp;galVai(q.id,tp,0,0);qMarcaGal();
-      const el=document.getElementById('gal_'+q.id+'_'+tp);el&&el.scrollIntoView({block:'nearest'})}
-    else{const L=galLista(q,GS.t),x=L[gIdx[q.id+'_'+GS.t]||0];if(x)zoom(x.u)}
+  const fb=!!sess.resp[q.id]&&!sess.sim,tp=qGalTipo(q);
+  const para=()=>{e.preventDefault();e.stopImmediatePropagation()};
+  if(isG){if(!tp)return;para();
+    if(!GS.on)qSelImg(q,tp);else{const x=galLista(q,GS.t)[gIdx[q.id+'_'+GS.t]||0];if(x)zoom(x.u)}
     return}
-  if(!GS.on)return;
-  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();e.stopImmediatePropagation();galVai(q.id,GS.t,e.key==='ArrowRight'?1:-1);qMarcaGal();return}
-  if(e.key==='Escape'){GS.on=false;qMarcaGal();return}
-  if((e.key==='ArrowUp'||e.key==='ArrowDown')&&!(sess.resp[q.id]&&!sess.sim)){GS.on=false;qMarcaGal()}   // foco volta às alternativas
+  if(GS.on&&(k==='ArrowLeft'||k==='ArrowRight')){para();galVai(q.id,GS.t,k==='ArrowRight'?1:-1);qMarcaGal();return}
+  if(GS.on&&k==='Escape'){GS.on=false;qMarcaGal();return}
+  if(fb||(k!=='ArrowUp'&&k!=='ArrowDown'))return;   // depois de responder ↑/↓ rolam a página (handler do app)
+  para();const L=Object.keys(q.alts),n=L.length,c=L.indexOf(selAtual());
+  if(GS.on){if(k==='ArrowDown'){GS.on=false;qMarcaGal();escolher(L[0])}return}
+  if(k==='ArrowDown'){escolher(L[(c+1)%n]);return}
+  if(c===0&&tp){qSelImg(q,tp);return}
+  escolher(L[c<=0?n-1:c-1]);
 },true);
+
+// ===== rolagem pelas setas: suave como a roda do mouse; passo em Config › Atalhos (cfg.passoSeta, padrão 120 px) =====
+const QR={alvo:null,raf:0};
+function qRola(dir){
+  const passo=+cfg.passoSeta||120,max=document.documentElement.scrollHeight-innerHeight;
+  if(QR.alvo==null||!QR.raf)QR.alvo=scrollY;
+  QR.alvo=Math.max(0,Math.min(max,QR.alvo+dir*passo));
+  if(!QR.raf){const anda=()=>{const d=QR.alvo-scrollY;if(Math.abs(d)<1){scrollTo(0,QR.alvo);QR.raf=0;return}
+    scrollTo(0,scrollY+d*0.2);QR.raf=requestAnimationFrame(anda)};QR.raf=requestAnimationFrame(anda)}
+}
+addEventListener('wheel',()=>{if(QR.raf){cancelAnimationFrame(QR.raf);QR.raf=0}},{passive:true});
 
 // ===== imagens sem piscar: a cada redesenho reaproveita as <img> já carregadas (mesma imagem = mesmo elemento) =====
 function qGuarda(root){const v={};root.querySelectorAll('img[data-u]').forEach(im=>{if(im.complete&&im.naturalWidth)(v[im.dataset.u]??=[]).push(im)});return v}
 function qReusa(root,v){root.querySelectorAll('img[data-u]').forEach(im=>{const o=(v[im.dataset.u]||[]).shift();if(!o)return;
   [...o.attributes].forEach(a=>{if(a.name!=='src'&&!im.hasAttribute(a.name))o.removeAttribute(a.name)});
   [...im.attributes].forEach(a=>{if(a.name!=='src')o.setAttribute(a.name,a.value)});im.replaceWith(o)})}
-function qPinta(html){const app=$('#app'),v=qGuarda(app);app.innerHTML=html;qReusa(app,v);qMarcaGal();qPreCarrega()}
+function qPinta(html){const app=$('#app'),v=qGuarda(app);app.innerHTML=html;qReusa(app,v);qMarcaGal();qPreCarrega();if(typeof smkPinta==='function')smkPinta()}
 // pré-carrega as imagens da questão atual e das 3 seguintes (ficam prontas na memória)
 const qPre=new Map();
 function qPreCarrega(){

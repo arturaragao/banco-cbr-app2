@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.12.1"
+VERSAO = "1.13.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -41,7 +41,7 @@ i0 = js.index("<h3>Peso das áreas na prova (%)</h3>"); i1 = js.index("</label>`
 js = js[:i0] + "${pesosUI()}" + js[i1:]
 # layouts + setas ↑/↓ rolam a página depois de responder
 troca("function render(){", "function render(){aplicaLayout();")
-troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?40:-40),behavior:e.repeat?'instant':'smooth'});return}   // depois de responder: passo do Chrome (40px), sempre na página (22/10/2026)\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
+troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();qRola(k==='ArrowDown'?1:-1);return}   // depois de responder: rolagem suave da página (build/questoes.js)\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
@@ -50,9 +50,9 @@ troca("function questoesTema(t){", "function questoesTemaOrig(t){")
 troca("function simulado(et){", "function simuladoOrig(et){")
 troca("function novasArea(id){", "function novasAreaOrig(id){")
 troca("function comecaFiltro(){", "function comecaFiltroOrig(){")
-troca("cfg.ri.v!==4", "cfg.ri.v!==6"); troca("cfg.ri={d:dKey(Date.now()),v:4,", "cfg.ri={d:dKey(Date.now()),v:6,")
+troca("cfg.ri.v!==4", "cfg.ri.v!==6||riRefaz()"); troca("cfg.ri={d:dKey(Date.now()),v:4,", "cfg.ri={d:dKey(Date.now()),v:6,cal:!!(typeof SM!=='undefined'&&SM.d),")   # cal: lista feita já com o calendário (senão é refeita, ver riRefaz)
 # cartão da RI: texto e contador seguem a lista de verdade (22/10/2026)
-troca("ALVO={ri:()=>cfg.diario,", "ALVO={ri:()=>modoProva()?riHoje().length:cfg.diario,")
+troca("ALVO={ri:()=>cfg.diario,", "ALVO={ri:()=>metaHoje(),")
 troca("`<p class=\"mut\">${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.</p>", "`<p class=\"mut\">${riDesc(devidas)}</p>")
 js = js.replace("${layoutUI()}${pesosUI()}", "${modoProvaUI()}${layoutUI()}${pesosUI()}", 1)
 # sugestões 1–5
@@ -79,9 +79,12 @@ troca("  ${metaProvaCard()}${chipsHoje(agendados)}", "  ${smCardHoje()}${metaPro
 troca("['semana','Semana'],", "['semana','Semana'],['questoes','Questões'],")
 troca("o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');", "o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');if(o.length&&!o.includes('questoes'))o.splice(o.indexOf('semana')+1,0,'questoes');")
 troca("quiz:vQuiz,", "quiz:vQuizQ,questoes:vQuestoes,")
-troca("function go(t,s){tela=t;", "function go(t,s){if(t==='questoes'&&qAbre())return;tela=t;")
+troca("function go(t,s){tela=t;", "function go(t,s){if(t==='questoes'&&qAbre())return;if(t==='semana')smkIni();tela=t;")
 troca("const ativa=tela==='quiz'||tela==='fim'?'':", "const ativa=tela==='quiz'?'questoes':tela==='fim'?'':")
 troca("$('#app').innerHTML=f();", "qPinta(f());")
+# atalhos do zoom configuráveis (Config > Atalhos)
+troca("if(e.key==='Escape')zClose();else if(e.key==='ArrowRight')zStep(1);else if(e.key==='ArrowLeft')zStep(-1);else if(e.key==='+'||e.key==='=')zScale(1.4);else if(e.key==='-')zScale(1/1.4);else if(e.key==='0')zFit();return}",
+      "if(e.key==='Escape')zClose();else if(keyIs(e,'znext'))zStep(1);else if(keyIs(e,'zprev'))zStep(-1);else if(keyIs(e,'zin')||(KEY('zin')==='+'&&e.key==='='))zScale(1.4);else if(keyIs(e,'zout'))zScale(1/1.4);else if(keyIs(e,'zfit'))zFit();return}")
 js = js + "\n\n" + open(f"{R}/build/questoes.js", encoding="utf8").read()
 js = open(f"{R}/build/semana.js", encoding="utf8").read() + "\n\n" + js   # antes do código do app: SM existe quando o app desenha a 1ª tela
 
