@@ -181,7 +181,7 @@ function riDesc(devidas){
   const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q.classif?q._d:'m']=(cnt[q.classif?q._d:'m']||0)+1});
   const reta=d!=null&&d>=0&&d<=fim;
   return `<b>${nov} questões novas</b>${reta?'':' (a meta de hoje)'}${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
-   `${cnt.f} fáceis · ${cnt.m} médias${cnt.d?' · '+cnt.d+' difícil'+(cnt.d>1?'eis':''):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
+   `${cnt.f} fáceis · ${cnt.m} médias${cnt.d?' · '+cnt.d+(cnt.d>1?' difíceis':' difícil'):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
 }
 // repetidas eventuais (pedido do Artur, 22/10/2026): ~1 a cada 25, no máx. 2 por RI — só erradas COM CERTEZA ou erradas FÁCEIS, última resposta errada há 5+ dias
 function pacoteRepeteRaro(n){
