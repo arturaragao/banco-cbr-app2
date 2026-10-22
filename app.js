@@ -1,4 +1,4 @@
-// Banco CBR app 1.12.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.12.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
 // Dados: semana/plano.json no repo privado banco-cbr-app (mesma chave do app). Formato v2:
 //  {v:2, regras, subtitulo, dias:{"AAAA-MM-DD":{agenda,tipo?,meta?}}, tarefas:[{id,dia,texto,area,feito,feitoEm,ordem,grupo?,auto?,adiado?}], notas:[...]}
@@ -1391,7 +1391,7 @@ document.addEventListener('keydown',e=>{
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),L=Object.keys(q.alts);
   if(k==='ArrowRight'){e.preventDefault();if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1);return}
   if(k==='ArrowLeft'){e.preventDefault();irPara(sess.i-1);return}
-  if(fb&&(k==='ArrowDown'||k==='ArrowUp'))return;   // depois de responder: rolagem nativa do navegador, igual ao Chrome (22/10/2026)
+  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?40:-40),behavior:e.repeat?'instant':'smooth'});return}   // depois de responder: passo do Chrome (40px), sempre na página (22/10/2026)
   if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();const c=sel?L.indexOf(sel):-1;
     escolher(L[k==='ArrowDown'?Math.min(c+1,L.length-1):c<0?L.length-1:Math.max(c-1,0)]);return}
   if(keyIs(e,'cut')&&sel){riscar(sel);return}

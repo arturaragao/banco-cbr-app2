@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.12.0"
+VERSAO = "1.12.1"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -41,7 +41,7 @@ i0 = js.index("<h3>Peso das áreas na prova (%)</h3>"); i1 = js.index("</label>`
 js = js[:i0] + "${pesosUI()}" + js[i1:]
 # layouts + setas ↑/↓ rolam a página depois de responder
 troca("function render(){", "function render(){aplicaLayout();")
-troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp'))return;   // depois de responder: rolagem nativa do navegador, igual ao Chrome (22/10/2026)\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
+troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();window.scrollBy({top:(k==='ArrowDown'?40:-40),behavior:e.repeat?'instant':'smooth'});return}   // depois de responder: passo do Chrome (40px), sempre na página (22/10/2026)\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
