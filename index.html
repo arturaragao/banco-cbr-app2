@@ -297,6 +297,41 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 /* teclado: cartão de hoje e tarefa selecionados */
 .sm-hoje1.kbsel{outline:2px solid var(--pri);outline-offset:2px}
 .sm-row.kbsel{background:color-mix(in srgb,var(--pri) 16%,transparent);border-radius:8px;box-shadow:inset 3px 0 0 var(--pri)}
+
+/* ===== tipos/subtemas, célula "Sem data", Hoje compacto, mini calendário (22/10/2026) ===== */
+.sm-grp i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--mut)}
+.sm-grp:not(.sm-estudo):not(.sm-ferramenta) .sm-lbl{color:var(--ok)}
+.sm-gs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));column-gap:26px;row-gap:4px}
+.sm-hh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.sm-hh h2{margin:0;font:800 1.35rem/1.2 var(--fd)}
+.sm-hh .sm-ags{align-items:center}
+.sm-hoje.sm-hoje1{padding-top:12px;padding-bottom:12px}
+.sm-hoje1 .sm-hl{gap:4px}
+.sm-hoje1 .sm-it,.sm-sd .sm-it,.sm-ch .sm-it{padding:3px 8px;gap:8px}
+.sm-hoje1 .sm-edb,.sm-sd .sm-edb{padding:5px 8px}
+.sm-hoje1 .sm-grp,.sm-sd .sm-grp{gap:0}
+.sm-hoje1 .sm-lbl,.sm-sd .sm-lbl{line-height:1.1;margin-top:2px}
+.sm-htm{font:700 .95rem var(--fd)}
+.sm-hh .sm-fo{margin:0}
+.sm-add.c1{gap:4px;margin-top:2px}
+.sm-add.c1 .row{gap:6px;flex-wrap:wrap}
+.sm-add.c1 .row>input{flex:1 1 160px!important;padding:5px 8px;font-size:.9rem}
+.sm-add.c1 .row>select{flex:0 1 auto;max-width:44%;padding:4px 6px;font-size:.85rem}
+.sm-add.c1 .b{padding:4px 10px}
+.sm-sd{padding:10px 14px!important;border-style:dashed!important}
+.sm-ch{padding:10px 14px!important}
+.sm-ch .sm-gs{column-gap:20px}
+.sm-tp{font:700 .66rem var(--fb);text-transform:uppercase;letter-spacing:.06em;color:var(--pri-tx)}
+.sm-sd.kbsel{outline:2px solid var(--pri);outline-offset:2px}
+/* mini calendário do Alt+A */
+.qa-cal{display:flex;flex-direction:column;gap:6px}
+.qa-cg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.qa-ch{text-align:center;font-size:.7rem;opacity:.6;padding:2px 0}
+.qa-cd{all:unset;box-sizing:border-box;text-align:center;padding:8px 0;border-radius:8px;border:2px solid transparent;cursor:pointer;font-variant-numeric:tabular-nums}
+.qa-cd:hover{background:rgba(56,189,248,.12)}
+.qa-cd.fora{opacity:.3}.qa-cd.des{opacity:.6}
+.qa-cd.hoje{font-weight:800;color:#38bdf8}
+.qa-cd.cur{border-color:#38bdf8;background:rgba(56,189,248,.15)}
 /* aba Questões: seletor de bloco, imagem selecionada pelo teclado, atalhos no rodapé (22/10/2026) */
 .qblocos{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:.85rem}
 .qblocos select{flex:1;min-width:0;max-width:420px;padding:5px 8px}
@@ -304,6 +339,11 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 .qatalhos{display:flex;flex-wrap:wrap;gap:4px 14px;margin:18px 0 8px;font-size:.72rem;color:var(--mut);line-height:1.6}
 .qatalhos kbd{display:inline-block;min-width:1.4em;padding:0 4px;margin-right:2px;border:1px solid var(--bd);border-radius:4px;background:var(--card2);font:inherit;font-size:.7rem;text-align:center}
 @media(max-width:700px){.qatalhos{display:none}}
+/* reordenar cartões arrastando (build/layout.js) */
+#app .card{-webkit-touch-callout:none}
+body.ly-on{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.card.ly-drag{position:relative;z-index:25;transform-origin:center;box-shadow:0 14px 34px rgba(0,0,0,.35);opacity:.96;pointer-events:none;transition:box-shadow .15s;outline:2px solid var(--band)}
+.ly-mk{position:fixed;z-index:26;background:var(--band);border-radius:4px;pointer-events:none;box-shadow:0 0 0 2px var(--bg)}
 </style></head><body>
 <title>Banco CBR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -527,12 +567,12 @@ kbd{background:rgba(255,255,255,.2);border-radius:5px;padding:0 6px;font:600 .72
 .marcos{display:flex;flex-wrap:wrap;gap:8px}.marco{font:600 .82rem var(--fb);border:1px dashed var(--bd);border-radius:99px;padding:5px 12px;color:var(--mut)}.marco.on{border:1px solid color-mix(in srgb,var(--warn) 60%,var(--bd));color:var(--tx);background:color-mix(in srgb,var(--warn) 14%,var(--card))}.marco.on{}
 .pnw{border:1px dashed color-mix(in srgb,var(--pri) 45%,var(--bd));border-radius:16px;padding:8px;margin-bottom:14px}.pnw .card{margin-bottom:0}.pnbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 6px 8px}.pnbar span{display:flex;gap:6px}.pnbar button{padding:5px 12px;font-size:.82rem}.pnc{pointer-events:none;opacity:.85;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 </style>
-<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.13.0</small></div>
+<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.14.0</small></div>
 <div class="hr"><span id="sync" class="local"><i></i><span>Só neste aparelho</span></span><button class="tg" id="tg" onclick="ciclaTema()"></button></div></div>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="toast"></div>
 <div id="zoom" hidden><div id="zbar"><button onclick="zStep(-1)" aria-label="Imagem anterior">‹</button><span id="zinfo"></span><button onclick="zStep(1)" aria-label="Próxima imagem">›</button><button onclick="zScale(1/1.4)" aria-label="Diminuir">−</button><button onclick="zScale(1.4)" aria-label="Aumentar">+</button><button onclick="zFit()">Ajustar</button><button onclick="zClose()">Fechar</button></div><div id="zst"><img id="zimg" alt="" draggable="false"></div></div>
 
-<script>window.BCBR_VERSAO="1.13.0"</script><script src="shim.js?v=1.13.0"></script>
+<script>window.BCBR_VERSAO="1.14.0"</script><script src="shim.js?v=1.14.0"></script>
 </body></html>

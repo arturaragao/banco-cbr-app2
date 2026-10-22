@@ -209,3 +209,38 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 /* teclado: cartão de hoje e tarefa selecionados */
 .sm-hoje1.kbsel{outline:2px solid var(--pri);outline-offset:2px}
 .sm-row.kbsel{background:color-mix(in srgb,var(--pri) 16%,transparent);border-radius:8px;box-shadow:inset 3px 0 0 var(--pri)}
+
+/* ===== tipos/subtemas, célula "Sem data", Hoje compacto, mini calendário (22/10/2026) ===== */
+.sm-grp i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600;color:var(--mut)}
+.sm-grp:not(.sm-estudo):not(.sm-ferramenta) .sm-lbl{color:var(--ok)}
+.sm-gs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));column-gap:26px;row-gap:4px}
+.sm-hh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.sm-hh h2{margin:0;font:800 1.35rem/1.2 var(--fd)}
+.sm-hh .sm-ags{align-items:center}
+.sm-hoje.sm-hoje1{padding-top:12px;padding-bottom:12px}
+.sm-hoje1 .sm-hl{gap:4px}
+.sm-hoje1 .sm-it,.sm-sd .sm-it,.sm-ch .sm-it{padding:3px 8px;gap:8px}
+.sm-hoje1 .sm-edb,.sm-sd .sm-edb{padding:5px 8px}
+.sm-hoje1 .sm-grp,.sm-sd .sm-grp{gap:0}
+.sm-hoje1 .sm-lbl,.sm-sd .sm-lbl{line-height:1.1;margin-top:2px}
+.sm-htm{font:700 .95rem var(--fd)}
+.sm-hh .sm-fo{margin:0}
+.sm-add.c1{gap:4px;margin-top:2px}
+.sm-add.c1 .row{gap:6px;flex-wrap:wrap}
+.sm-add.c1 .row>input{flex:1 1 160px!important;padding:5px 8px;font-size:.9rem}
+.sm-add.c1 .row>select{flex:0 1 auto;max-width:44%;padding:4px 6px;font-size:.85rem}
+.sm-add.c1 .b{padding:4px 10px}
+.sm-sd{padding:10px 14px!important;border-style:dashed!important}
+.sm-ch{padding:10px 14px!important}
+.sm-ch .sm-gs{column-gap:20px}
+.sm-tp{font:700 .66rem var(--fb);text-transform:uppercase;letter-spacing:.06em;color:var(--pri-tx)}
+.sm-sd.kbsel{outline:2px solid var(--pri);outline-offset:2px}
+/* mini calendário do Alt+A */
+.qa-cal{display:flex;flex-direction:column;gap:6px}
+.qa-cg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.qa-ch{text-align:center;font-size:.7rem;opacity:.6;padding:2px 0}
+.qa-cd{all:unset;box-sizing:border-box;text-align:center;padding:8px 0;border-radius:8px;border:2px solid transparent;cursor:pointer;font-variant-numeric:tabular-nums}
+.qa-cd:hover{background:rgba(56,189,248,.12)}
+.qa-cd.fora{opacity:.3}.qa-cd.des{opacity:.6}
+.qa-cd.hoje{font-weight:800;color:#38bdf8}
+.qa-cd.cur{border-color:#38bdf8;background:rgba(56,189,248,.15)}

@@ -1,0 +1,5 @@
+/* reordenar cartões arrastando (build/layout.js) */
+#app .card{-webkit-touch-callout:none}
+body.ly-on{user-select:none;-webkit-user-select:none;cursor:grabbing}
+.card.ly-drag{position:relative;z-index:25;transform-origin:center;box-shadow:0 14px 34px rgba(0,0,0,.35);opacity:.96;pointer-events:none;transition:box-shadow .15s;outline:2px solid var(--band)}
+.ly-mk{position:fixed;z-index:26;background:var(--band);border-radius:4px;pointer-events:none;box-shadow:0 0 0 2px var(--bg)}

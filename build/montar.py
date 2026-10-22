@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.13.0"
+VERSAO = "1.14.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -86,11 +86,14 @@ troca("$('#app').innerHTML=f();", "qPinta(f());")
 troca("if(e.key==='Escape')zClose();else if(e.key==='ArrowRight')zStep(1);else if(e.key==='ArrowLeft')zStep(-1);else if(e.key==='+'||e.key==='=')zScale(1.4);else if(e.key==='-')zScale(1/1.4);else if(e.key==='0')zFit();return}",
       "if(e.key==='Escape')zClose();else if(keyIs(e,'znext'))zStep(1);else if(keyIs(e,'zprev'))zStep(-1);else if(keyIs(e,'zin')||(KEY('zin')==='+'&&e.key==='='))zScale(1.4);else if(keyIs(e,'zout'))zScale(1/1.4);else if(keyIs(e,'zfit'))zFit();return}")
 js = js + "\n\n" + open(f"{R}/build/questoes.js", encoding="utf8").read()
+# reordenar cartões arrastando (22/10/2026): botões de restaurar em Config + arrastar/segurar (build/layout.js)
+troca("${layoutUI()}${pesosUI()}", "${layoutUI()}${ordemUI()}${pesosUI()}")
+js = js + "\n\n" + open(f"{R}/build/layout.js", encoding="utf8").read()
 js = open(f"{R}/build/semana.js", encoding="utf8").read() + "\n\n" + js   # antes do código do app: SM existe quando o app desenha a 1ª tela
 
 open(f"{R}/app.js", "w", encoding="utf8").write(f"// Banco CBR app {VERSAO} — gerado por build/montar.py a partir do artefato (não editar à mão)\n" + js)
 
-css = open(f"{R}/build/extra.css", encoding="utf8").read() + open(f"{R}/build/semana.css", encoding="utf8").read() + open(f"{R}/build/questoes.css", encoding="utf8").read()
+css = open(f"{R}/build/extra.css", encoding="utf8").read() + open(f"{R}/build/semana.css", encoding="utf8").read() + open(f"{R}/build/questoes.css", encoding="utf8").read() + open(f"{R}/build/layout.css", encoding="utf8").read()
 pwa = ('<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png">'
        '<meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes">')
 head = head.replace("<style>", pwa + "<style>", 1).replace("</style>", css + "</style>", 1)
