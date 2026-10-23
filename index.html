@@ -153,12 +153,10 @@ button.b.sm-del{background:var(--bad);color:#fff}
 .sm-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.72rem;color:var(--mut);margin-bottom:8px}
 .sm-leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px;border:1px solid var(--bd)}
 .sm-legp{color:var(--warn)}
-.sm-lin{display:grid;grid-template-columns:52px repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px}
+.sm-lin{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px}
 .sm-lin.cab span{font:700 .72rem var(--fb);color:var(--mut);text-align:center}
-.sm-sem{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed var(--bd);border-radius:8px;color:var(--pri-tx);font-size:.75rem}
-.sm-sem small{font-size:.6rem;color:var(--mut)}.sm-sem.on{border-style:solid;border-color:var(--pri);background:color-mix(in srgb,var(--pri) 18%,transparent)}
 .sm-cel{all:unset;box-sizing:border-box;cursor:pointer;position:relative;min-height:76px;min-width:0;border:1px solid var(--bd);border-radius:8px;padding:5px 7px;display:flex;flex-direction:column;gap:1px;background:var(--bg);overflow:hidden}
-.sm-cel:focus-visible,.sm-sem:focus-visible{outline:2px solid var(--pri)}
+.sm-cel:focus-visible{outline:2px solid var(--pri)}
 .sm-cel .n{font:700 .85rem var(--fb)}
 .sm-cel.fora{opacity:.3}
 .sm-cel.off{background:transparent;border-style:dashed}
@@ -187,8 +185,7 @@ button.b.sm-del{background:var(--bad);color:#fff}
 .sm-wadd{all:unset;cursor:pointer;color:var(--pri-tx);font-size:.75rem;margin-top:2px}
 @media(max-width:1100px){.sm-wcs{grid-template-columns:1fr}.sm-wc{display:grid;grid-template-columns:72px 1fr;column-gap:8px}.sm-wc>*{grid-column:2}.sm-wc>.sm-wch{grid-column:1;grid-row:1 / span 20}}
 @media(max-width:640px){
- .sm-lin{grid-template-columns:30px repeat(7,minmax(0,1fr));gap:3px;margin-bottom:3px}
- .sm-sem small{display:none}
+ .sm-lin{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:3px}
  .sm-cel{min-height:48px;padding:3px 4px}
  .sm-cel .n{font-size:.8rem}.sm-cel .q{font-size:.7rem}
  .sm-lg{display:none}.sm-sh{display:inline;position:absolute;top:3px;right:4px;font:800 .6rem var(--fb)}
@@ -253,8 +250,7 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 /* celular: mesma grade do PC, letra menor, tudo visível */
 @media(max-width:640px){
  .sm-cal{padding:8px!important}
- .sm-lin{grid-template-columns:18px repeat(7,minmax(0,1fr));gap:2px;margin-bottom:2px}
- .sm-sem{border-radius:5px}.sm-sem b{font-size:.5rem;writing-mode:vertical-rl;transform:rotate(180deg)}
+  .sm-lin{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;margin-bottom:2px}
  .sm-lin.cab span{font-size:.6rem}
  .sm-cel{min-height:82px;padding:2px 2px 3px;gap:1px;border-radius:6px}
  .sm-cel .top{gap:2px}
@@ -361,6 +357,28 @@ body.smd-on [data-drop]{outline:1px dashed color-mix(in srgb,var(--pri) 45%,tran
 body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px;background:color-mix(in srgb,var(--pri) 14%,transparent)!important}
 .sm-cel .top{width:100%;align-self:stretch;flex-wrap:nowrap}
 .sm-cel .top .sm-nt{flex:1 1 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* v1.16: mesma grade, uma semana por vez e mais espaço para o texto. */
+.sm-vsem .sm-cel{min-height:260px;gap:6px}
+.sm-vsem .sm-cel .sm-ev{white-space:normal;overflow-wrap:anywhere;font-size:.75rem}
+.sm-vsem .sm-tm{font-size:.95rem;line-height:1.35}
+.sm-vsem .sm-fo,.sm-vsem .sm-rs{font-size:.85rem;line-height:1.35}
+.sm-vsem .sm-fe{font-size:.8rem}
+.sm-it{cursor:default}
+.sm-it input[type="checkbox"]{cursor:pointer}
+.sm-texto{cursor:text;outline:none;white-space:pre-wrap;-webkit-user-select:text;user-select:text}
+.sm-texto:focus{box-shadow:0 1px 0 var(--pri);border-radius:2px}
+.sm-tg{padding:2px 1px;align-self:flex-start}
+.sm-urg .sm-texto{font-weight:800;color:var(--ok)}
+.sm-urg.t-e .sm-texto{color:var(--pri-tx)}
+.sm-urg.t-f .sm-texto{color:var(--warn)}
+.sm-tagb[aria-pressed="true"]{color:var(--pri-tx);background:color-mix(in srgb,var(--pri) 14%,transparent)}
+@media(max-width:640px){
+ .sm-vsem .sm-cel{min-height:210px;gap:4px}
+ .sm-vsem .sm-tm{font-size:.68rem;line-height:1.3}
+ .sm-vsem .sm-fo,.sm-vsem .sm-rs{font-size:.6rem;line-height:1.3}
+ .sm-vsem .sm-cel .sm-ev,.sm-vsem .sm-fe{font-size:.58rem}
+}
 /* aba Questões: seletor de bloco, imagem selecionada pelo teclado, atalhos no rodapé (22/10/2026) */
 .qblocos{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:.85rem}
 .qblocos select{flex:1;min-width:0;max-width:420px;padding:5px 8px}
@@ -596,12 +614,12 @@ kbd{background:rgba(255,255,255,.2);border-radius:5px;padding:0 6px;font:600 .72
 .marcos{display:flex;flex-wrap:wrap;gap:8px}.marco{font:600 .82rem var(--fb);border:1px dashed var(--bd);border-radius:99px;padding:5px 12px;color:var(--mut)}.marco.on{border:1px solid color-mix(in srgb,var(--warn) 60%,var(--bd));color:var(--tx);background:color-mix(in srgb,var(--warn) 14%,var(--card))}.marco.on{}
 .pnw{border:1px dashed color-mix(in srgb,var(--pri) 45%,var(--bd));border-radius:16px;padding:8px;margin-bottom:14px}.pnw .card{margin-bottom:0}.pnbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 6px 8px}.pnbar span{display:flex;gap:6px}.pnbar button{padding:5px 12px;font-size:.82rem}.pnc{pointer-events:none;opacity:.85;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 </style>
-<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.15.0</small></div>
+<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.16.0</small></div>
 <div class="hr"><span id="sync" class="local"><i></i><span>Só neste aparelho</span></span><button class="tg" id="tg" onclick="ciclaTema()"></button></div></div>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="toast"></div>
 <div id="zoom" hidden><div id="zbar"><button onclick="zStep(-1)" aria-label="Imagem anterior">‹</button><span id="zinfo"></span><button onclick="zStep(1)" aria-label="Próxima imagem">›</button><button onclick="zScale(1/1.4)" aria-label="Diminuir">−</button><button onclick="zScale(1.4)" aria-label="Aumentar">+</button><button onclick="zFit()">Ajustar</button><button onclick="zClose()">Fechar</button></div><div id="zst"><img id="zimg" alt="" draggable="false"></div></div>
 
-<script>window.BCBR_VERSAO="1.15.0"</script><script src="shim.js?v=1.15.0"></script>
+<script>window.BCBR_VERSAO="1.16.0"</script><script src="shim.js?v=1.16.0"></script>
 </body></html>

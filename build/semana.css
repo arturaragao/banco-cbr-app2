@@ -65,12 +65,10 @@ button.b.sm-del{background:var(--bad);color:#fff}
 .sm-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.72rem;color:var(--mut);margin-bottom:8px}
 .sm-leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px;border:1px solid var(--bd)}
 .sm-legp{color:var(--warn)}
-.sm-lin{display:grid;grid-template-columns:52px repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px}
+.sm-lin{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:5px}
 .sm-lin.cab span{font:700 .72rem var(--fb);color:var(--mut);text-align:center}
-.sm-sem{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed var(--bd);border-radius:8px;color:var(--pri-tx);font-size:.75rem}
-.sm-sem small{font-size:.6rem;color:var(--mut)}.sm-sem.on{border-style:solid;border-color:var(--pri);background:color-mix(in srgb,var(--pri) 18%,transparent)}
 .sm-cel{all:unset;box-sizing:border-box;cursor:pointer;position:relative;min-height:76px;min-width:0;border:1px solid var(--bd);border-radius:8px;padding:5px 7px;display:flex;flex-direction:column;gap:1px;background:var(--bg);overflow:hidden}
-.sm-cel:focus-visible,.sm-sem:focus-visible{outline:2px solid var(--pri)}
+.sm-cel:focus-visible{outline:2px solid var(--pri)}
 .sm-cel .n{font:700 .85rem var(--fb)}
 .sm-cel.fora{opacity:.3}
 .sm-cel.off{background:transparent;border-style:dashed}
@@ -99,8 +97,7 @@ button.b.sm-del{background:var(--bad);color:#fff}
 .sm-wadd{all:unset;cursor:pointer;color:var(--pri-tx);font-size:.75rem;margin-top:2px}
 @media(max-width:1100px){.sm-wcs{grid-template-columns:1fr}.sm-wc{display:grid;grid-template-columns:72px 1fr;column-gap:8px}.sm-wc>*{grid-column:2}.sm-wc>.sm-wch{grid-column:1;grid-row:1 / span 20}}
 @media(max-width:640px){
- .sm-lin{grid-template-columns:30px repeat(7,minmax(0,1fr));gap:3px;margin-bottom:3px}
- .sm-sem small{display:none}
+ .sm-lin{grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:3px}
  .sm-cel{min-height:48px;padding:3px 4px}
  .sm-cel .n{font-size:.8rem}.sm-cel .q{font-size:.7rem}
  .sm-lg{display:none}.sm-sh{display:inline;position:absolute;top:3px;right:4px;font:800 .6rem var(--fb)}
@@ -165,8 +162,7 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 /* celular: mesma grade do PC, letra menor, tudo visível */
 @media(max-width:640px){
  .sm-cal{padding:8px!important}
- .sm-lin{grid-template-columns:18px repeat(7,minmax(0,1fr));gap:2px;margin-bottom:2px}
- .sm-sem{border-radius:5px}.sm-sem b{font-size:.5rem;writing-mode:vertical-rl;transform:rotate(180deg)}
+  .sm-lin{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;margin-bottom:2px}
  .sm-lin.cab span{font-size:.6rem}
  .sm-cel{min-height:82px;padding:2px 2px 3px;gap:1px;border-radius:6px}
  .sm-cel .top{gap:2px}
@@ -273,3 +269,25 @@ body.smd-on [data-drop]{outline:1px dashed color-mix(in srgb,var(--pri) 45%,tran
 body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px;background:color-mix(in srgb,var(--pri) 14%,transparent)!important}
 .sm-cel .top{width:100%;align-self:stretch;flex-wrap:nowrap}
 .sm-cel .top .sm-nt{flex:1 1 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* v1.16: mesma grade, uma semana por vez e mais espaço para o texto. */
+.sm-vsem .sm-cel{min-height:260px;gap:6px}
+.sm-vsem .sm-cel .sm-ev{white-space:normal;overflow-wrap:anywhere;font-size:.75rem}
+.sm-vsem .sm-tm{font-size:.95rem;line-height:1.35}
+.sm-vsem .sm-fo,.sm-vsem .sm-rs{font-size:.85rem;line-height:1.35}
+.sm-vsem .sm-fe{font-size:.8rem}
+.sm-it{cursor:default}
+.sm-it input[type="checkbox"]{cursor:pointer}
+.sm-texto{cursor:text;outline:none;white-space:pre-wrap;-webkit-user-select:text;user-select:text}
+.sm-texto:focus{box-shadow:0 1px 0 var(--pri);border-radius:2px}
+.sm-tg{padding:2px 1px;align-self:flex-start}
+.sm-urg .sm-texto{font-weight:800;color:var(--ok)}
+.sm-urg.t-e .sm-texto{color:var(--pri-tx)}
+.sm-urg.t-f .sm-texto{color:var(--warn)}
+.sm-tagb[aria-pressed="true"]{color:var(--pri-tx);background:color-mix(in srgb,var(--pri) 14%,transparent)}
+@media(max-width:640px){
+ .sm-vsem .sm-cel{min-height:210px;gap:4px}
+ .sm-vsem .sm-tm{font-size:.68rem;line-height:1.3}
+ .sm-vsem .sm-fo,.sm-vsem .sm-rs{font-size:.6rem;line-height:1.3}
+ .sm-vsem .sm-cel .sm-ev,.sm-vsem .sm-fe{font-size:.58rem}
+}

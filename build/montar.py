@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.15.0"
+VERSAO = "1.16.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -71,6 +71,16 @@ fim = js.index("let cfgTab='geral';")
 js = js[:ini] + open(f"{R}/build/banco.js", encoding="utf8").read() + "\n\n" + js[fim:]
 
 # aba Semana (substitui o artefato "Minha Semana", 21/10/2026)
+troca("let sess=null,tela='hoje',sub=null;", "let sess=null,tela='semana',sub=null;")
+troca("aplicaTema();render();iniciaSync();", "aplicaTema();smkIni();render();iniciaSync();smAtalhosInicia();")
+# Atalhos aguardam o primeiro resultado de progresso, inclusive o caminho de erro/offline.
+troca("if(!db)return;", "if(!db){smSyncResolve();return;}")
+troca("DB.collection('cbr').onSnapshot(s=>mergeRemote(s.docs),()=>setSync('err'));",
+      "DB.collection('cbr').onSnapshot(s=>{mergeRemote(s.docs);smSyncResolve()},()=>{setSync('err');smSyncResolve()});")
+troca("}catch(e){setSync('err')}\n}", "}catch(e){setSync('err');smSyncResolve()}\n}")
+troca("qa:'a',smdel:'f'", "qa:'a',smdel:'f',smurg:'u'")
+troca("smdel:'Apagar a tarefa selecionada'", "smdel:'Apagar a tarefa selecionada',smurg:'U = urgente (tarefa selecionada)'")
+troca("sem:['smdel']", "sem:['smdel','smurg']")
 troca("const TABS=[['hoje','Hoje'],", "const TABS=[['hoje','Hoje'],['semana','Semana'],")
 troca("const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));", "const base=TABS.map(t=>t[0]),o=(cfg.tabs||[]).filter(k=>base.includes(k));if(o.length&&!o.includes('semana'))o.splice(Math.max(0,o.indexOf('hoje'))+1,0,'semana');")
 troca("fc:vFc,fcstudy:vFcStudy}[tela];", "fc:vFc,fcstudy:vFcStudy,semana:vSemana}[tela];")
