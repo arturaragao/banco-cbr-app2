@@ -1,6 +1,6 @@
 // Service worker do Banco CBR: guarda o app para abrir sem internet e serve as imagens (./img/<arquivo>)
 // lendo do repositório privado com a chave do aparelho. Imagem vista uma vez fica no aparelho.
-const VERSAO = "bcbr-v19";
+const VERSAO = "bcbr-v20";
 const APP = ["./", "./index.html", "./shim.js", "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-mask.png", "./apple-touch-icon.png"];
 const REPO = "arturaragao/banco-cbr-app";
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(APP)).catch(() => {})); self.skipWaiting(); });
@@ -22,9 +22,24 @@ self.addEventListener("fetch", (e) => {
   if (u.origin !== location.origin) return;
   const m = u.pathname.match(/\/img\/([^/]+)$/);
   if (m) return e.respondWith(imagem(e.request, decodeURIComponent(m[1])));
-  // app: rede primeiro (pega versão nova), cache se estiver sem internet
-  e.respondWith(fetch(e.request).then((r) => {
-    if (r.ok && e.request.method === "GET") { const cp = r.clone(); caches.open(VERSAO).then((c) => c.put(e.request, cp)); return r; }
-    return caches.match(e.request, { ignoreSearch: true }).then((c) => c || r);   // GitHub fora do ar (erro 5xx): usa a cópia do aparelho
-  }).catch(() => caches.match(e.request, { ignoreSearch: true })));
+  if (e.request.method !== "GET") return;
+  // app: abre na hora com a cópia do aparelho e baixa a versão nova por trás (pedido do Artur, 23/10/2026: abrir rápido no celular).
+  // Se a página mudou, avisa o app ("Versão nova do app pronta · Atualizar"). Sem cópia: rede (e cópia se o GitHub falhar).
+  e.respondWith((async () => {
+    const cache = await caches.open(VERSAO), hit = await cache.match(e.request);
+    const rede = fetch(e.request).then(async (r) => {
+      if (r.ok) {
+        const pagina = e.request.mode === "navigate";
+        if (pagina && hit) {
+          const [a, b] = await Promise.all([hit.clone().text(), r.clone().text()]);
+          await cache.put(e.request, r.clone());
+          if (a !== b) (await self.clients.matchAll()).forEach((c) => c.postMessage("bcbr-nova"));
+        } else await cache.put(e.request, r.clone());
+      }
+      return r;
+    });
+    if (hit) { e.waitUntil(rede.catch(() => {})); return hit; }
+    return rede.then((r) => r.ok ? r : caches.match(e.request, { ignoreSearch: true }).then((c) => c || r))
+      .catch(() => caches.match(e.request, { ignoreSearch: true }));
+  })());
 });

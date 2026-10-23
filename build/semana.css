@@ -244,3 +244,32 @@ main:has(>.sm),main:has(.sm-cal){max-width:1240px}
 .qa-cd.fora{opacity:.3}.qa-cd.des{opacity:.6}
 .qa-cd.hoje{font-weight:800;color:#38bdf8}
 .qa-cd.cur{border-color:#38bdf8;background:rgba(56,189,248,.15)}
+
+/* 23/10/2026: bolinhas na cor do tipo (azul estudo, amarelo ferramenta, verde tarefas) */
+.sm-cel .dots i.t-e,.sm-li .dots i.t-e{border-color:var(--pri-tx)}.sm-cel .dots i.t-e.ok,.sm-li .dots i.t-e.ok{background:var(--pri-tx)}
+.sm-cel .dots i.t-f,.sm-li .dots i.t-f{border-color:var(--warn)}.sm-cel .dots i.t-f.ok,.sm-li .dots i.t-f.ok{background:var(--warn)}
+.sm-cel .dots i.t-t,.sm-li .dots i.t-t{border-color:var(--ok)}.sm-cel .dots i.t-t.ok,.sm-li .dots i.t-t.ok{background:var(--ok)}
+.sm-cel .dots i.late.late,.sm-li .dots i.late.late{background:var(--bad);border-color:var(--bad)}
+/* BR/HSI ocupam a largura ao lado do número */
+.sm-cel .top .sm-nt{flex:1 1 auto;text-align:center;min-width:0}
+/* eventos do dia */
+.sm-ev{--evc:#a855f7;display:block;font:800 .66rem var(--fb);letter-spacing:.03em;padding:1px 7px;border-radius:5px;border:1px solid var(--evc);color:var(--evc);background:color-mix(in srgb,var(--evc) 18%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;min-width:0}
+.c-roxo{--evc:#a855f7}.c-azul{--evc:#3b82f6}.c-laranja{--evc:#f97316}.c-rosa{--evc:#ec4899}.c-turquesa{--evc:#14b8a6}.c-cinza{--evc:#94a3b8}
+.sm-ags .sm-ev,.sm-li .lt .sm-ev{display:inline-block}
+.sm-evr{align-items:center;gap:6px}.sm-evx{display:inline-flex;align-items:center;gap:4px}.sm-evx button{all:unset;cursor:pointer;font-size:.9rem;line-height:1;padding:0 2px}
+.sm-evcs{display:inline-flex;gap:4px}.sm-evc{all:unset;cursor:pointer;width:18px;height:18px;border-radius:50%;background:var(--evc);opacity:.45}.sm-evc[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--evc)}
+@media (max-width:700px){.sm-cel .sm-ev{font-size:.5rem;padding:0 2px;letter-spacing:0}}
+/* detalhes da tarefa (toggle ▸) */
+.sm-tg{all:unset;flex:none;cursor:pointer;color:var(--mut);font-size:.8rem;padding:7px 0 7px 6px;line-height:1.2}
+.sm-row.tem-det .sm-tx{font-weight:600}
+.sm-det{margin:0 0 4px 40px;padding:6px 10px;border-left:2px solid var(--bd);font-size:.85rem;color:var(--mut)}
+.sm-det p{margin:.2em 0}
+.sm-detin{width:100%;box-sizing:border-box;margin-top:6px;font:inherit;resize:vertical}
+.qa-det{margin-top:8px;resize:vertical;min-height:44px}
+/* arrastar tarefa */
+.sm-row[data-tid]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.smd-g{position:fixed;z-index:9999;pointer-events:none;background:var(--card);border:1px solid var(--pri);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:.95;margin:0}
+body.smd-on [data-drop]{outline:1px dashed color-mix(in srgb,var(--pri) 45%,transparent);outline-offset:-1px}
+body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px;background:color-mix(in srgb,var(--pri) 14%,transparent)!important}
+.sm-cel .top{width:100%;align-self:stretch;flex-wrap:nowrap}
+.sm-cel .top .sm-nt{flex:1 1 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

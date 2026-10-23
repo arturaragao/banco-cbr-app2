@@ -65,16 +65,19 @@
       curso: u.curso || null, claudeMd: u.claude_md_suspeito ? "" : (u.claude_md || ""), chegou: u.chegou || null, classif: u.classif || null, origem: u.origem || null, legendas: u.legendas || [], legendasCom: u.legendasCom || [],
     }));
   }
-  async function carregarDados() {
+  // fundo=true: o app já abriu com a cópia do aparelho; só baixa o que mudou e guarda (vale ao recarregar). Devolve true se mudou.
+  async function carregarDados(fundo) {
     const lista = await api(`/repos/${REPO}/contents/dados`);
     const sha = Object.fromEntries(lista.map((f) => [f.name, f.sha]));
+    let mudou = false;
     const pegar = async (nome) => {
       const c = await kvGet("f:" + nome);
       if (c && c.sha === sha[nome]) return c.txt;
-      const txt = await raw(sha[nome]); kvSet("f:" + nome, { sha: sha[nome], txt }); return txt;
+      const txt = await raw(sha[nome]); mudou = true; await kvSet("f:" + nome, { sha: sha[nome], txt }); return txt;
     };
     const [q, m] = await Promise.all([pegar("questoes.json"), sha["metodologia.md"] ? pegar("metodologia.md") : ""]);
-    window.QUESTOES = adaptar(JSON.parse(q)); window.METODO = m;
+    if (!fundo) { window.QUESTOES = adaptar(JSON.parse(q)); window.METODO = m; }
+    return mudou;
   }
   async function dadosDoCache() {
     const q = await kvGet("f:questoes.json"), m = await kvGet("f:metodologia.md");
@@ -193,19 +196,41 @@
   }, true);
   window.BCBR.imgDireto = imgDireto;
 
+  // ---------- aviso "versão nova / questões novas" (o app abre na hora com a cópia do aparelho e se atualiza por trás) ----------
+  function aviso(txt) {
+    let el = document.getElementById("bcbr_aviso");
+    if (!el) {
+      el = document.createElement("div"); el.id = "bcbr_aviso";
+      el.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:99999;display:flex;gap:10px;align-items:center;background:var(--card,#1e293b);color:var(--tx,#fff);border:1px solid var(--pri,#3b82f6);border-radius:12px;padding:8px 12px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:.9rem;max-width:calc(100vw - 32px)";
+      document.body.appendChild(el);
+    }
+    el.innerHTML = `<span>${txt}</span><button class="b s" id="bcbr_av_ok">Atualizar</button><button class="b s sm-ghost" id="bcbr_av_no" aria-label="Depois">✕</button>`;
+    document.getElementById("bcbr_av_ok").onclick = () => location.reload();
+    document.getElementById("bcbr_av_no").onclick = () => el.remove();
+  }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { if (e.data === "bcbr-nova") aviso("Versão nova do app pronta."); });
+  let ultChecagem = Date.now();
+  const checarDados = () => carregarDados(true).then((m) => { if (m) aviso("Questões novas baixadas."); }).catch(() => {});
+  document.addEventListener("visibilitychange", () => {   // app que ficou aberto em segundo plano: confere de novo (no máx. a cada 10 min)
+    if (document.visibilityState === "visible" && Date.now() - ultChecagem > 600000) { ultChecagem = Date.now(); checarDados(); }
+  });
+
   // ---------- início ----------
   async function iniciar() {
-    if ("serviceWorker" in navigator) { try { await navigator.serviceWorker.register("./sw.js"); await passarChaveSW(); } catch (e) {} }
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").then(passarChaveSW).catch(() => {});   // não espera
     if (!tok()) return telaConfig();
     document.getElementById("app").innerHTML = `<div class="card"><p class="mut">Carregando o banco…</p></div>`;
     let ok = false;
+    // Abre na hora com o banco guardado no aparelho; confere o GitHub por trás (pedido do Artur, 23/10/2026: abrir rápido no celular)
+    if (await dadosDoCache()) { abrirApp(); checarDados(); return; }
     try { await carregarDados(); ok = true; }
     catch (e) {
       if (e.chave) return telaConfig("A chave do GitHub foi recusada. Confira e cole de novo.");
       ok = await dadosDoCache();   // sem internet: usa o que já está no aparelho
       if (!ok) return telaConfig("Não consegui baixar o banco (" + e.message + "). Confira a internet e a chave.");
     }
-    const s = document.createElement("script"); s.src = "./app.js?v=" + (window.BCBR_VERSAO || "1"); document.body.appendChild(s);
+    abrirApp();
   }
+  function abrirApp() { const s = document.createElement("script"); s.src = "./app.js?v=" + (window.BCBR_VERSAO || "1"); document.body.appendChild(s); }
   iniciar();
 })();

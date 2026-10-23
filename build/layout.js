@@ -51,7 +51,7 @@ function ordemUI(){
 
 // ---- arrastar ----
 let lyD=null;   // {c,p,x0,y0,sy0,pid,ativo,timer,alvo,antes,mk,auto,cx,cy}
-const lyIgnora='input,button,select,textarea,a,label,summary,[contenteditable],[onclick],.gal,.bar';
+const lyIgnora='input,button,select,textarea,a,label,summary,.sm-row,[contenteditable],[onclick],.gal,.bar';
 function lyFim(cancela){
   const d=lyD;if(!d)return;clearTimeout(d.timer);clearInterval(d.auto);lyD=null;
   document.body.classList.remove('ly-on');
