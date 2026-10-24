@@ -142,6 +142,9 @@ document.addEventListener('touchend',e=>{
   const dx=t.clientX-QSW.x,dy=t.clientY-QSW.y;
   if(Math.abs(dx)<=60||Math.abs(dx)<=1.5*Math.abs(dy)||Date.now()-QSW.t>1200)return;
   try{const s=getSelection();if(s&&!s.isCollapsed&&String(s).trim())return}catch(x){}
-  if(dx<0){if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1)}
-  else irPara(sess.i-1);
+  if(dx<0){if(sess.i>=sess.ids.length-1)toast('Última questão');else{irPara(sess.i+1);qPulaGrade()}}
+  else{irPara(sess.i-1);qPulaGrade()}
 },{passive:true});
+
+// depois de deslizar, a página já abre na questão: a grade com os números fica acima, fora da tela (pedido do Artur, 24/10/2026)
+function qPulaGrade(){const g=document.querySelector('#app .qgrid');if(g)scrollTo(0,Math.max(0,g.getBoundingClientRect().bottom+scrollY+4))}

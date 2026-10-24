@@ -1,4 +1,4 @@
-// Banco CBR app 1.18.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.18.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
 //  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
@@ -696,7 +696,10 @@ function qaRascSalva(extra){
     if(!r.texto.trim()&&!r.det.trim()&&r.area==='tarefas'&&!r.quando&&!(r.dias||[]).length&&!r.urg&&!r.salvar)localStorage.removeItem(QA_RASC);else localStorage.setItem(QA_RASC,JSON.stringify(r))}catch(e){}
 }
 const qaRascLimpa=()=>{try{localStorage.removeItem(QA_RASC)}catch(e){}};
-const qaVozAPI=()=>window.SpeechRecognition||window.webkitSpeechRecognition;
+// No app Android (WebView) a voz do navegador não funciona: o 🎤 abre o reconhecedor nativo (BCBRNativo.falar), que grava na fila de pendentes;
+// o app importa ao voltar (MainActivity.onResume chama smNativoImporta). APK antigo sem falar(): sem 🎤 (pedido do Artur, 24/10/2026).
+const qaVozNativa=()=>!!(window.BCBRNativo&&typeof window.BCBRNativo.falar==='function');
+const qaVozAPI=()=>window.BCBRNativo?qaVozNativa():(window.SpeechRecognition||window.webkitSpeechRecognition);
 function qaZera(){Object.assign(QA,{texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,detAberto:false,diasAberto:false})}
 function qaAbre(){
   if(QA.on){const i=document.getElementById('qa_in');i&&i.focus();return}
@@ -786,6 +789,7 @@ function smRascPend(){
 }
 // ---- voz (Web Speech API; sem ela o botão 🎤 nem aparece) ----
 function qaVoz(){
+  if(qaVozNativa()){qaFecha();try{window.BCBRNativo.falar()}catch(e){toast('Não consegui abrir o microfone.')}return}
   const API=qaVozAPI();if(!API||!QA.on)return;
   if(QA.ouvindo&&QA.rec){try{QA.rec.stop()}catch(e){}return}
   const rec=new API(),base=QA.texto.trim();let final='';
@@ -1010,7 +1014,7 @@ function smNativoImporta(){
     const ids=[];smNatBusy=true;
     lista.forEach(p=>{
       if(!p||p.id==null)return;const id=String(p.id);ids.push(id);if(jaImp.includes(id))return;
-      const t=String(p.texto||'').trim();if(t)smCriaDeTexto(t,{});
+      const t=String(p.texto||'').trim();if(t){const nv=smCriaDeTexto(t,{});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}
       jaImp.push(id);
     });
     try{localStorage.setItem(SM_NAT_IMP,JSON.stringify(jaImp.slice(-500)))}catch(e){}
@@ -2719,9 +2723,12 @@ document.addEventListener('touchend',e=>{
   const dx=t.clientX-QSW.x,dy=t.clientY-QSW.y;
   if(Math.abs(dx)<=60||Math.abs(dx)<=1.5*Math.abs(dy)||Date.now()-QSW.t>1200)return;
   try{const s=getSelection();if(s&&!s.isCollapsed&&String(s).trim())return}catch(x){}
-  if(dx<0){if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1)}
-  else irPara(sess.i-1);
+  if(dx<0){if(sess.i>=sess.ids.length-1)toast('Última questão');else{irPara(sess.i+1);qPulaGrade()}}
+  else{irPara(sess.i-1);qPulaGrade()}
 },{passive:true});
+
+// depois de deslizar, a página já abre na questão: a grade com os números fica acima, fora da tela (pedido do Artur, 24/10/2026)
+function qPulaGrade(){const g=document.querySelector('#app .qgrid');if(g)scrollTo(0,Math.max(0,g.getBoundingClientRect().bottom+scrollY+4))}
 
 
 // ===== Reordenar cartões arrastando (pedido do Artur, 22/10/2026) =====
