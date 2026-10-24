@@ -109,11 +109,18 @@ function interpretarTarefa(texto, hoje) {
   texto = String(texto == null ? '' : texto).normalize('NFC');
   return itpPartes(texto).map(p => itpUma(p, hoje));
 }
-// Título curto de uma ideia ditada no widget Ideia: até ~70 letras, cortando na palavra, com "…".
+// Título curto de uma ideia ditada no widget Ideia (pedido do Artur, 24/10/2026): tira a enrolação da fala
+// ("eu queria que", "tipo", "né") e fica com a 1ª frase, até 8 palavras. O texto inteiro vai nos detalhes.
+const ITP_MULETAS = /(^|\s)(n[ée]|tipo assim|tipo|beleza|a[íi]|ent[ãa]o|assim|sabe|cara|enfim)[,.]?(?=\s|$)/gi;
+const ITP_INICIO = /^(e |mas |olha |bom |a ideia [ée] |ideia:? |seria (legal|bom) (se |que )?|(eu )?(queria|quero|preciso|gostaria)( de)?( que)? |vamos |fazer (com )?que )+/i;
 function tituloIdeia(texto) {
   const t = String(texto == null ? '' : texto).replace(/\s+/g, ' ').trim();
-  if (t.length <= 70) return t.charAt(0).toUpperCase() + t.slice(1);
-  const c = t.slice(0, 70).replace(/\s+\S*$/, '').replace(/[\s,.;:—-]+$/, '');
-  return c.charAt(0).toUpperCase() + c.slice(1) + '…';
+  const frase = t.split(/[.!?;]|, (?=mas |porque |pq )/)[0].trim() || t;
+  let c = frase.replace(ITP_MULETAS, ' ').replace(/\s+/g, ' ').trim();
+  for (let k = 0; k < 3; k++) c = c.replace(ITP_INICIO, '').trim();
+  if (!c) c = t;
+  c = c.split(' ').slice(0, 8).join(' ').replace(/[\s,.;:—-]+$/, '')
+    .replace(/\s+(e|de|do|da|que|o|a|os|as|em|no|na|pra|para|com|um|uma|ele|ela|se|mas|é)$/i, '');
+  return c.charAt(0).toUpperCase() + c.slice(1);
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia };

@@ -36,6 +36,9 @@ t('vazio', '   ', []);
 // tituloIdeia (widget Ideia -> tarefa Ferramenta "💡 título")
 function ti(nome, entrada, esperado) { n++; const o = tituloIdeia(entrada); if (o !== esperado) { falhas++; console.log('FALHOU: ' + nome + ' -> ' + o + ' (esperado ' + esperado + ')') } }
 ti('ideia curta', '  versão do apk  no topo ', 'Versão do apk no topo');
-ti('ideia longa corta na palavra', 'quando eu tô gravando aqui esses áudios é pelo Google né Beleza mas se eu paro de falar ele para', 'Quando eu tô gravando aqui esses áudios é pelo Google né Beleza mas…');
+ti('tira enrolação e corta em 7 palavras', 'quando eu tô gravando aqui esses áudios é pelo Google né Beleza mas se eu paro de falar ele para', 'Quando eu tô gravando aqui esses áudios');
+ti('tira eu queria que', 'eu queria que o app de fotos abrisse em tela cheia. e mais coisas', 'O app de fotos abrisse em tela cheia');
+ti('muletas no meio', 'tipo um botão né pra exportar o laudo', 'Um botão pra exportar o laudo');
+ti('só enrolação usa o texto', 'né', 'Né');
 console.log(falhas ? falhas + ' de ' + n + ' falharam' : 'ok: ' + n + ' casos');
 process.exit(falhas ? 1 : 0);
