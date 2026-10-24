@@ -1,4 +1,4 @@
-// Banco CBR app 1.18.3 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.19.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
 //  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
@@ -110,7 +110,14 @@ function interpretarTarefa(texto, hoje) {
   texto = String(texto == null ? '' : texto).normalize('NFC');
   return itpPartes(texto).map(p => itpUma(p, hoje));
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa };
+// Título curto de uma ideia ditada no widget Ideia: até ~70 letras, cortando na palavra, com "…".
+function tituloIdeia(texto) {
+  const t = String(texto == null ? '' : texto).replace(/\s+/g, ' ').trim();
+  if (t.length <= 70) return t.charAt(0).toUpperCase() + t.slice(1);
+  const c = t.slice(0, 70).replace(/\s+\S*$/, '').replace(/[\s,.;:—-]+$/, '');
+  return c.charAt(0).toUpperCase() + c.slice(1) + '…';
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia };
 
 
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
@@ -1003,7 +1010,8 @@ try{const B=window.BCBRNativo,v=document.querySelector('.brand .versao');if(B&&t
 if(window.BCBRNativo){setInterval(()=>smNativo(),20000);document.addEventListener('visibilitychange',()=>{if(document.hidden)smNativo(true)});setTimeout(()=>smNativo(true),4000)}
 
 // ---- Tarefas criadas pela tela nativa do app Android (sem abrir a WebView) — 1.17.0 ----
-// BCBRNativo.pendentes() -> JSON [{id, texto, criadoEm, voz}] · cada texto passa por interpretarTarefa · BCBRNativo.confirmar(JSON de ids).
+// BCBRNativo.pendentes() -> JSON [{id, texto, criadoEm, voz, tipo?}] · cada texto passa por interpretarTarefa;
+// tipo 'ideia' (widget Ideia, APK 1.3) vira 1 tarefa Ferramenta sem data "💡 título" com o texto inteiro nos detalhes (1.19.0) · BCBRNativo.confirmar(JSON de ids).
 // Ids já importados ficam em localStorage (não duplica se o app nativo reenviar). Tolera a ponte sem esses métodos.
 const SM_NAT_IMP='bcbr_nat_importados';
 let smNatBusy=false;
@@ -1016,7 +1024,7 @@ function smNativoImporta(){
     const ids=[];smNatBusy=true;
     lista.forEach(p=>{
       if(!p||p.id==null)return;const id=String(p.id);ids.push(id);if(jaImp.includes(id))return;
-      const t=String(p.texto||'').trim();if(t){const nv=smCriaDeTexto(t,{});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}
+      const t=String(p.texto||'').trim();if(t&&p.tipo==='ideia'){const nv=smNovos(['sem'],'💡 '+tituloIdeia(t),'ferramenta','',t);smPoe(nv,'ideia do celular');toast('Ideia nas tarefas: '+nv[0].texto)}else if(t){const nv=smCriaDeTexto(t,{});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}
       jaImp.push(id);
     });
     try{localStorage.setItem(SM_NAT_IMP,JSON.stringify(jaImp.slice(-500)))}catch(e){}

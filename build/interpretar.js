@@ -109,4 +109,11 @@ function interpretarTarefa(texto, hoje) {
   texto = String(texto == null ? '' : texto).normalize('NFC');
   return itpPartes(texto).map(p => itpUma(p, hoje));
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa };
+// Título curto de uma ideia ditada no widget Ideia: até ~70 letras, cortando na palavra, com "…".
+function tituloIdeia(texto) {
+  const t = String(texto == null ? '' : texto).replace(/\s+/g, ' ').trim();
+  if (t.length <= 70) return t.charAt(0).toUpperCase() + t.slice(1);
+  const c = t.slice(0, 70).replace(/\s+\S*$/, '').replace(/[\s,.;:—-]+$/, '');
+  return c.charAt(0).toUpperCase() + c.slice(1) + '…';
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia };

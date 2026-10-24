@@ -1,5 +1,5 @@
 // Testes de interpretarTarefa (build/interpretar.js). Uso: node teste/interpretar.test.js  (sai com código 1 se falhar)
-const { interpretarTarefa } = require('../build/interpretar.js');
+const { interpretarTarefa, tituloIdeia } = require('../build/interpretar.js');
 const H = '2026-10-23';   // sexta-feira
 let falhas = 0, n = 0;
 function t(nome, entrada, esperado) {
@@ -33,5 +33,9 @@ t('30 de outubro', '30 de outubro dentista', [{ texto: 'Dentista', dia: '2026-10
 t('para hoje', 'entregar relatório para hoje', [{ texto: 'Entregar relatório', dia: H }]);
 t('sem nada', 'comprar café', [{ texto: 'Comprar café' }]);
 t('vazio', '   ', []);
+// tituloIdeia (widget Ideia -> tarefa Ferramenta "💡 título")
+function ti(nome, entrada, esperado) { n++; const o = tituloIdeia(entrada); if (o !== esperado) { falhas++; console.log('FALHOU: ' + nome + ' -> ' + o + ' (esperado ' + esperado + ')') } }
+ti('ideia curta', '  versão do apk  no topo ', 'Versão do apk no topo');
+ti('ideia longa corta na palavra', 'quando eu tô gravando aqui esses áudios é pelo Google né Beleza mas se eu paro de falar ele para', 'Quando eu tô gravando aqui esses áudios é pelo Google né Beleza mas…');
 console.log(falhas ? falhas + ' de ' + n + ' falharam' : 'ok: ' + n + ' casos');
 process.exit(falhas ? 1 : 0);
