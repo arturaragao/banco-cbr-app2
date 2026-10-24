@@ -1,4 +1,4 @@
-// Banco CBR app 1.18.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.18.3 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
 //  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
@@ -998,6 +998,8 @@ function smNativo(forca){
   try{if(!window.BCBRNativo)return;const r=smNativoResumo();if(!r)return;
     const s=JSON.stringify({...r,geradoEm:''});if(!forca&&s===smNatUlt)return;smNatUlt=s;window.BCBRNativo.dados(JSON.stringify(r))}catch(e){console.warn('ponte Android',e)}
 }
+// No app Android: topo mostra a versão do site e a do APK (BCBRNativo.versao), para saber se o app atualizou.
+try{const B=window.BCBRNativo,v=document.querySelector('.brand .versao');if(B&&typeof B.versao==='function'&&v)v.textContent='site '+(window.BCBR_VERSAO||'')+' · app '+B.versao()}catch(e){}
 if(window.BCBRNativo){setInterval(()=>smNativo(),20000);document.addEventListener('visibilitychange',()=>{if(document.hidden)smNativo(true)});setTimeout(()=>smNativo(true),4000)}
 
 // ---- Tarefas criadas pela tela nativa do app Android (sem abrir a WebView) — 1.17.0 ----

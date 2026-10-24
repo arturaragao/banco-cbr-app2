@@ -883,6 +883,8 @@ function smNativo(forca){
   try{if(!window.BCBRNativo)return;const r=smNativoResumo();if(!r)return;
     const s=JSON.stringify({...r,geradoEm:''});if(!forca&&s===smNatUlt)return;smNatUlt=s;window.BCBRNativo.dados(JSON.stringify(r))}catch(e){console.warn('ponte Android',e)}
 }
+// No app Android: topo mostra a versão do site e a do APK (BCBRNativo.versao), para saber se o app atualizou.
+try{const B=window.BCBRNativo,v=document.querySelector('.brand .versao');if(B&&typeof B.versao==='function'&&v)v.textContent='site '+(window.BCBR_VERSAO||'')+' · app '+B.versao()}catch(e){}
 if(window.BCBRNativo){setInterval(()=>smNativo(),20000);document.addEventListener('visibilitychange',()=>{if(document.hidden)smNativo(true)});setTimeout(()=>smNativo(true),4000)}
 
 // ---- Tarefas criadas pela tela nativa do app Android (sem abrir a WebView) — 1.17.0 ----
