@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.19.0"
+VERSAO = "1.19.1"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -16,6 +16,9 @@ def troca(a, b, n=1):
 # imagens do repositório privado (servidas pelo sw.js)
 troca("const imgSrc=u=>String(u).startsWith('u:')?",
       "const imgSrc=u=>String(u).startsWith('gh:')?(window.BCBR&&BCBR.imgPronta(String(u).slice(3))||'./img/'+encodeURIComponent(String(u).slice(3))):String(u).startsWith('u:')?")
+# 1.19.1: botão de tema só com ícone (Artur: com a versão do APK no topo ele descia para outra linha)
+troca("b.textContent=t==='auto'?'Tema: auto':t==='claro'?'Tema: claro':'Tema: escuro'",
+      "{b.textContent=t==='auto'?'◐':t==='claro'?'☀':'☾';b.title=b.ariaLabel='Tema: '+t}")
 # número da questão = número no Notion
 troca("const posDe=q=>+q.id.slice(1);", "const posDe=q=>q.n??1e5;")
 troca("Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}", "Notion #${q.n??'—'}")
