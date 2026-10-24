@@ -147,4 +147,9 @@ document.addEventListener('touchend',e=>{
 },{passive:true});
 
 // depois de deslizar, a página já abre na questão: a grade com os números fica acima, fora da tela (pedido do Artur, 24/10/2026)
-function qPulaGrade(){const g=document.querySelector('#app .qgrid');if(g)scrollTo(0,Math.max(0,g.getBoundingClientRect().bottom+scrollY+4))}
+// o cabeçalho encolhe ao rolar: rola, e corrige uma vez depois que ele mudou de altura
+function qPulaGrade(){qPulaGrade1();setTimeout(qPulaGrade1,60)}
+function qPulaGrade1(){   // topo do cartão da questão logo abaixo da barra fixa (título + abas); a grade fica acima, é só subir
+  const c=document.querySelector('#app .qlay .card');if(!c)return;let off=0;
+  document.querySelectorAll('body>*,body>*>*').forEach(e=>{if(e.id==='app')return;const p=getComputedStyle(e).position;if(p!=='sticky'&&p!=='fixed')return;const r=e.getBoundingClientRect();if(r.top<=0.5&&r.bottom>0&&r.bottom<innerHeight/2&&r.width>innerWidth/2)off=Math.max(off,r.bottom)});
+  scrollTo(0,Math.max(0,c.getBoundingClientRect().top+scrollY-off-8))}
