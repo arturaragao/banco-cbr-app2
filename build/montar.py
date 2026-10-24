@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.19.1"
+VERSAO = "1.19.2"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -114,4 +114,5 @@ head = head.replace("<style>", pwa + "<style>", 1).replace("</style>", css + "</
 assert head.count("</svg>Banco CBR</div>") == 1
 head = head.replace("</svg>Banco CBR</div>", f'</svg>Banco CBR<small class="versao">v{VERSAO}</small></div>')
 open(f"{R}/index.html", "w", encoding="utf8").write(head + f'\n<script>window.BCBR_VERSAO="{VERSAO}"</script><script src="shim.js?v={VERSAO}"></script>\n</body></html>\n')
+open(f"{R}/versao.txt", "w", encoding="utf8").write(VERSAO)  # o app confere ao abrir (atualização instantânea)
 print("ok: app.js", len(js), "bytes · index.html", VERSAO)

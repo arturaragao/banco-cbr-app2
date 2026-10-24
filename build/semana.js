@@ -902,11 +902,29 @@ function smNativoImporta(){
     const ids=[];smNatBusy=true;
     lista.forEach(p=>{
       if(!p||p.id==null)return;const id=String(p.id);ids.push(id);if(jaImp.includes(id))return;
-      const t=String(p.texto||'').trim();if(t&&p.tipo==='ideia'){const nv=smNovos(['sem'],'💡 '+tituloIdeia(t),'ferramenta','',t);smPoe(nv,'ideia do celular');toast('Ideia nas tarefas: '+nv[0].texto)}else if(t){const nv=smCriaDeTexto(t,{});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}
+      const t=String(p.texto||'').trim();if(t&&p.tipo==='ideia'){smIdeiaNova=true}else if(t){const nv=smCriaDeTexto(t,{});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}
       jaImp.push(id);
     });
     try{localStorage.setItem(SM_NAT_IMP,JSON.stringify(jaImp.slice(-500)))}catch(e){}
     SM.fila.then(()=>{smNatBusy=false;if(!SM.erro&&ids.length&&typeof B.confirmar==='function'){try{B.confirmar(JSON.stringify(ids))}catch(e){console.warn('confirmar',e)}}});
   }catch(e){smNatBusy=false;console.warn('ponte Android (pendentes)',e)}
 }
+// ---- Caixa de ideias (ideias/caixa.md do repo privado) -> tarefas "💡" em Ferramenta, sem data — 1.19.2 ----
+// A caixa é a fonte (pedido do Artur, 24/10/2026): cada "- [ ] AAAA-MM-DD HH:MM — texto" vira 1 tarefa (campo ideia = data/hora, não duplica);
+// "- [x]" (o Claude no PC fez a ideia) marca a tarefa como concluída. Ideia do widget (APK) só é confirmada e entra pela caixa.
+let smIdeiaNova=false,smIdeiasUlt=0;
+function smIdeiasLinhas(md){const r=[];String(md||'').split(String.fromCharCode(10)).forEach(l=>{const m=l.trim().match(/^- \[( |x)\] (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) — (.+)$/);if(m&&!/^TESTE/.test(m[3]))r.push({feita:m[1]==='x',chave:m[2],texto:m[3].trim()})});return r}
+async function smIdeiasSync(forca){
+  if(!forca&&Date.now()-smIdeiasUlt<60000)return;smIdeiasUlt=Date.now();
+  try{await smCarga;if(!SM.d)return;
+    const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/ideias/caixa.md`);const linhas=smIdeiasLinhas(smDec(f.content));
+    const muda=x=>{const t=SM.d.tarefas.find(y=>y.ideia===x.chave);return !t||t.feito!==x.feita};
+    if(!linhas.some(muda))return;
+    smMudar(d=>linhas.forEach(x=>{const t=d.tarefas.find(y=>y.ideia===x.chave);
+      if(t){t.feito=x.feita;return}
+      const n=smNovos(['sem'],'💡 '+tituloIdeia(x.texto),'ferramenta','',x.texto)[0];n.ideia=x.chave;n.feito=x.feita;d.tarefas.push(n)}),'ideias do celular');
+  }catch(e){if(e&&e.status!==404)console.warn('caixa de ideias',e)}
+}
+smIdeiasSync(true);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')smIdeiasSync()});
+setInterval(()=>{if(smIdeiaNova){smIdeiaNova=false;setTimeout(()=>smIdeiasSync(true),12000)}},3000);   // widget acabou de mandar: relê a caixa
 if(window.BCBRNativo){smNativoImporta();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')smNativoImporta()})}

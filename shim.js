@@ -209,9 +209,25 @@
     document.getElementById("bcbr_av_no").onclick = () => el.remove();
   }
   if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => { if (e.data === "bcbr-nova") aviso("Versão nova do app pronta."); });
+  // 1.19.2: atualização instantânea (pedido do Artur, 24/10/2026): ao abrir e ao voltar para a tela, confere versao.txt (sem cache).
+  // Se mudou, apaga a cópia do app no aparelho e recarrega sozinho (progresso e rascunhos já ficam salvos).
+  async function confereVersao() {
+    try {
+      const r = await fetch("./versao.txt?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return;
+      const v = (await r.text()).trim(); if (!v || v === window.BCBR_VERSAO) return;
+      if (sessionStorage.getItem("bcbr_recarregou") === v) return;   // não entra em laço se o GitHub ainda serve a velha
+      sessionStorage.setItem("bcbr_recarregou", v);
+      const ks = await caches.keys(); await Promise.all(ks.filter((k) => k.startsWith("bcbr-v")).map((k) => caches.delete(k)));
+      const reg = "serviceWorker" in navigator && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update().catch(() => {});
+      location.reload();
+    } catch (e) {}
+  }
+  window.bcbrConfereVersao = confereVersao;
+  confereVersao();
   let ultChecagem = Date.now();
   const checarDados = () => carregarDados(true).then((m) => { if (m) aviso("Questões novas baixadas."); }).catch(() => {});
   document.addEventListener("visibilitychange", () => {   // app que ficou aberto em segundo plano: confere de novo (no máx. a cada 10 min)
+    if (document.visibilityState === "visible") confereVersao();
     if (document.visibilityState === "visible" && Date.now() - ultChecagem > 600000) { ultChecagem = Date.now(); checarDados(); }
   });
 

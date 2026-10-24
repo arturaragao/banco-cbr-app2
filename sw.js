@@ -1,6 +1,6 @@
 // Service worker do Banco CBR: guarda o app para abrir sem internet e serve as imagens (./img/<arquivo>)
 // lendo do repositório privado com a chave do aparelho. Imagem vista uma vez fica no aparelho.
-const VERSAO = "bcbr-v25";
+const VERSAO = "bcbr-v26";
 const APP = ["./", "./index.html", "./shim.js", "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-mask.png", "./apple-touch-icon.png"];
 const REPO = "arturaragao/banco-cbr-app";
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(APP)).catch(() => {})); self.skipWaiting(); });
@@ -23,11 +23,12 @@ self.addEventListener("fetch", (e) => {
   const m = u.pathname.match(/\/img\/([^/]+)$/);
   if (m) return e.respondWith(imagem(e.request, decodeURIComponent(m[1])));
   if (e.request.method !== "GET") return;
+  if (u.pathname.endsWith("/versao.txt")) return;   // sempre da rede (confere versão nova)
   // app: abre na hora com a cópia do aparelho e baixa a versão nova por trás (pedido do Artur, 23/10/2026: abrir rápido no celular).
   // Se a página mudou, avisa o app ("Versão nova do app pronta · Atualizar"). Sem cópia: rede (e cópia se o GitHub falhar).
   e.respondWith((async () => {
     const cache = await caches.open(VERSAO), hit = await cache.match(e.request);
-    const rede = fetch(e.request).then(async (r) => {
+    const rede = fetch(e.request.url, { cache: "no-cache" }).then(async (r) => {
       if (r.ok) {
         const pagina = e.request.mode === "navigate";
         if (pagina && hit) {
