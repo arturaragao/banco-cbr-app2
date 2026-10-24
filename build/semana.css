@@ -291,3 +291,17 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
  .sm-vsem .sm-fo,.sm-vsem .sm-rs{font-size:.6rem;line-height:1.3}
  .sm-vsem .sm-cel .sm-ev,.sm-vsem .sm-fe{font-size:.58rem}
 }
+
+/* ===== 1.17.0 ===== */
+/* texto e detalhes só editam ao clicar; fora disso não selecionam (senão atrapalham segurar e arrastar) */
+.sm-texto:not([contenteditable]),.sm-row .sm-tag{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.sm-row[data-tid]{-webkit-touch-callout:none}
+.sm-det{cursor:text;white-space:normal}
+.sm-det.ed{white-space:pre-wrap;outline:none;box-shadow:0 1px 0 var(--pri);color:var(--tx)}
+.sm-texto.ed{box-shadow:0 1px 0 var(--pri);border-radius:2px}
+/* Nova tarefa */
+.qa-prev{min-height:1.2em;font-size:.82rem;color:var(--mut,#94a3b8)}
+.qa-opts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.sm-dz{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:100000;display:flex;gap:10px;align-items:center;background:var(--tx,#111);color:var(--bg,#fff);padding:8px 12px;border-radius:10px;max-width:92vw}
+.sm-dz span{min-width:0;overflow-wrap:anywhere}
+#qa_mic[aria-pressed="true"]{border-color:var(--bad,#ef4444);color:var(--bad,#ef4444)}

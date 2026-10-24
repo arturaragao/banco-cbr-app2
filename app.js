@@ -1,4 +1,118 @@
-// Banco CBR app 1.16.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.17.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
+// Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
+//  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
+//  hora: 'HH:MM' | null · urg: boolean · area: 'estudo' | 'ferramenta' | 'tarefas' | null (null = padrão de quem chama)
+//  hoje: 'AAAA-MM-DD' (padrão: hoje no aparelho). Um ditado pode ter várias tarefas: "próxima tarefa", "nova tarefa", "outra tarefa" ou ";".
+// Ex.: "consulta neurologista dia 30/10 11 horas" -> [{texto:'Consulta neurologista', dia:'AAAA-10-30', hora:'11:00', ...}]
+// Testes: teste/interpretar.test.js (node teste/interpretar.test.js). Sem dependências: roda no navegador e no node.
+const itpSem = s => s.replace(/[áàâãä]/g, 'a').replace(/[éèêë]/g, 'e').replace(/[íìîï]/g, 'i').replace(/[óòôõö]/g, 'o').replace(/[úùûü]/g, 'u').replace(/ç/g, 'c').replace(/ñ/g, 'n');
+const itpP = n => String(n).padStart(2, '0');
+const itpIso = (y, m, d) => y + '-' + itpP(m) + '-' + itpP(d);
+const itpValida = (y, m, d) => { const x = new Date(y, m - 1, d, 12); return x.getFullYear() === y && x.getMonth() === m - 1 && x.getDate() === d };
+function itpMais(iso, n) { const [y, m, d] = iso.split('-').map(Number), x = new Date(y, m - 1, d + n, 12); return itpIso(x.getFullYear(), x.getMonth() + 1, x.getDate()) }
+function itpDow(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d, 12).getDay() }
+const ITP_MESES = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const ITP_DIAS = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+
+// dia/mês (sem ano: este ano, ou o próximo se já passou) -> ISO ou null
+function itpDataNum(d, mo, y, hoje) {
+  const hy = +hoje.slice(0, 4);
+  if (y != null) { y = y < 100 ? 2000 + y : y; return itpValida(y, mo, d) ? itpIso(y, mo, d) : null }
+  if (itpValida(hy, mo, d) && itpIso(hy, mo, d) >= hoje) return itpIso(hy, mo, d);
+  return itpValida(hy + 1, mo, d) ? itpIso(hy + 1, mo, d) : null;
+}
+// "dia 30": este mês; se já passou (ou o mês não tem o dia), o próximo que tiver
+function itpDiaDoMes(d, hoje) {
+  const y = +hoje.slice(0, 4), m = +hoje.slice(5, 7);
+  for (let i = 0; i < 14; i++) { const mm = m + i, yy = y + Math.floor((mm - 1) / 12), m2 = ((mm - 1) % 12) + 1; if (itpValida(yy, m2, d) && itpIso(yy, m2, d) >= hoje) return itpIso(yy, m2, d) }
+  return null;
+}
+
+function itpPartes(s) {
+  const n = itpSem(s.toLowerCase()), re = /\s*;\s*|[\s,.]*\b(?:proxima|nova|outra)\s+tarefa\b[\s,.:]*/g, out = [];
+  let ult = 0, m;
+  while ((m = re.exec(n))) { out.push(s.slice(ult, m.index)); ult = m.index + m[0].length; if (!m[0].length) re.lastIndex++ }
+  out.push(s.slice(ult));
+  return out.map(x => x.trim()).filter(Boolean);
+}
+
+function itpUma(seg, hoje) {
+  let o = seg, n = itpSem(seg.toLowerCase());
+  const R = { texto: '', dia: null, hora: null, urg: false, area: null };
+  // acha a 1ª ocorrência em que fn(m) não devolve false e apaga o trecho (o e n ficam alinhados, com espaços no lugar)
+  const tira = (re, fn) => {
+    const g = new RegExp(re.source, 'g'); let m;
+    while ((m = g.exec(n))) {
+      if (!m[0].length) { g.lastIndex++; continue }
+      if (fn(m) === false) continue;
+      const b = ' '.repeat(m[0].length);
+      o = o.slice(0, m.index) + b + o.slice(m.index + m[0].length); n = n.slice(0, m.index) + b + n.slice(m.index + m[0].length);
+      return true;
+    }
+    return false;
+  };
+  tira(/\bsem\s+data(?:\s+definida)?\b/, () => { R.dia = 'sem' });
+  tira(/\burgente\b/, () => { R.urg = true });
+  // ---- data ----
+  const pre = '(?:\\b(?:para|pra|ate|em)\\s+)?';
+  if (!R.dia) {
+    tira(new RegExp(pre + '\\bdepois\\s+de\\s+amanha\\b'), () => { R.dia = itpMais(hoje, 2) }) ||
+    tira(new RegExp(pre + '\\bamanha\\b'), () => { R.dia = itpMais(hoje, 1) }) ||
+    tira(new RegExp(pre + '\\bhoje\\b'), () => { R.dia = hoje }) ||
+    tira(/(?:\bdia\s+)?\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?(?!\d)/, m => { const iso = itpDataNum(+m[1], +m[2], m[3] != null ? +m[3] : null, hoje); if (!iso) return false; R.dia = iso }) ||
+    tira(new RegExp('(?:\\bdia\\s+)?\\b(\\d{1,2})\\s+de\\s+(' + ITP_MESES.join('|') + ')(?:\\s+de\\s+(\\d{4}))?\\b'), m => { const iso = itpDataNum(+m[1], ITP_MESES.indexOf(m[2]) + 1, m[3] != null ? +m[3] : null, hoje); if (!iso) return false; R.dia = iso }) ||
+    tira(/\bdia\s+(\d{1,2})\b/, m => { const iso = itpDiaDoMes(+m[1], hoje); if (!iso) return false; R.dia = iso }) ||
+    tira(new RegExp('(?:\\b(?:na|no|nesta|neste|esta|este|proxima|proximo|pra|para)\\s+)?\\b(' + ITP_DIAS.join('|') + ')(?:-feira)?\\b'), m => {
+      const alvo = ITP_DIAS.indexOf(m[1]), delta = ((alvo - itpDow(hoje)) % 7 + 7) % 7 || 7; R.dia = itpMais(hoje, delta);
+    });
+  }
+  // ---- hora ----
+  const as = '(?:\\bas\\s+)?', hv = (h, mi) => { if (h > 23 || mi > 59) return false; R.hora = itpP(h) + ':' + itpP(mi) };
+  tira(new RegExp(as + '\\b(\\d{1,2})\\s+(?:horas?\\s+)?da\\s+(tarde|noite|manha)\\b'), m => { let h = +m[1]; if (m[2] !== 'manha' && h < 12) h += 12; return hv(h, 0) }) ||
+  tira(new RegExp(as + '\\b(\\d{1,2})\\s*(?:horas?|h)\\s+e\\s+meia\\b'), m => hv(+m[1], 30)) ||
+  tira(new RegExp(as + '\\b(\\d{1,2}):(\\d{2})\\b'), m => hv(+m[1], +m[2])) ||
+  tira(new RegExp(as + '\\b(\\d{1,2})h(\\d{2})\\b'), m => hv(+m[1], +m[2])) ||
+  tira(new RegExp(as + '\\b(\\d{1,2})\\s*(?:horas?|h)\\b'), m => hv(+m[1], 0)) ||
+  tira(new RegExp(as + '\\b(\\d{1,2})\\s+e\\s+meia\\b'), m => hv(+m[1], 30)) ||
+  tira(/\bmeio[\s-]dia\b/, () => hv(12, 0)) ||
+  tira(/\bas\s+(\d{1,2})\b(?![\/:])/, m => hv(+m[1], 0));
+  if (R.hora) {   // "3 horas da tarde", "11 da noite": ajusta para 24 h e tira a palavra
+    const h = +R.hora.slice(0, 2);
+    tira(/\bda\s+(tarde|noite|manha)\b/, m => { if (m[1] !== 'manha' && h >= 1 && h < 12) R.hora = itpP(h + 12) + R.hora.slice(2) });
+  }
+  // ---- tipo: "estudo"/"ferramenta"/"tarefa" no começo ou no fim ----
+  const resta = (re) => { const m = re.exec(n); if (!m) return null; const t = n.slice(0, m.index) + ' '.repeat(m[0].length) + n.slice(m.index + m[0].length); return /[a-z0-9]/.test(t) ? m : null };
+  const tira2 = (m) => { const b = ' '.repeat(m[0].length); o = o.slice(0, m.index) + b + o.slice(m.index + m[0].length); n = n.slice(0, m.index) + b + n.slice(m.index + m[0].length) };
+  const tipoDe = w => /^tarefa/.test(w) ? 'tarefas' : w;
+  for (let i = 0; i < 4; i++) {
+    const ini = resta(/^\s*(?:[,.:;-]\s*)*(estudo|ferramenta|tarefas?)\b(?!\s+(?:de|do|da|dos|das|sobre|para|pra)\b)/), fim = resta(/\b(estudo|ferramenta|tarefas?)[\s,.:;-]*$/);
+    const m = ini || fim; if (!m) break;
+    if (!R.area) R.area = tipoDe(m[1]);
+    tira2(m);
+  }
+  // ---- limpeza: espaços, pontuação solta e preposições que sobraram nas pontas ----
+  let t = o.replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 12; i++) {
+    const nt = itpSem(t.toLowerCase());
+    const f = nt.match(/^(?:[,.:;-]\s*)+/) || nt.match(/(?:\s*[,:;-])+$/) || nt.match(/\s+(?:a|as|o|os|no|na|nos|nas|em|para|pra|de|do|da|e|ate|por)$/) || nt.match(/^(?:para|pra|e|ate)\s+/);
+    if (!f) break;
+    t = f.index === 0 ? t.slice(f[0].length) : t.slice(0, f.index);
+    t = t.trim();
+  }
+  if (!t) t = seg.trim();
+  R.texto = t.charAt(0).toUpperCase() + t.slice(1);
+  return R;
+}
+
+function interpretarTarefa(texto, hoje) {
+  if (!hoje) { const x = new Date(); hoje = itpIso(x.getFullYear(), x.getMonth() + 1, x.getDate()) }
+  texto = String(texto == null ? '' : texto).normalize('NFC');
+  return itpPartes(texto).map(p => itpUma(p, hoje));
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa };
+
+
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
 // Dados: semana/plano.json no repo privado banco-cbr-app (mesma chave do app). Formato v2:
 //  {v:2, regras, subtitulo, dias:{"AAAA-MM-DD":{agenda,tipo?,meta?}}, tarefas:[{id,dia,texto,area,sub?,feito,feitoEm,ordem,grupo?,auto?,adiado?}], notas:[...], tipos?:[{id,nome,subs?:[]}]}
@@ -20,9 +134,9 @@ const smDt=iso=>{const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d
 const smMais=(iso,n)=>{const x=smDt(iso);x.setDate(x.getDate()+n);return dKey(+x)};
 const smRot=iso=>{if(iso==='proxima')return'Sem dia';if(iso==='sem')return'Sem data';const x=smDt(iso);return smDOW[x.getDay()]+' '+x.getDate()};
 const smRotL=iso=>{const x=smDt(iso);return smDOW[x.getDay()]+' '+x.getDate()+'/'+String(x.getMonth()+1).padStart(2,'0')};
-const smSeg=iso=>{const x=smDt(iso),k=(x.getDay()+6)%7;return smMais(iso,-k)};        // segunda da semana
+const smSeg=iso=>smMais(iso,-smDt(iso).getDay());        // início da semana = DOMINGO (1.17.0)
 const smSemana=iso=>{const s=smSeg(iso);return Array.from({length:7},(_,i)=>smMais(s,i))};
-const smNumSem=iso=>{const x=smDt(smMais(smSeg(iso),3)),a=new Date(x.getFullYear(),0,1,12);return 1+Math.floor(Math.round((x-a)/DAY)/7)};   // semana ISO (pela quinta-feira)
+const smNumSem=iso=>{const x=smDt(smMais(smSeg(iso),4)),a=new Date(x.getFullYear(),0,1,12);return 1+Math.floor(Math.round((x-a)/DAY)/7)};   // semana ISO (pela quinta-feira)
 function smGuardaCache(){try{localStorage.setItem('sm_cache2',JSON.stringify({sha:SM.sha,d:SM.d}))}catch(e){}}
 
 // ---------- leitura / gravação ----------
@@ -213,7 +327,7 @@ function smFeitasAlterna(dia){SM_FEITAS[dia]=!SM_FEITAS[dia];try{localStorage.se
 function smCheck(id,v){const feitoEm=v?new Date().toISOString():null;smMudar(d=>{const t=d.tarefas.find(x=>x.id===id);if(t){t.feito=v;t.feitoEm=feitoEm;if(!v)delete t.auto}},v?'feito':'desmarcado');if(!v)SM.auto.add(id)}
 function smUrgente(id){const t=smTar(id);if(!t)return;const urg=!t.urg;smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x){if(urg)x.urg=true;else delete x.urg}},'urgência do item')}
 function smEdita(id){
-  if(SM.ed&&SM.ed.id===id){SM.ed=null;render();return}
+  if(SM.ed&&SM.ed.id===id){smEdFecha();return}
   const t=smTar(id);if(!t)return;SM.ed={id,esc:'todos',dias:new Set(smGrupo(t).map(x=>x.dia).filter(x=>x!=='proxima'&&x!=='sem')),conf:false};render();
   const i=document.getElementById('sm_ed_txt');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}
 }
@@ -229,23 +343,23 @@ function smSalvar(id,textoDireto){
   const dtEl=document.getElementById('sm_ed_det'),det=dtEl?dtEl.value.trim():(t.det||'');const dEl=document.getElementById('sm_ed_dia'),nd=dEl?(dEl.value||(/^\d{4}-/.test(t.dia)?'sem':t.dia)):t.dia,mudouDia=!!dEl&&nd!==t.dia;
   const g=smGrupo(t),ligado=g.length>1;
   const aplica=(x,sd)=>{x.texto=texto;x.area=area;if(urg)x.urg=true;else delete x.urg;if(det)x.det=det;else delete x.det;if(sub)x.sub=sub;else delete x.sub;if(sd){x.dia=nd;delete x.grupo;x.ordem=100+SM.d.tarefas.filter(y=>y.dia===nd).length}};
-  if((ligado&&SM.ed.esc==='este')||t.dia==='sem'||(!ligado&&mudouDia)){const id=t.id,sd=mudouDia;SM.ed=null;smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x)aplica(x,sd)},'editou item');return}
+  if((ligado&&SM.ed.esc==='este')||t.dia==='sem'||(!ligado&&mudouDia)){const id=t.id,sd=mudouDia;smRascEdLimpa();SM.ed=null;smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x)aplica(x,sd)},'editou item');return}
   const semana=new Set(smSemana(t.dia==='proxima'?smHoje():t.dia)),dias=[...SM.ed.dias].filter(x=>semana.has(x));
   if(!dias.length&&t.dia!=='proxima'&&g.every(x=>semana.has(x.dia))){toast('Escolha pelo menos um dia (ou use Excluir).');return}
   const gid=t.grupo||(dias.length>1?'g'+smId():null),tem=new Set(g.map(x=>x.dia)),ids=g.map(x=>x.id);
   const fora=g.filter(x=>semana.has(x.dia)&&!SM.ed.dias.has(x.dia)).map(x=>x.id);   // só mexe nos dias desta semana
   const novos=dias.filter(dia=>!tem.has(dia)).map(dia=>({id:smId(),dia,texto,area,...(urg?{urg:true}:{}),...(sub?{sub}:{}),...(det?{det}:{}),feito:false,ordem:100+smItensDe(dia).length,...(gid?{grupo:gid}:{})}));
-  SM.ed=null;
+  smRascEdLimpa();SM.ed=null;
   smMudar(d=>{d.tarefas=d.tarefas.filter(x=>!fora.includes(x.id));d.tarefas.forEach(x=>{if(ids.includes(x.id)){aplica(x,false);if(gid)x.grupo=gid}});
     novos.forEach(n=>{if(!d.tarefas.some(x=>x.id===n.id))d.tarefas.push({...n})})},'editou item');
 }
 function smExcluir(){
-  const t=smTar(SM.ed&&SM.ed.id);if(!t)return;const ids=(SM.ed.conf==='todos'?smGrupo(t):[t]).map(x=>x.id);SM.ed=null;
+  const t=smTar(SM.ed&&SM.ed.id);if(!t)return;const ids=(SM.ed.conf==='todos'?smGrupo(t):[t]).map(x=>x.id);smRascEdLimpa();SM.ed=null;
   smMudar(d=>{d.tarefas=d.tarefas.filter(x=>!ids.includes(x.id))},'excluiu item');
 }
 function smProxEstudo(base){let x=smMais(base,1);for(let i=0;i<60;i++,x=smMais(x,1))if(smTipo(x)==='estudo')return x;return'proxima'}
 function smAdiar(id){   // passa para o próximo dia de estudo (pula descanso e sobreaviso)
-  const t=smTar(id);if(!t)return;const base=t.dia==='proxima'||t.dia==='sem'||t.dia<smHoje()?smMais(smHoje(),-1):t.dia,alvo=smProxEstudo(base);SM.ed=null;
+  const t=smTar(id);if(!t)return;const base=t.dia==='proxima'||t.dia==='sem'||t.dia<smHoje()?smMais(smHoje(),-1):t.dia,alvo=smProxEstudo(base);smRascEdLimpa();SM.ed=null;
   smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(!x||x.dia===alvo)return;
     if(x.grupo&&d.tarefas.some(y=>y.id!==id&&y.grupo===x.grupo&&y.dia===alvo)){d.tarefas=d.tarefas.filter(y=>y.id!==id);return}
     x.dia=alvo;x.feito=false;x.adiado=(x.adiado||0)+1;x.ordem=200+d.tarefas.filter(y=>y.dia===alvo).length},'adiou item');
@@ -313,31 +427,65 @@ function smProva(v){if(!v)return;cfg.prova=v;persist('_est');render()}
 const smVal=(id,pad)=>esc(SM.dr[id]??pad??'');
 const smTipoNome={estudo:'Estudo',sobreaviso:'Sobreaviso',descanso:'Descanso'};
 function smChips(set,mk,dias){return `<div class="sm-chips">${dias.map(x=>`<button type="button" class="sm-chip ${smTipo(x)!=='estudo'?'fraco':''}" aria-pressed="${set.has(x)}" onclick="${mk(x)}">${smRot(x)}</button>`).join('')}<button type="button" class="sm-chip" aria-pressed="${dias.every(x=>set.has(x))}" onclick="${mk('*')}">Todos</button></div>`}
+// rascunho da edição de tarefa (localStorage a cada tecla; some ao salvar/cancelar/excluir)
+const SM_RASC_ED='bcbr_rasc_edicao';
+const smRascEd=id=>{try{const r=JSON.parse(localStorage.getItem(SM_RASC_ED)||'null');return r&&r.id===id?r:null}catch(e){return null}};
+function smRascEdSalva(id){
+  const g=k=>document.getElementById(k),a=g('sm_ed_txt');if(!a)return;
+  try{localStorage.setItem(SM_RASC_ED,JSON.stringify({id,texto:a.value,det:g('sm_ed_det')?g('sm_ed_det').value:undefined,area:g('sm_ed_area').value,urg:g('sm_ed_urg').getAttribute('aria-pressed')==='true',dia:g('sm_ed_dia')?g('sm_ed_dia').value:undefined}))}catch(e){}
+}
+const smRascEdLimpa=()=>{try{localStorage.removeItem(SM_RASC_ED)}catch(e){}};
+function smEdFecha(){smRascEdLimpa();SM.ed=null;render()}
 function smEditor(t){
+  const rd=smRascEd(t.id)||{};
   const g=smGrupo(t),lig=g.length>1,todos=!lig||SM.ed.esc==='todos',prox=t.dia==='proxima'||t.dia==='sem',sem=smSemana(prox?smHoje():t.dia),outras=g.filter(x=>!sem.includes(x.dia)).length;
   return `<div class="sm-ed">
-   <div class="row"><input id="sm_ed_txt" value="${esc(t.texto)}" style="flex:1 1 200px;min-width:0" onkeydown="if(event.key==='Enter')smSalvar();if(event.key==='Escape'){SM.ed=null;render()}" aria-label="Texto">
-     <select id="sm_ed_area" aria-label="Tipo">${smOpcoes(t.sub?(t.area||'estudo')+'|'+t.sub:(t.area||'estudo'))}</select><button type="button" id="sm_ed_urg" class="sm-tagb" aria-label="Urgente" aria-pressed="${!!t.urg}" onclick="this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')!=='true')">! urgente</button></div>
-   <textarea id="sm_ed_det" class="sm-detin" rows="3" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa (▸)" aria-label="Detalhes">${esc(t.det||'')}</textarea>
-   ${!lig||SM.ed.esc==='este'?`<div class="row"><span class="sm-lbl">Data</span><input type="date" id="sm_ed_dia" class="sm-date" value="${/^\d{4}-/.test(t.dia)?t.dia:''}" aria-label="Data"><button type="button" class="sm-tagb" onclick="document.getElementById('sm_ed_dia').value=''">sem data</button>${t.dia==='proxima'?'<span class="mut">(hoje: sem dia, semana nova)</span>':''}</div>`:''}
+   <div class="row"><input id="sm_ed_txt" value="${esc(rd.texto??t.texto)}" style="flex:1 1 200px;min-width:0" oninput="smRascEdSalva('${t.id}')" onkeydown="if(event.key==='Enter')smSalvar();if(event.key==='Escape')smEdFecha()" aria-label="Texto">
+     <select id="sm_ed_area" aria-label="Tipo" onchange="smRascEdSalva('${t.id}')">${smOpcoes(rd.area??(t.sub?(t.area||'estudo')+'|'+t.sub:(t.area||'estudo')))}</select><button type="button" id="sm_ed_urg" class="sm-tagb" aria-label="Urgente" aria-pressed="${rd.urg??!!t.urg}" onclick="this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')!=='true');smRascEdSalva('${t.id}')">! urgente</button></div>
+   <textarea id="sm_ed_det" class="sm-detin" rows="3" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa (▸)" aria-label="Detalhes" oninput="smRascEdSalva('${t.id}')">${esc(rd.det??t.det??'')}</textarea>
+   ${!lig||SM.ed.esc==='este'?`<div class="row"><span class="sm-lbl">Data</span><input type="date" id="sm_ed_dia" class="sm-date" value="${rd.dia!=null?rd.dia:/^\d{4}-/.test(t.dia)?t.dia:''}" aria-label="Data" onchange="smRascEdSalva('${t.id}')"><button type="button" class="sm-tagb" onclick="document.getElementById('sm_ed_dia').value='';smRascEdSalva('${t.id}')">sem data</button>${t.dia==='proxima'?'<span class="mut">(hoje: sem dia, semana nova)</span>':''}</div>`:''}
    ${lig?`<div class="row"><span class="sm-lbl">Aplicar em</span><div class="sm-seg"><button type="button" aria-pressed="${SM.ed.esc==='este'}" onclick="smEdEsc('este')">Só neste dia</button><button type="button" aria-pressed="${SM.ed.esc==='todos'}" onclick="smEdEsc('todos')">Todos os ${g.length} dias</button></div></div>`:''}
    ${todos&&!prox?`<span class="sm-lbl">Dias desta semana${outras?` <span class="mut">(+${outras} em outras semanas, ficam como estão)</span>`:''}</span>${smChips(SM.ed.dias,x=>`smEdChip('${x}')`,sem)}`:''}
    ${SM.ed.conf?`<div class="row"><span class="sm-conf">${SM.ed.conf==='todos'?`Excluir dos ${g.length} dias?`:'Excluir este item?'}</span><span style="flex:1"></span><button class="b s sm-ghost" onclick="smEdConf(false)">Não</button><button class="b s sm-del" onclick="smExcluir()">Excluir</button></div>`
-   :`<div class="row"><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button><button class="b s sm-danger" onclick="smEdConf('este')">${lig?'Excluir só deste dia':'Excluir'}</button>${lig?`<button class="b s sm-danger" onclick="smEdConf('todos')">De todos</button>`:''}<span style="flex:1"></span><button class="b s sm-ghost" onclick="SM.ed=null;render()">Cancelar</button><button class="b s" onclick="smSalvar()">Salvar</button></div>`}
+   :`<div class="row"><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button><button class="b s sm-danger" onclick="smEdConf('este')">${lig?'Excluir só deste dia':'Excluir'}</button>${lig?`<button class="b s sm-danger" onclick="smEdConf('todos')">De todos</button>`:''}<span style="flex:1"></span><button class="b s sm-ghost" onclick="smEdFecha()">Cancelar</button><button class="b s" onclick="smSalvar()">Salvar</button></div>`}
   </div>`;
 }
 function smTextoTecla(e,el){
   if(e.isComposing)return;
-  if(e.key==='Enter'){e.preventDefault();el.blur()}
-  else if(e.key==='Escape'){e.preventDefault();el.textContent=el.dataset.original;el.blur()}
+  if(e.key==='Enter'&&(!el.classList.contains('sm-det')||e.ctrlKey)){e.preventDefault();el.blur()}
+  else if(e.key==='Escape'){e.preventDefault();el.dataset.cancela='1';el.blur()}
 }
-function smTexto(t){return `<span class="sm-texto" contenteditable="plaintext-only" role="textbox" aria-label="Texto da tarefa" spellcheck="true" onfocus="this.dataset.original=this.textContent" onkeydown="smTextoTecla(event,this)" onblur="const v=this.textContent.trim();if(v)smSalvar('${t.id}',v);else this.textContent=this.dataset.original">${esc(t.texto)}</span>`}
+// Texto e detalhes da tarefa só viram editáveis no CLIQUE (não no toque/botão do mouse): editável o tempo todo atrapalhava
+// o segurar e arrastar (1.16.0). Depois do clique: cursor onde tocou; Enter/clicar fora salva, Esc desfaz.
+function smEditavel(ev,el,texto){
+  if(el.isContentEditable||(ev.target.closest&&ev.target.closest('a')))return;
+  el.dataset.original=texto;el.textContent=texto;el.classList.add('ed');el.setAttribute('contenteditable','plaintext-only');el.focus();
+  try{let r=null;const x=ev.clientX,y=ev.clientY;
+    if(document.caretPositionFromPoint){const p=document.caretPositionFromPoint(x,y);if(p&&el.contains(p.offsetNode)){r=document.createRange();r.setStart(p.offsetNode,p.offset)}}
+    else if(document.caretRangeFromPoint){r=document.caretRangeFromPoint(x,y);if(r&&!el.contains(r.startContainer))r=null}
+    if(!r){r=document.createRange();r.selectNodeContents(el);r.collapse(false)}
+    r.collapse(true);const sel=getSelection();sel.removeAllRanges();sel.addRange(r)}catch(e){}
+}
+function smTxtIni(ev,el,id){const t=smTar(id);if(t)smEditavel(ev,el,t.texto)}
+function smTxtFim(el,id){
+  el.removeAttribute('contenteditable');el.classList.remove('ed');
+  const v=el.textContent.trim(),cancela=el.dataset.cancela==='1';delete el.dataset.cancela;
+  if(!cancela&&v&&v!==el.dataset.original)smSalvar(id,v);else el.textContent=el.dataset.original;
+}
+function smDetIni(ev,el,id){const t=smTar(id);if(t)smEditavel(ev,el,t.det||'')}
+function smDetFim(el,id){
+  el.removeAttribute('contenteditable');el.classList.remove('ed');
+  const v=el.innerText.replace(/\s+$/,'').trim(),cancela=el.dataset.cancela==='1';delete el.dataset.cancela;
+  if(cancela||v===el.dataset.original){render();return}
+  smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x){if(v)x.det=v;else delete x.det}},'editou detalhes');
+}
+function smTexto(t){return `<span class="sm-texto" role="textbox" aria-label="Texto da tarefa (clique para editar)" spellcheck="true" onclick="smTxtIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smTxtFim(this,'${t.id}')">${esc(t.texto)}</span>`}
 function smItem(t){
   const g=t.grupo?SM.d.tarefas.filter(x=>x.grupo===t.grupo):[t],ed=SM.ed&&SM.ed.id===t.id,m=smMeta(t),q=m&&t.dia!=='proxima'&&t.dia!=='sem'?smQ(t.dia):null;
   if(t.pri)return `<div class="sm-row ${t.feito?'ok':''}"><div class="sm-it"><input type="checkbox" aria-label="Concluir prioridade" ${t.feito?'checked':''} onchange="smPriCheck('${t.dia}',this.checked)"><span class="sm-tx">${esc(t.texto)} <span class="sm-tag" title="Vem da lista de prioridades (muda sozinho quando a lista muda)">prioridades</span></span></div></div>`;
   const ab=t.det&&SM.ab.has(t.id),tg=t.det?`<button class="sm-tg" onclick="smTg('${t.id}')" aria-expanded="${!!ab}" aria-label="Detalhes">${ab?'▾':'▸'}</button>`:'';
-  return `<div class="sm-row ${t.feito?'ok':''} ${t.det?'tem-det':''} ${t.urg?'sm-urg t-'+smCorTipo(t.area):''}" data-tid="${t.id}"><div class="sm-it"><input type="checkbox" aria-label="Concluir tarefa" ${t.feito?'checked':''} onchange="smCheck('${t.id}',this.checked)">${tg}<span class="sm-tx">${smTexto(t)}${g.length>1?` <span class="sm-tag">${g.filter(x=>x.feito).length}/${g.length} dias</span>`:''}${q&&q.n?` <span class="sm-tag ${q.n>=m?'g':''}">banco ${q.n}/${m}</span>`:''}${t.auto?' <span class="sm-tag g">automático</span>':''}${t.adiado?` <span class="sm-tag">adiado</span>`:''}</span></div>
-   <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${ab?`<div class="sm-det">${md(t.det)}</div>`:''}${ed?smEditor(t):''}`;
+  return `<div class="sm-row ${t.feito?'ok':''} ${t.det?'tem-det':''} ${t.urg?'sm-urg t-'+smCorTipo(t.area):''}" data-tid="${t.id}"><div class="sm-it"><input type="checkbox" aria-label="Concluir tarefa" ${t.feito?'checked':''} onchange="smCheck('${t.id}',this.checked)">${tg}<span class="sm-tx">${smTexto(t)}${g.length>1?` <span class="sm-tag">${g.filter(x=>x.feito).length}/${g.length} dias</span>`:''}${q&&q.n?` <span class="sm-tag ${q.n>=m?'g':''}">banco ${q.n}/${m}</span>`:''}${t.auto?' <span class="sm-tag g">automático</span>':''}</span></div>
+   <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${ab?`<div class="sm-det" role="textbox" aria-label="Detalhes da tarefa (clique para editar)" onclick="smDetIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smDetFim(this,'${t.id}')">${md(t.det)}</div>`:''}${ed?smEditor(t):''}`;
 }
 function smGrupos(its){
   const g=smAgrupa(its);if(!g.length)return'';
@@ -465,7 +613,7 @@ function smGrade(mes,ini,fim,p,r,sem=false){
     if(SM.sem===s)h+=smPainelSemana(s);
     if(SM.sel&&ds.includes(SM.sel))h+=smPainelDia(SM.sel);
   }
-  return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
+  return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
 }
 function smLista(mes,ini,fim,p,r){
   const hj=smHoje(),esta=smSeg(hj);let h='';
@@ -528,118 +676,128 @@ function smMetaHoje(){
    <div class="sm-hp">${dd!=null?`<span class="sm-bign">${dd}</span><span class="mut">dias até a prova</span>`:''}${rit!=null?`<span class="mut">ritmo: <b style="color:${rit>=90?'var(--ok)':rit>=60?'var(--warn)':'var(--bad)'}">${rit>=90?'no caminho':rit>=60?'um pouco abaixo':'abaixo'}</b> (${rit}% da meta nos últimos 5 dias de estudo)</span>`:''}<span class="mut">${_restantesFM()} fáceis/médias novas</span>${r?`<span class="mut">reta final (rever erros) a partir de ${smRotL(r)}</span>`:''}</div></div>`;
 }
 
-// ===== ADICIONAR TAREFA RÁPIDO — Alt+A nas abas Hoje e Semana (pedido do Artur, 22/10/2026) =====
-// Passos: texto › tipo (↑↓ entre todos os tipos; "+ novo tipo") › [Estudo/Ferramenta: Enter = só hoje · → = escolher dias]
-// [Tarefas e tipos com subtema: subtema (↑↓, "sem subtema", "+ novo subtema") › Quando (Hoje / Dia específico / Sem data) › mini calendário]. Esc volta um passo.
-const QA={on:false,passo:'texto',texto:'',det:'',area:'estudo',sub:'',quando:'',dias:new Set(),cur:0,lista:[],tc:0,sc:0,qc:0,calCur:null};
-const qaCurto=a=>{const t=smTipoDe(a);return (a==='estudo'||a==='ferramenta')&&!(t.subs&&t.subs.length)};   // fluxo antigo (dias) x fluxo com subtema/quando
-const qaSeq=()=>qaCurto(QA.area)?['texto','tipo','dias']:['texto','tipo','sub','quando',...(QA.quando==='dia'?['data']:[])];
-const qaBase=p=>p==='novotipo'?'tipo':p==='novosub'?'sub':p;
-const qaTipos=()=>smTipos();
+// ===== NOVA TAREFA — Alt+A, botão +, ?acao=tarefa / ?acao=voz (1.17.0: campo único, Enter salva na hora) =====
+// Um campo só. Enter (ou Salvar) grava na hora: tipo "Tarefas", sem data, não urgente, a não ser que o texto diga outra coisa
+// (interpretarTarefa, build/interpretar.js). Quando / tipo / urgente / detalhes são botões opcionais. O que estiver digitado fica em
+// localStorage (QA_RASC) a cada tecla e volta ao reabrir, mesmo depois de recarregar o app; só some ao salvar ou em "Limpar".
+const QA_RASC='bcbr_rasc_tarefa';
+const QA={on:false,texto:'',det:'',area:'tarefas',quando:'',urg:false,ouvindo:false,rec:null,detAberto:false};
+const qaRascLer=()=>{try{return JSON.parse(localStorage.getItem(QA_RASC)||'null')}catch(e){return null}};
+function qaRascSalva(extra){
+  try{const r={texto:QA.texto,det:QA.det,area:QA.area,quando:QA.quando,urg:!!QA.urg,aberto:QA.on,...(extra||{})};
+    if(!r.texto.trim()&&!r.det.trim()&&r.area==='tarefas'&&!r.quando&&!r.urg&&!r.salvar)localStorage.removeItem(QA_RASC);else localStorage.setItem(QA_RASC,JSON.stringify(r))}catch(e){}
+}
+const qaRascLimpa=()=>{try{localStorage.removeItem(QA_RASC)}catch(e){}};
+const qaVozAPI=()=>window.SpeechRecognition||window.webkitSpeechRecognition;
+function qaZera(){Object.assign(QA,{texto:'',det:'',area:'tarefas',quando:'',urg:false,detAberto:false})}
 function qaAbre(){
-  if(!SM.d){toast('O calendário ainda não carregou. Tente de novo em instantes.');return}
-  const hj=smHoje();Object.assign(QA,{on:true,passo:'texto',texto:'',det:'',urg:false,area:'estudo',sub:'',quando:'',tc:0,sc:0,qc:0,dias:new Set([hj]),cur:1,lista:Array.from({length:21},(_,i)=>smMais(hj,i)),calCur:hj});qaDesenha();
+  if(QA.on){const i=document.getElementById('qa_in');i&&i.focus();return}
+  const r=qaRascLer()||{};
+  Object.assign(QA,{on:true,texto:r.texto||'',det:r.det||'',area:r.area||'tarefas',quando:r.quando||'',urg:!!r.urg,ouvindo:false,rec:null,detAberto:!!r.det});
+  qaRascSalva();qaDesenha();
 }
-function qaFecha(){QA.on=false;const el=document.getElementById('qa');if(el)el.remove()}
-function qaVai(p){
-  if(p!=='texto'&&!QA.texto.trim()){toast('Escreva a tarefa primeiro');return}
-  if(p==='tipo'){const i=qaTipos().findIndex(x=>x.id===QA.area);QA.tc=i<0?0:i}
-  if(p==='sub'){const t=smTipoDe(QA.area),i=QA.sub?(t.subs||[]).indexOf(QA.sub)+1:0;QA.sc=i<0?0:i}
-  if(p==='quando')QA.qc=0;
-  QA.passo=p;qaDesenha();
+function qaFechaEl(){if(QA.rec){try{QA.rec.abort()}catch(e){}QA.rec=null}QA.ouvindo=false;QA.on=false;const el=document.getElementById('qa');if(el)el.remove()}
+function qaFecha(){qaFechaEl();qaRascSalva()}                       // fechar NÃO apaga o rascunho
+function qaLimpa(){qaZera();qaRascLimpa();qaRascSalva();if(QA.on){qaDesenha()}}   // "Limpar": apaga o rascunho de propósito
+function qaTxt(v){QA.texto=v;qaRascSalva();qaPinta()}
+function qaQuando(v){QA.quando=QA.quando===v?'':v;qaRascSalva();qaPinta()}
+function qaUrgente(){QA.urg=!QA.urg;qaRascSalva();qaPinta()}
+function qaDetAlterna(){QA.detAberto=!QA.detAberto;const d=document.getElementById('qa_det');if(d){d.hidden=!QA.detAberto;if(QA.detAberto)d.focus()}qaPinta()}
+const qaDM=iso=>iso.slice(8)+'/'+iso.slice(5,7);
+function qaPrevTxt(){
+  const hj=smHoje(),L=interpretarTarefa(QA.texto,hj);if(!L.length)return'';
+  const parte=r=>{const p=[];if(r.dia)p.push(r.dia==='sem'?'♾️ sem data':'📅 '+qaDM(r.dia));if(r.hora)p.push(r.hora);if(r.urg)p.push('! urgente');if(r.area&&r.area!=='tarefas')p.push(smTipoIco(r.area)+' '+smTipoDe(r.area).nome);return p.join(' · ')};
+  if(L.length===1)return parte(L[0]);
+  return L.length+' tarefas: '+L.map(r=>r.texto+(parte(r)?' ('+parte(r)+')':'')).join(' | ');
 }
-function qaVolta(){const p=QA.passo;if(p==='texto')qaFecha();else if(p==='tipo')qaVai('texto');else if(p==='novotipo'||p==='sub'||p==='dias')qaVai('tipo');else if(p==='novosub'||p==='quando')qaVai('sub');else if(p==='data')qaVai('quando')}
-function qaAdd(dias){
-  const hj=smHoje();dias=(dias&&dias.length?dias:QA.dias.size?[...QA.dias]:[hj]).sort();const t=QA.texto.trim();if(!t)return;
-  smPoe(smNovos(dias,t,QA.area,QA.sub,QA.det).map(x=>QA.urg?{...x,urg:true}:x),'novo item');qaFecha();
-  toast(smTipoDe(QA.area).nome+' adicionada '+(dias[0]==='sem'?'em Sem data':dias.length===1&&dias[0]===hj?'a hoje':dias.length===1?'em '+smRotL(dias[0]):'em '+dias.length+' dias'));
+function qaPinta(){   // atualiza só o que mudou (não refaz o campo: não perde foco nem teclado do celular)
+  const el=document.getElementById('qa');if(!el)return;
+  el.querySelectorAll('[data-q]').forEach(b=>b.setAttribute('aria-pressed',String(QA.quando===b.dataset.q)));
+  const dt=document.getElementById('qa_dt');if(dt)dt.value=/^\d{4}-/.test(QA.quando)?QA.quando:'';
+  const u=document.getElementById('qa_urg');if(u)u.setAttribute('aria-pressed',String(!!QA.urg));
+  const db=document.getElementById('qa_detb');if(db)db.setAttribute('aria-pressed',String(QA.detAberto));
+  const pv=document.getElementById('qa_prev');if(pv)pv.textContent=qaPrevTxt();
+  const mic=document.getElementById('qa_mic');if(mic){mic.setAttribute('aria-pressed',String(QA.ouvindo));mic.textContent=QA.ouvindo?'⏹ Ouvindo…':'🎤'}
 }
-function qaMarca(iso){QA.dias.has(iso)?QA.dias.delete(iso):QA.dias.add(iso);qaDesenha()}
-function qaEscolheTipo(i){const l=qaTipos();QA.tc=(i+l.length+1)%(l.length+1);if(QA.tc<l.length){const m=l[QA.tc].id;if(m!==QA.area){QA.area=m;QA.sub=''}}qaDesenha()}
-function qaTipoOk(){   // Enter/Próximo no passo do tipo
-  if(QA.tc>=qaTipos().length){qaVai('novotipo');return}
-  if(qaCurto(QA.area)){QA.dias=new Set([smHoje()]);qaAdd();return}
-  qaVai('sub');
+// cria a(s) tarefa(s) a partir de um texto livre; pad = escolhas dos botões {quando,area,urg,det}. Devolve as tarefas criadas.
+function smCriaDeTexto(bruto,pad){
+  pad=pad||{};const hj=smHoje(),novos=[];
+  interpretarTarefa(bruto,hj).forEach(r=>{
+    const dia=r.dia||(pad.quando==='hoje'?hj:pad.quando||'sem'),ts=r.area?{area:r.area,sub:''}:smParseTS(pad.area||'tarefas');
+    const texto=r.hora?r.hora+' '+r.texto:r.texto,urg=r.urg||!!pad.urg;
+    smNovos([dia],texto,ts.area,ts.sub,pad.det).forEach(x=>novos.push(urg?{...x,urg:true}:x));
+  });
+  if(novos.length)smPoe(novos,'novo item');
+  return novos;
 }
-function qaNovoTipo(){const i=document.getElementById('qa_in'),id=smTipoNovo(i&&i.value);if(!id){toast('Escreva o nome do tipo');return}QA.area=id;QA.sub='';qaVai('sub')}
-function qaSubOk(i){const t=smTipoDe(QA.area),n=(t.subs||[]).length;QA.sc=i;if(i>n){qaVai('novosub');return}QA.sub=i===0?'':t.subs[i-1];qaVai('quando')}
-function qaNovoSub(){const i=document.getElementById('qa_in'),v=(i&&i.value||'').trim();if(!v){toast('Escreva o nome do subtema');return}smSubNovo(QA.area,v);QA.sub=v;qaVai('quando')}
-function qaQuandoOk(i){
-  QA.qc=i;if(i===0){QA.quando='hoje';qaAdd([smHoje()])}else if(i===2){QA.quando='sem';qaAdd(['sem'])}
-  else{QA.quando='dia';QA.calCur=smHoje();qaVai('data')}
+function smResumoNovos(l){const x=l[0];return (l.length>1?l.length+' tarefas':'“'+x.texto+'”')+' · '+(x.dia==='sem'?'sem data':qaDM(x.dia))}
+// aviso com "Desfazer" (~3,5 s)
+function smDesfazToast(msg,fn){
+  let el=document.getElementById('sm_dz');if(el)el.remove();
+  el=document.createElement('div');el.id='sm_dz';el.className='sm-dz';
+  const sp=document.createElement('span');sp.textContent=msg;const b=document.createElement('button');b.className='b s';b.textContent='Desfazer';
+  b.onclick=()=>{clearTimeout(el._t);el.remove();fn()};el.append(sp,b);document.body.appendChild(el);el._t=setTimeout(()=>el.remove(),3500);
 }
-function qaCalVai(iso){QA.calCur=iso;qaDesenha()}
-function qaCalMes(k){const[y,m,d]=QA.calCur.split('-').map(Number),n=new Date(y,m-1+k,1,12),ult=new Date(n.getFullYear(),n.getMonth()+1,0,12).getDate();QA.calCur=dKey(+new Date(n.getFullYear(),n.getMonth(),Math.min(d,ult),12));qaDesenha()}
-function qaCalHtml(){
-  const hj=smHoje(),c=QA.calCur,[y,m]=c.split('-').map(Number),ini=smSeg(dKey(+new Date(y,m-1,1,12))),fim=dKey(+new Date(y,m,0,12));let h='';
-  for(let x=ini;x<=fim||smDt(x).getDay()!==1;x=smMais(x,1)){
-    const dm=x.slice(0,7)===c.slice(0,7);
-    h+=`<button type="button" class="qa-cd ${dm?'':'fora'} ${x===hj?'hoje':''} ${x===c?'cur':''} ${dm&&smTipo(x)!=='estudo'?'des':''}" onclick="qaAdd(['${x}'])">${smDt(x).getDate()}</button>`;
-  }
-  return `<div class="qa-cal"><div class="row" style="justify-content:space-between;align-items:center"><button class="b s sm-ghost" onclick="qaCalMes(-1)" aria-label="Mês anterior">‹</button><b>${smMES[m-1]} ${y}</b><button class="b s sm-ghost" onclick="qaCalMes(1)" aria-label="Próximo mês">›</button></div>
-   <div class="qa-cg">${['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d=>`<span class="qa-ch">${d}</span>`).join('')}${h}</div></div>`;
+function qaSalvar(){
+  const bruto=QA.texto.trim();if(!bruto){toast('Escreva a tarefa');return}
+  const pad={quando:QA.quando,area:QA.area,urg:QA.urg,det:QA.det.trim()};
+  if(!SM.d){   // calendário ainda não carregou nem está guardado no aparelho: guarda e grava quando chegar
+    qaFechaEl();qaRascSalva({salvar:true,aberto:false});toast('Vai salvar assim que o calendário carregar.');smCarga.then(smRascPend);return}
+  const novos=smCriaDeTexto(bruto,pad);if(!novos.length)return;
+  qaFechaEl();qaZera();qaRascLimpa();
+  const ids=novos.map(x=>x.id);
+  smDesfazToast('Salvei: '+smResumoNovos(novos),()=>{
+    smMudar(d=>{d.tarefas=d.tarefas.filter(t=>!ids.includes(t.id))},'desfez item');
+    try{localStorage.setItem(QA_RASC,JSON.stringify({texto:bruto,det:pad.det,area:pad.area,quando:pad.quando,urg:!!pad.urg,aberto:true}))}catch(e){}
+    qaAbre();
+  });
 }
-function qaUrgente(){QA.urg=!QA.urg;const b=document.getElementById('qa_urg');if(b){b.setAttribute('aria-pressed',String(QA.urg));b.textContent=QA.urg?'! Urgente (U)':'! Urgente (U): não'}}
+// rascunho marcado para salvar assim que o calendário carregar (atalho usado antes do app terminar de carregar)
+function smRascPend(){
+  const r=qaRascLer();if(!r||!r.salvar)return;
+  if(!SM.d){toast('Não consegui salvar a tarefa agora. O texto está guardado neste aparelho.');return}
+  const bruto=(r.texto||'').trim();qaRascLimpa();if(!bruto)return;
+  const novos=smCriaDeTexto(bruto,{quando:r.quando,area:r.area,urg:r.urg,det:(r.det||'').trim()});
+  if(novos.length)toast('Salvei: '+smResumoNovos(novos));
+}
+// ---- voz (Web Speech API; sem ela o botão 🎤 nem aparece) ----
+function qaVoz(){
+  const API=qaVozAPI();if(!API||!QA.on)return;
+  if(QA.ouvindo&&QA.rec){try{QA.rec.stop()}catch(e){}return}
+  const rec=new API(),base=QA.texto.trim();let final='';
+  rec.lang='pt-BR';rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=1;
+  rec.onresult=e=>{let f='',pv='';for(let i=0;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)f+=r[0].transcript;else pv+=r[0].transcript}
+    final=f;QA.texto=((base?base+' ':'')+(f+pv)).trim();const c=document.getElementById('qa_in');if(c)c.value=QA.texto;qaRascSalva();qaPinta()};
+  rec.onerror=e=>{const c=e.error;if(c==='not-allowed'||c==='service-not-allowed')toast('Permita o microfone para ditar.');else if(c==='no-speech')toast('Não ouvi nada.');else if(c!=='aborted')toast('Não consegui ouvir ('+c+').')};
+  rec.onend=()=>{if(QA.rec===rec){QA.rec=null;QA.ouvindo=false;qaPinta();if(final.trim()&&QA.on)qaSalvar()}};
+  QA.rec=rec;QA.ouvindo=true;qaPinta();
+  try{rec.start()}catch(e){QA.rec=null;QA.ouvindo=false;qaPinta()}
+}
 function qaDesenha(){
   let el=document.getElementById('qa');
   if(!el){el=document.createElement('div');el.id='qa';el.className='qa-fundo';el.onclick=e=>{if(e.target===el)qaFecha()};document.body.appendChild(el)}
-  const p=QA.passo,b=qaBase(p),hj=smHoje(),seq=qaSeq(),ix=seq.indexOf(b),nomes={texto:'Tarefa',tipo:'Tipo',sub:'Subtema',quando:'Quando',data:'Data',dias:'Dias'};
-  const pas=seq.map((n,i)=>`<span class="qa-p ${ix===i?'on':ix>i?'ok':''}">${ix>i?'✓':i+1} ${nomes[n]}</span>`).join('');
-  const T=smTipoDe(QA.area),resumo=`${QA.urg?'! Urgente · ':''}“${esc(QA.texto.trim())}” · ${smTipoIco(QA.area)} ${esc(T.nome)}${QA.sub?' › '+esc(QA.sub):''}`;
-  const lista=(itens,cur,fn)=>`<div class="qa-ops">${itens.map((n,i)=>`<button class="qa-op ${i===cur?'on':''}" onclick="${fn}(${i})">${n}</button>`).join('')}</div>`;
-  const voltar=p2=>`<button class="b s sm-ghost" onclick="qaVai('${p2}')">← voltar</button>`;
-  let corpo,dica;
-  if(p==='texto'){corpo=`<input id="qa_in" class="qa-in" placeholder="Ex.: revisar RM de joelho" value="${esc(QA.texto)}" oninput="QA.texto=this.value" autocomplete="off"><textarea id="qa_det" class="qa-in qa-det" rows="2" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa" oninput="QA.det=this.value">${esc(QA.det)}</textarea><div class="row" style="margin-top:10px"><button type="button" id="qa_urg" class="sm-tagb" aria-pressed="${!!QA.urg}" onclick="qaUrgente()">! Urgente (U)${QA.urg?'':': não'}</button><button class="b" onclick="qaVai('tipo')">Próximo →</button></div>`;
-    dica='<kbd>Enter</kbd> próximo · <kbd>U</kbd> urgente · <kbd>Tab</kbd> detalhes (Enter = nova linha, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> próximo) · <kbd>Esc</kbd> fechar'}
-  else if(p==='tipo'){const L=qaTipos(),curto=qaCurto(QA.area)&&QA.tc<L.length;
-    corpo=`<div class="qa-tx">“${esc(QA.texto.trim())}”</div>${lista([...L.map(t=>`${smTipoIco(t.id)} ${esc(t.nome)}`),'➕ Novo tipo…'],QA.tc,'qaEscolheTipo')}
-    <div class="row" style="margin-top:10px">${curto?`<button class="b" onclick="QA.dias=new Set(['${hj}']);qaAdd()">Adicionar só hoje</button><button class="b s sm-ghost" onclick="qaVai('dias')">Escolher mais dias →</button><button class="b s sm-ghost" onclick="qaAdd(['sem'])">♾️ Tarefas (sem data)</button>`:`<button class="b" onclick="qaTipoOk()">Próximo →</button>`}${voltar('texto')}</div>`;
-    dica=curto?'<kbd>↑</kbd><kbd>↓</kbd> escolhe o tipo · <kbd>Enter</kbd> adiciona <b>só hoje</b> · <kbd>→</kbd> mais dias · <kbd>S</kbd> Tarefas (sem data) · <kbd>Esc</kbd> volta':'<kbd>↑</kbd><kbd>↓</kbd> escolhe o tipo · <kbd>Enter</kbd> ou <kbd>→</kbd> próximo · <kbd>Esc</kbd> volta'}
-  else if(p==='novotipo'){corpo=`<div class="qa-tx">Novo tipo de tarefa</div><input id="qa_in" class="qa-in" placeholder="Ex.: Pessoal, Casa, Leitura" value="" autocomplete="off"><div class="row" style="margin-top:10px"><button class="b" onclick="qaNovoTipo()">Criar e continuar →</button>${voltar('tipo')}</div>`;
-    dica='<kbd>Enter</kbd> cria o tipo · <kbd>Esc</kbd> volta'}
-  else if(p==='sub'){const ss=T.subs||[];
-    corpo=`<div class="qa-tx">${resumo}</div>${lista(['Sem subtema',...ss.map(esc),'➕ Novo subtema…'],QA.sc,'qaSubOk')}<div class="row" style="margin-top:10px">${voltar('tipo')}</div>`;
-    dica='<kbd>↑</kbd><kbd>↓</kbd> escolhe o subtema · <kbd>Enter</kbd> confirma · <kbd>Esc</kbd> volta'}
-  else if(p==='novosub'){corpo=`<div class="qa-tx">Novo subtema de ${esc(T.nome)}</div><input id="qa_in" class="qa-in" placeholder="Ex.: Casamento" value="" autocomplete="off"><div class="row" style="margin-top:10px"><button class="b" onclick="qaNovoSub()">Criar e continuar →</button>${voltar('sub')}</div>`;
-    dica='<kbd>Enter</kbd> cria o subtema · <kbd>Esc</kbd> volta'}
-  else if(p==='quando'){
-    corpo=`<div class="qa-tx">${resumo}</div>${lista(['📅 Hoje','🗓️ Dia específico…','♾️ Sem data'],QA.qc,'qaQuandoOk')}<div class="row" style="margin-top:10px">${voltar('sub')}</div>`;
-    dica='<kbd>↑</kbd><kbd>↓</kbd> escolhe · <kbd>Enter</kbd> confirma · <kbd>Esc</kbd> volta'}
-  else if(p==='data'){
-    corpo=`<div class="qa-tx">${resumo}</div>${qaCalHtml()}<div class="row" style="margin-top:10px"><button class="b" onclick="qaAdd(['${QA.calCur}'])">Adicionar em ${smRotL(QA.calCur)}</button>${voltar('quando')}</div>`;
-    dica='<kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> dia/semana · <kbd>PgUp</kbd><kbd>PgDn</kbd> mês · <kbd>Enter</kbd> escolhe · <kbd>Esc</kbd> volta'}
-  else{let sem='';corpo=`<div class="qa-tx">${resumo}</div><div class="qa-dias">${QA.lista.map((d,i)=>{
-      const s=smNumSem(d),cab=s!==sem?`<div class="qa-sem">Semana ${s}</div>`:'';sem=s;const tp=smTipo(d),noi=smNoite(d);
-      return cab+`<div class="qa-dia ${QA.dias.has(d)?'on':''} ${i===QA.cur?'cur':''} ${tp!=='estudo'?'des':''}" id="qa_d${i}" onclick="QA.cur=${i};qaMarca('${d}')"><span class="qa-ck">${QA.dias.has(d)?'✓':''}</span>${smRotL(d)}${d===hj?' <b>· hoje</b>':''}<span class="mut">${noi?' · '+noi:''}${tp!=='estudo'?' · '+tp:''}</span></div>`}).join('')}</div>
-    <div class="row" style="margin-top:10px"><button class="b" onclick="qaAdd()">Adicionar em ${QA.dias.size||1} dia${(QA.dias.size||1)>1?'s':''}</button>${voltar('tipo')}</div>`;
-    dica='<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> anda · <kbd>A</kbd> marca/desmarca · <kbd>Enter</kbd> adiciona · <kbd>Esc</kbd> volta'}
-  el.innerHTML=`<div class="qa-caixa" role="dialog" aria-label="Adicionar tarefa"><div class="row" style="justify-content:space-between"><b>➕ Nova tarefa</b><button class="b s sm-ghost" onclick="qaFecha()" aria-label="Fechar">✕</button></div>
-    <div class="qa-passos">${pas}</div>${corpo}<div class="qa-dica">${dica}</div></div>`;
-  if(p==='texto'||p==='novotipo'||p==='novosub'){const i=document.getElementById('qa_in');i.focus();i.setSelectionRange(i.value.length,i.value.length)}
-  else{document.activeElement&&document.activeElement.blur();const c=document.getElementById('qa_d'+QA.cur)||document.querySelector('#qa .qa-op.on');c&&c.scrollIntoView({block:'nearest'})}
+  const tp=QA.area&&smTipos().some(t=>QA.area.split('|')[0]===t.id)?QA.area:smTipos()[0].id;
+  el.innerHTML=`<div class="qa-caixa" role="dialog" aria-label="Nova tarefa"><div class="row" style="justify-content:space-between;align-items:center"><b>➕ Nova tarefa</b><span style="flex:1"></span>${qaVozAPI()?`<button type="button" id="qa_mic" class="b s sm-ghost" onclick="qaVoz()" aria-label="Falar a tarefa" aria-pressed="false">🎤</button>`:''}<button class="b s sm-ghost" onclick="qaFecha()" aria-label="Fechar">✕</button></div>
+    <input id="qa_in" class="qa-in" placeholder="Ex.: consulta neurologista dia 30/10 11 horas" value="${esc(QA.texto)}" oninput="qaTxt(this.value)" autocomplete="off" enterkeyhint="done" aria-label="Tarefa">
+    <div id="qa_prev" class="qa-prev" aria-live="polite"></div>
+    <div class="qa-opts"><span class="sm-lbl">Quando</span><button type="button" class="sm-tagb" data-q="sem" onclick="qaQuando('sem')">Sem data</button><button type="button" class="sm-tagb" data-q="hoje" onclick="qaQuando('hoje')">Hoje</button><input type="date" id="qa_dt" class="sm-date" aria-label="Escolher o dia" onchange="QA.quando=this.value;qaRascSalva();qaPinta()"></div>
+    <div class="qa-opts"><span class="sm-lbl">Tipo</span><select id="qa_area" aria-label="Tipo" onchange="QA.area=this.value;qaRascSalva()">${smOpcoes(tp)}</select><button type="button" id="qa_urg" class="sm-tagb" onclick="qaUrgente()" title="Alt+U">! urgente</button><button type="button" id="qa_detb" class="sm-tagb" onclick="qaDetAlterna()">≡ detalhes</button></div>
+    <textarea id="qa_det" class="qa-in qa-det" rows="2" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa" oninput="QA.det=this.value;qaRascSalva()" ${QA.detAberto?'':'hidden'}>${esc(QA.det)}</textarea>
+    <div class="row" style="margin-top:6px"><button class="b" onclick="qaSalvar()">Salvar</button><span style="flex:1"></span><button class="b s sm-ghost" onclick="qaLimpa()">Limpar</button></div>
+    <div class="qa-dica"><kbd>Enter</kbd> salva na hora (sem data, tipo Tarefas, a menos que o texto diga) · <kbd>Alt</kbd>+<kbd>U</kbd> urgente · <kbd>Esc</kbd> fecha e guarda o rascunho · ex.: “amanhã 9h”, “dia 30/10”, “urgente”, “estudo …”, “próxima tarefa …”</div></div>`;
+  const s=document.getElementById('qa_area');if(s)s.value=tp;
+  qaPinta();const i=document.getElementById('qa_in');i.focus();i.setSelectionRange(i.value.length,i.value.length);
 }
 window.addEventListener('keydown',e=>{
   if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
-  const k=e.key,p=QA.passo;e.stopImmediatePropagation();
-  const usa=()=>e.preventDefault();
-  if(p==='texto'||p==='novotipo'||p==='novosub'){
-    if(p==='texto'&&k.toLowerCase()==='u'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&e.target.id!=='qa_det'&&!e.isComposing){usa();qaUrgente();return}
-    if(k==='Enter'){if(e.target&&e.target.id==='qa_det'&&!e.ctrlKey)return;usa();p==='texto'?qaVai('tipo'):p==='novotipo'?qaNovoTipo():qaNovoSub()}else if(k==='Escape'){usa();qaVolta()}return}
-  usa();const dn=k==='ArrowDown',up=k==='ArrowUp';
-  if(p==='tipo'){if(up||dn)qaEscolheTipo(QA.tc+(dn?1:-1));else if(k==='Enter')qaTipoOk();
-    else if(k==='ArrowRight'){if(qaCurto(QA.area)&&QA.tc<qaTipos().length)qaVai('dias');else qaTipoOk()}
-    else if((k==='s'||k==='S')&&qaCurto(QA.area)&&QA.tc<qaTipos().length)qaAdd(['sem']);
-    else if(k==='Escape'||k==='ArrowLeft')qaVolta();return}
-  if(p==='sub'){const n=(smTipoDe(QA.area).subs||[]).length+2;
-    if(up||dn){QA.sc=(QA.sc+(dn?1:-1)+n)%n;qaDesenha()}else if(k==='Enter'||k==='ArrowRight')qaSubOk(QA.sc);else if(k==='Escape'||k==='ArrowLeft')qaVolta();return}
-  if(p==='quando'){if(up||dn){QA.qc=(QA.qc+(dn?1:-1)+3)%3;qaDesenha()}else if(k==='Enter'||k==='ArrowRight')qaQuandoOk(QA.qc);else if(k==='Escape'||k==='ArrowLeft')qaVolta();return}
-  if(p==='data'){const m={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[k];
-    if(m)qaCalVai(smMais(QA.calCur,m));else if(k==='PageUp')qaCalMes(-1);else if(k==='PageDown')qaCalMes(1);else if(k==='Enter')qaAdd([QA.calCur]);else if(k==='Escape')qaVolta();return}
-  const n=QA.lista.length;   // passo "dias" (Estudo/Ferramenta)
-  if(dn||k==='ArrowRight'){QA.cur=Math.min(n-1,QA.cur+1);qaDesenha()}
-  else if(up||k==='ArrowLeft'){QA.cur=Math.max(0,QA.cur-1);qaDesenha()}
-  else if((k==='a'||k==='A'||k===' ')&&!e.altKey)qaMarca(QA.lista[QA.cur]);
-  else if(k==='Enter')qaAdd();else if(k==='Escape')qaVolta();
+  e.stopImmediatePropagation();const k=e.key,alvo=e.target||{};
+  if(k==='Escape'){e.preventDefault();qaFecha();return}
+  if(e.altKey&&e.code==='KeyU'){e.preventDefault();qaUrgente();return}
+  if(k==='Enter'&&!e.isComposing){
+    if(alvo.tagName==='BUTTON')return;                    // Enter num botão = aperta o botão
+    if(alvo.id==='qa_det'&&!e.ctrlKey)return;              // nos detalhes, Enter = nova linha (Ctrl+Enter salva)
+    e.preventDefault();qaSalvar();
+  }
 },true);
 // botão flutuante "+" (celular e mouse) nas abas Hoje e Semana — chamado a cada render
 function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoje'||tela==='semana';
@@ -712,7 +870,7 @@ function smEvDel(iso,id){smMudar(d=>{const x=d.dias[iso];if(x&&x.ev){x.ev=x.ev.f
 // ===== ARRASTAR TAREFA PARA OUTRO DIA (pedido do Artur, 23/10/2026) =====
 // Na aba Semana: mouse inicia ao mover >4 px; toque segura ~120 ms antes de mover e soltar
 // num dia do calendário (grade ou lista), no cartão Hoje, na célula Tarefas (sem data) ou numa coluna da semana.
-const SMD_HOLD=120;let SMD=null,smdEngole=0;
+const SMD_HOLD=300;let SMD=null,smdEngole=0;
 function smMover(id,dia){
   const t=smTar(id);if(!t||t.dia===dia)return;
   smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(!x||x.dia===dia)return;
@@ -757,16 +915,28 @@ document.addEventListener('selectstart',e=>{if(SMD&&(!e.target.isContentEditable
 document.addEventListener('contextmenu',e=>{if(SMD)e.preventDefault()});
 document.addEventListener('click',e=>{if(smdEngole){smdEngole=0;e.stopPropagation();e.preventDefault()}},true);
 
-// Atalhos Android: o script do app já recebe as questões; aguarda também calendário e primeiro sync.
+// Atalhos do ícone (?acao=tarefa | voz | ri). Nova tarefa abre NA HORA (usa o calendário guardado no aparelho; não espera o GitHub
+// nem as questões); se o calendário nunca foi carregado, o texto fica de rascunho e grava quando chegar. RI do dia espera os dados.
 let smSyncResolve;
 const smSyncCarga=new Promise(resolve=>{smSyncResolve=resolve});
 function smAtalhosInicia(){
-  const url=new URL(location.href),acao=url.searchParams.get('acao');if(!['tarefa','ri'].includes(acao))return;
-  Promise.all([smCarga,smSyncCarga]).then(()=>{
-    if(!SM.d){toast('Não foi possível carregar o calendário. Reabra o atalho quando houver conexão.');return}
-    url.searchParams.delete('acao');history.replaceState(history.state,'',url.pathname+url.search+url.hash);
-    if(acao==='tarefa'){go('semana');qaAbre()}else iniciaRI();
-  });
+  const url=new URL(location.href),acao=url.searchParams.get('acao'),r=qaRascLer();
+  if(r&&r.salvar){smCarga.then(smRascPend);if(!['tarefa','voz','ri'].includes(acao))return}   // tarefa digitada antes do app abrir (shim.js)
+  if(!['tarefa','voz','ri'].includes(acao)){
+    if(r&&r.aberto&&!r.salvar&&(r.texto||'').trim())setTimeout(()=>{if(!QA.on)qaAbre()},0);   // app recarregou/atualizou com a Nova tarefa aberta: reabre
+    return;
+  }
+  url.searchParams.delete('acao');history.replaceState(history.state,'',url.pathname+url.search+url.hash);
+  if(acao==='ri'){
+    Promise.all([smCarga,smSyncCarga]).then(()=>{
+      if(!SM.d){toast('Não foi possível carregar o calendário. Reabra o atalho quando houver conexão.');return}
+      iniciaRI();
+    });
+    return;
+  }
+  if(r&&r.salvar)return;
+  go('semana');qaAbre();
+  if(acao==='voz'&&qaVozAPI())qaVoz();
 }
 
 // ---- Ponte com o app Android (widgets e notificações; repo banco-cbr-android) ----
@@ -786,6 +956,29 @@ function smNativo(forca){
     const s=JSON.stringify({...r,geradoEm:''});if(!forca&&s===smNatUlt)return;smNatUlt=s;window.BCBRNativo.dados(JSON.stringify(r))}catch(e){console.warn('ponte Android',e)}
 }
 if(window.BCBRNativo){setInterval(()=>smNativo(),20000);document.addEventListener('visibilitychange',()=>{if(document.hidden)smNativo(true)});setTimeout(()=>smNativo(true),4000)}
+
+// ---- Tarefas criadas pela tela nativa do app Android (sem abrir a WebView) — 1.17.0 ----
+// BCBRNativo.pendentes() -> JSON [{id, texto, criadoEm, voz}] · cada texto passa por interpretarTarefa · BCBRNativo.confirmar(JSON de ids).
+// Ids já importados ficam em localStorage (não duplica se o app nativo reenviar). Tolera a ponte sem esses métodos.
+const SM_NAT_IMP='bcbr_nat_importados';
+let smNatBusy=false;
+function smNativoImporta(){
+  try{
+    const B=window.BCBRNativo;if(!B||typeof B.pendentes!=='function'||smNatBusy)return;
+    if(!SM.d){smCarga.then(()=>{if(SM.d)smNativoImporta()});return}
+    let lista=JSON.parse(B.pendentes()||'[]');if(!Array.isArray(lista)||!lista.length)return;
+    let jaImp=[];try{jaImp=JSON.parse(localStorage.getItem(SM_NAT_IMP)||'[]')}catch(e){}
+    const ids=[];smNatBusy=true;
+    lista.forEach(p=>{
+      if(!p||p.id==null)return;const id=String(p.id);ids.push(id);if(jaImp.includes(id))return;
+      const t=String(p.texto||'').trim();if(t)smCriaDeTexto(t,{});
+      jaImp.push(id);
+    });
+    try{localStorage.setItem(SM_NAT_IMP,JSON.stringify(jaImp.slice(-500)))}catch(e){}
+    SM.fila.then(()=>{smNatBusy=false;if(!SM.erro&&ids.length&&typeof B.confirmar==='function'){try{B.confirmar(JSON.stringify(ids))}catch(e){console.warn('confirmar',e)}}});
+  }catch(e){smNatBusy=false;console.warn('ponte Android (pendentes)',e)}
+}
+if(window.BCBRNativo){smNativoImporta();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')smNativoImporta()})}
 
 
 
@@ -2461,6 +2654,35 @@ function qPreCarrega(){
     [...(q.imgs||[]),...(q.imgsCom||[])].forEach(u=>{u=String(u);if(!u.startsWith('gh:'))return;const n=u.slice(3);if(qPre.has(n))return;
       qPre.set(n,null);BCBR.imgDireto(n).then(src=>{const im=new Image();im.src=src;qPre.set(n,im);if(im.decode)im.decode().catch(()=>{})}).catch(()=>qPre.delete(n))})}
 }
+
+// ===== deslizar o dedo na questão (1.17.0): ← próxima, → anterior (mesmas funções das teclas ←/→) =====
+// Só gesto horizontal claro (|dx|>60 px e |dx|>1.5·|dy|). Ignora: rolagem vertical, zoom de imagem aberto, galeria/miniaturas,
+// campos de texto, áreas que rolam na horizontal, seleção de texto e a tela Nova tarefa.
+const QSW={x:0,y:0,t:0,ok:false};
+function qSwOk(el){
+  if(!el||!el.closest||el.closest('input,textarea,select,[contenteditable],.gal,.galt,.galm,#zoom,#qa,#nav,button'))return false;
+  for(let e=el;e&&e!==document.body;e=e.parentElement){const o=getComputedStyle(e).overflowX;if((o==='auto'||o==='scroll')&&e.scrollWidth>e.clientWidth+2)return false}
+  return true;
+}
+document.addEventListener('touchstart',e=>{
+  QSW.ok=false;
+  if(e.touches.length!==1||tela!=='quiz'||!sess||sess.fim||sess.qEdit||(typeof QA!=='undefined'&&QA.on))return;
+  const z=document.getElementById('zoom');if(z&&!z.hidden)return;
+  if(!qSwOk(e.target))return;
+  QSW.x=e.touches[0].clientX;QSW.y=e.touches[0].clientY;QSW.t=Date.now();QSW.ok=true;
+},{passive:true});
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)QSW.ok=false},{passive:true});
+document.addEventListener('touchcancel',()=>{QSW.ok=false},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(!QSW.ok)return;QSW.ok=false;
+  if(tela!=='quiz'||!sess||sess.fim)return;
+  const t=e.changedTouches[0];if(!t)return;
+  const dx=t.clientX-QSW.x,dy=t.clientY-QSW.y;
+  if(Math.abs(dx)<=60||Math.abs(dx)<=1.5*Math.abs(dy)||Date.now()-QSW.t>1200)return;
+  try{const s=getSelection();if(s&&!s.isCollapsed&&String(s).trim())return}catch(x){}
+  if(dx<0){if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1)}
+  else irPara(sess.i-1);
+},{passive:true});
 
 
 // ===== Reordenar cartões arrastando (pedido do Artur, 22/10/2026) =====

@@ -116,3 +116,32 @@ function qPreCarrega(){
     [...(q.imgs||[]),...(q.imgsCom||[])].forEach(u=>{u=String(u);if(!u.startsWith('gh:'))return;const n=u.slice(3);if(qPre.has(n))return;
       qPre.set(n,null);BCBR.imgDireto(n).then(src=>{const im=new Image();im.src=src;qPre.set(n,im);if(im.decode)im.decode().catch(()=>{})}).catch(()=>qPre.delete(n))})}
 }
+
+// ===== deslizar o dedo na questão (1.17.0): ← próxima, → anterior (mesmas funções das teclas ←/→) =====
+// Só gesto horizontal claro (|dx|>60 px e |dx|>1.5·|dy|). Ignora: rolagem vertical, zoom de imagem aberto, galeria/miniaturas,
+// campos de texto, áreas que rolam na horizontal, seleção de texto e a tela Nova tarefa.
+const QSW={x:0,y:0,t:0,ok:false};
+function qSwOk(el){
+  if(!el||!el.closest||el.closest('input,textarea,select,[contenteditable],.gal,.galt,.galm,#zoom,#qa,#nav,button'))return false;
+  for(let e=el;e&&e!==document.body;e=e.parentElement){const o=getComputedStyle(e).overflowX;if((o==='auto'||o==='scroll')&&e.scrollWidth>e.clientWidth+2)return false}
+  return true;
+}
+document.addEventListener('touchstart',e=>{
+  QSW.ok=false;
+  if(e.touches.length!==1||tela!=='quiz'||!sess||sess.fim||sess.qEdit||(typeof QA!=='undefined'&&QA.on))return;
+  const z=document.getElementById('zoom');if(z&&!z.hidden)return;
+  if(!qSwOk(e.target))return;
+  QSW.x=e.touches[0].clientX;QSW.y=e.touches[0].clientY;QSW.t=Date.now();QSW.ok=true;
+},{passive:true});
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)QSW.ok=false},{passive:true});
+document.addEventListener('touchcancel',()=>{QSW.ok=false},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(!QSW.ok)return;QSW.ok=false;
+  if(tela!=='quiz'||!sess||sess.fim)return;
+  const t=e.changedTouches[0];if(!t)return;
+  const dx=t.clientX-QSW.x,dy=t.clientY-QSW.y;
+  if(Math.abs(dx)<=60||Math.abs(dx)<=1.5*Math.abs(dy)||Date.now()-QSW.t>1200)return;
+  try{const s=getSelection();if(s&&!s.isCollapsed&&String(s).trim())return}catch(x){}
+  if(dx<0){if(sess.i>=sess.ids.length-1)toast('Última questão');else irPara(sess.i+1)}
+  else irPara(sess.i-1);
+},{passive:true});

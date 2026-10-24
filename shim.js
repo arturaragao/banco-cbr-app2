@@ -215,14 +215,33 @@
     if (document.visibilityState === "visible" && Date.now() - ultChecagem > 600000) { ultChecagem = Date.now(); checarDados(); }
   });
 
+  // ---------- Nova tarefa antes do app abrir (?acao=tarefa|voz, 1ª vez no aparelho, enquanto as questões baixam) ----------
+  // Só guarda o texto no rascunho (mesma chave do app); o app abre a Nova tarefa com ele, ou grava na hora se deu Enter.
+  function tarefaRapida() {
+    const acao = new URLSearchParams(location.search).get("acao");
+    if (acao !== "tarefa" && acao !== "voz") return;
+    const K = "bcbr_rasc_tarefa";
+    let r = {}; try { r = JSON.parse(localStorage.getItem(K) || "{}") || {}; } catch (e) {}
+    document.getElementById("app").innerHTML = `<div class="card" style="max-width:560px;margin:24px auto"><b>➕ Nova tarefa</b>
+      <input id="tr_in" style="width:100%;box-sizing:border-box;font-size:1.05rem;padding:10px;margin-top:8px" placeholder="Digite e aperte Enter" autocomplete="off" enterkeyhint="done">
+      <p class="mut" id="tr_msg">Carregando o banco… o que você digitar é guardado e salvo em seguida.</p></div>`;
+    const i = document.getElementById("tr_in"); i.value = r.texto || "";
+    const guarda = (extra) => { try { localStorage.setItem(K, JSON.stringify({ ...r, texto: i.value, aberto: true, ...(extra || {}) })); } catch (e) {} };
+    i.oninput = () => guarda();
+    i.onkeydown = (e) => { if (e.key === "Enter" && i.value.trim()) { guarda({ salvar: true, aberto: false }); i.disabled = true; document.getElementById("tr_msg").textContent = "Guardada. Salvo assim que o app terminar de carregar."; } };
+    i.focus();
+  }
+
   // ---------- início ----------
   async function iniciar() {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").then(passarChaveSW).catch(() => {});   // não espera
     if (!tok()) return telaConfig();
     document.getElementById("app").innerHTML = `<div class="card"><p class="mut">Carregando o banco…</p></div>`;
     let ok = false;
+    const cache = await dadosDoCache();
+    if (!cache) tarefaRapida();   // 1ª vez neste aparelho: deixa digitar a tarefa enquanto as questões baixam
     // Abre na hora com o banco guardado no aparelho; confere o GitHub por trás (pedido do Artur, 23/10/2026: abrir rápido no celular)
-    if (await dadosDoCache()) { abrirApp(); checarDados(); return; }
+    if (cache) { abrirApp(); checarDados(); return; }
     try { await carregarDados(); ok = true; }
     catch (e) {
       if (e.chave) return telaConfig("A chave do GitHub foi recusada. Confira e cole de novo.");
