@@ -1,4 +1,4 @@
-// Banco CBR app 1.19.3 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.19.4 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
 //  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
@@ -1047,11 +1047,19 @@ async function smIdeiasSync(forca){
   if(!forca&&Date.now()-smIdeiasUlt<60000)return;smIdeiasUlt=Date.now();
   try{await smCarga;if(!SM.d)return;
     const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/ideias/caixa.md`);const linhas=smIdeiasLinhas(smDec(f.content));
-    const muda=x=>{const t=SM.d.tarefas.find(y=>y.ideia===x.chave);return !t||t.feito!==x.feita};
-    if(!linhas.some(muda))return;
-    smMudar(d=>linhas.forEach(x=>{const t=d.tarefas.find(y=>y.ideia===x.chave);
-      if(t){t.feito=x.feita;return}
-      const n=smNovos(['sem'],'💡 '+tituloIdeia(x.texto),'ferramenta','',x.texto)[0];n.ideia=x.chave;n.feito=x.feita;d.tarefas.push(n)}),'ideias do celular');
+    // 1.19.4: a caixa só acrescenta. Ideia já importada nunca volta: concluída ou apagada por ele na aba fica assim
+    // (antes "- [ ]" na caixa desmarcava a tarefa concluída e recriava a apagada). "- [x]" ainda conclui.
+    const vistas=new Set(SM.d.ideiasVistas||SM.d.tarefas.filter(y=>y.ideia).map(y=>y.ideia));
+    const muda=x=>{const t=SM.d.tarefas.find(y=>y.ideia===x.chave);return t?(x.feita&&!t.feito):!vistas.has(x.chave)};
+    if(!linhas.some(muda)&&SM.d.ideiasVistas)return;
+    // 1ª vez: ideias com mais de 2 h já passaram pela aba; se não há tarefa, ele apagou — não recria.
+    const velha=x=>Date.now()-new Date(x.chave.replace(' ','T')).getTime()>7200000;
+    smMudar(d=>{const v=new Set(d.ideiasVistas||[...d.tarefas.filter(y=>y.ideia).map(y=>y.ideia),...linhas.filter(velha).map(x=>x.chave)]);
+      linhas.forEach(x=>{const t=d.tarefas.find(y=>y.ideia===x.chave);
+        if(t){if(x.feita)t.feito=true;v.add(x.chave);return}
+        if(v.has(x.chave))return;
+        v.add(x.chave);const n=smNovos(['sem'],'💡 '+tituloIdeia(x.texto),'ferramenta','',x.texto)[0];n.ideia=x.chave;n.feito=x.feita;d.tarefas.push(n)});
+      d.ideiasVistas=[...v].slice(-1000)},'ideias do celular');
   }catch(e){if(e&&e.status!==404)console.warn('caixa de ideias',e)}
 }
 smIdeiasSync(true);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')smIdeiasSync()});
