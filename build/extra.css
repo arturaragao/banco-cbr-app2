@@ -89,3 +89,7 @@ body.emquiz:is(.lay-ajustada,.lay-otimizado) .gal .galm{min-height:0}
 
 .tg{padding:4px 9px;font-size:.95rem;line-height:1}
 @media(max-width:520px){.hb{flex-wrap:nowrap;gap:8px}.brand{min-width:0;overflow:hidden;text-overflow:ellipsis}.versao{margin-left:2px}}
+/* PersonalRad 1.23: cores das alternativas herdadas de .ok/.bad. */
+.pr-percentual{white-space:nowrap;margin-left:.4em;font-weight:600}
+.pr-aviso{color:var(--warn);display:inline-block;margin:6px 0}
+.pr-prova{margin-left:.5em}

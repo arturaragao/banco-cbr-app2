@@ -6,11 +6,14 @@ const vm=require('node:vm');
 const fonte=fs.readFileSync(path.join(__dirname,'../fonte/artefato-app.js'),'utf8');
 const banco=fs.readFileSync(path.join(__dirname,'../build/banco.js'),'utf8');
 const shim=fs.readFileSync(path.join(__dirname,'../shim.js'),'utf8');
+const pr=fs.readFileSync(path.join(__dirname,'../build/personalrad.js'),'utf8');
+const gerado=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
 function trecho(s,a,b){const i=s.indexOf(a),j=s.indexOf(b,i);assert.ok(i>=0&&j>i,a);return s.slice(i,j)}
 function contexto(){
   const c=vm.createContext({console});
   vm.runInContext(trecho(fonte,'const DIF=','let metoU='),c);
   vm.runInContext(`let pon={},all=[],Q=[],log=[];const classTags=()=>{},nomeArea=x=>x,areaDe=q=>q.ar;`,c);
+  vm.runInContext(pr,c);
   vm.runInContext(trecho(fonte,'function refQ(q){','const aplicaEdTodas='),c);
   vm.runInContext(trecho(banco,'function prAcertoBloco(q){','function bCorpo(q){'),c);
   vm.runInContext(trecho(banco,'function pesoVolume(q){','function pacoteVolume('),c);
@@ -129,4 +132,101 @@ test('ponte de dados mantém estatísticas e dificuldade sem substituir campos a
   assert.equal(executar(c,'adaptar(entrada)[0].dif_pr'),'d');
   assert.equal(executar(c,'adaptar(entrada)[0].dif'),'f');
   assert.equal(executar(c,'adaptar(entrada)[0].acerto'),85);
+});
+
+test('pesos moderados: aviso, prova real e incidência normalizada, sem casamento é neutro',()=>{
+  const c=contexto();preparar(c);
+  assert.equal(executar(c,'pesoPR(q)'),1);
+  executar(c,`q.pr_qualidade={needsReview:true};q.pr_prova={test:['Título CBR'],year:['2026']}`);
+  assert.equal(executar(c,'pesoPR(q)'),.66);
+  executar(c,`q.pr_qualidade={needsReview:false,reportsOpen:1}`);
+  assert.equal(executar(c,'prAviso(q)'),true);
+  executar(c,`q.pr_qualidade={reportsOpen:0};q.pr_prova={test:['Simulado CBR']}`);
+  assert.equal(executar(c,'pesoPR(q)'),1);
+  executar(c,`q.cl=['TÓRAX'];Q=[q,{cl:['Abdome']}];globalThis.TAXONOMIA_PR={termos:[
+    {type:'theme',nome:' tórax ',questoes:10000},{type:'theme',nome:'Abdome',questoes:1},
+    {type:'theme',nome:'Sem casamento',questoes:1e9}],arvores:[]}`);
+  assert.ok(executar(c,'prPesoTema(q)')>1);
+  assert.equal(executar(c,"prPesoTema({cl:['Abdome']})"),.8);
+  assert.equal(executar(c,"prPesoTema({cl:['Desconhecido']})"),1);
+  assert.ok(executar(c,'prPesoTema(q)')<=1.25);
+  executar(c,`TAXONOMIA_PR={arvores:[{root:{type:'theme',label:'Tórax',questionsActiveCount:2,subtreeQuestionsActiveCount:50}}]}`);
+  assert.equal(executar(c,"prContagens(TAXONOMIA_PR)['torax']"),50);
+});
+
+test('percentuais só após resposta; 0% é válido; metadados não viram tags',()=>{
+  const c=contexto();preparar(c);
+  executar(c,`const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
+    q.pr_stats.alternativas={A:{percentual:0},B:{percentual:87.65}};
+    q.pr_prova={test:['Título CBR'],year:['2026']}`);
+  assert.equal(executar(c,"prAlternativa(q,'A',false)"),'');
+  assert.match(executar(c,"prAlternativa(q,'A',true)"),/>0%</);
+  assert.match(executar(c,"prAlternativa(q,'B',true)"),/87,65%/);
+  assert.equal(executar(c,"prAlternativa(q,'C',true)"),'');
+  assert.match(executar(c,'prProvaBloco(q)'),/Título CBR · 2026/);
+  executar(c,trecho(shim,'const limpa =','// fundo=true:'));
+  c.entrada=[{id:'q',alts:{A:'A'},tags:['Claude'],cl:['Tema'],pr_tags:{theme:['Site']},pr_prova:{year:['2026']},pr_qualidade:{needsReview:true}}];
+  assert.equal(executar(c,"adaptar(entrada)[0].tags.join()"),'Claude');
+  assert.equal(executar(c,"adaptar(entrada)[0].pr_tags.theme[0]"),'Site');
+  assert.equal(executar(c,'adaptar(entrada)[0].pr_qualidade.needsReview'),true);
+});
+
+for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}: correta verde, marcada errada vermelha e as outras neutras`,()=>{
+  const c=contexto();preparar(c);
+  executar(c,`const esc=String,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[],TES='';
+    const tituloQ=()=>'',posDe=()=>1,keyLab=()=>'',tgHtml=q=>'Tags Claude',painelNav=()=>'',
+      precisaConf=()=>false,imgSrc=()=>false,pontoBloco=()=>'',iaBloco=()=>'',cur=()=>q,selAtual=()=>null;
+    const galeria=()=>'',comentAlt=()=>'',cursoBloco=()=>'',claudeMdBloco=()=>'',bannerResp=()=>'',
+      blocoFeedback=(q,r,s)=>s,verCom=()=>true;
+    const difTag=q=>'<span class="dif '+q._d+'">Dif</span>';
+    let sess={i:0,ids:['q1'],resp:{},cut:{}};
+    q.alts={A:'Certa',B:'Errada marcada',C:'Outra errada'};q.gab='A';q.cl=['Tema Claude'];q.coment={};
+    q.pr_stats.alternativas={A:{percentual:60},B:{percentual:30},C:{percentual:10}};
+    q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['NÃO EXIBIR']};`);
+  executar(c,trecho(script,'function vQuiz(){','function reclass('));
+  const antes=executar(c,'vQuiz()');
+  assert.match(antes,/class="dif d"/);
+  assert.match(antes,/acerto dos alunos 20%/);
+  assert.match(antes,/possível erro na questão/);
+  assert.doesNotMatch(antes,/pr-percentual|NÃO EXIBIR/);
+  executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
+  const depois=executar(c,'vQuiz()');
+  assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
+  assert.match(depois,/class="alt bad [^"]*"[^]*?Errada marcada[^]*?30%/);
+  assert.match(depois,/class="alt  [^"]*"[^]*?Outra errada[^]*?10%/);
+  assert.doesNotMatch(depois,/NÃO EXIBIR/);
+});
+
+test('pesos do site são aplicados uma vez também no sorteio de revisões',()=>{
+  const c=contexto();preparar(c);
+  executar(c,trecho(fonte,'function sorteioPonderado(','const embaralha='));
+  executar(c,`q.pr_qualidade={needsReview:true};const outra={...q,id:'outra',pr_qualidade:null};
+    Q=[q,outra];Math.random=()=>.3`);
+  assert.equal(executar(c,'sorteioPonderado(Q,()=>1,1)[0].id'),'q1');
+  assert.equal(executar(c,'sorteioPonderado(Q,pesoVolume,1,false)[0].id'),'q1');
+  assert.ok(executar(c,'pesoVolume(q)<pesoVolume(outra)'));
+});
+
+test('taxonomia e simulados usam SHA, atualização em fundo e cache offline',async()=>{
+  const cache=new Map(),baixados=[];
+  let lista=[{name:'questoes.json',sha:'q'},{name:'taxonomia-pr.json',sha:'t1'},{name:'simulados-pr.json',sha:'s'}];
+  const textos={q:'[]',t1:JSON.stringify({termos:[{type:'theme',nome:'Tórax',questoes:20}]}),
+    t2:JSON.stringify({termos:[{type:'theme',nome:'Tórax',questoes:40}]}),s:JSON.stringify({items:[{id:'sim'}]})};
+  const c=vm.createContext({window:{},REPO:'privado/teste',api:async()=>lista,
+    raw:async sha=>{baixados.push(sha);return textos[sha]},kvGet:async k=>cache.get(k),kvSet:async(k,v)=>cache.set(k,v),adaptar:u=>u});
+  executar(c,trecho(shim,'  async function carregarDados(fundo)','  // ---------- progresso:'));
+  assert.equal(await c.carregarDados(),true);
+  assert.equal(c.window.TAXONOMIA_PR.termos[0].questoes,20);
+  assert.equal(c.window.SIMULADOS_PR.items[0].id,'sim');
+  assert.equal(await c.carregarDados(),false);
+  assert.equal(baixados.length,3);
+  lista[1].sha='t2';assert.equal(await c.carregarDados(true),true);
+  assert.equal(c.window.TAXONOMIA_PR.termos[0].questoes,20);
+  c.window={};c.api=async()=>{throw Error('offline')};
+  assert.equal(await c.dadosDoCache(),true);
+  assert.equal(c.window.TAXONOMIA_PR.termos[0].questoes,40);
+  assert.equal(c.window.SIMULADOS_PR.items[0].id,'sim');
+  c.api=async()=>lista;lista=lista.slice(0,1);
+  assert.equal(await c.carregarDados(true),true);await c.dadosDoCache();
+  assert.equal(c.window.TAXONOMIA_PR,null);assert.equal(c.window.SIMULADOS_PR,null);
 });

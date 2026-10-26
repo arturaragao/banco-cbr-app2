@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.22.1"
+VERSAO = "1.23.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -26,7 +26,6 @@ troca("Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}", "Notion
 troca("${fb&&q.coment[l]?`<div class=\"mut md cm\" style=\"margin-top:6px\">${md(q.coment[l])}</div>`:''}", "${fb?comentAlt(q,l):''}")
 # ponto de ensino do curso antes do CCQ do Claude
 troca("${pontoBloco(q)}${iaBloco(q)}", "${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}")
-troca("<span class=\"mut\">(${r.conf})</span>", "<span class=\"mut\">(${r.conf})</span>${prAcertoBloco(q)}")
 # IA = Gemini
 troca("'CCQ e resumo rápido com o Claude ('+keyLab('ia')+')'", "'CCQ e resumo rápido com IA ('+keyLab('ia')+')'")
 troca("toast('O Claude não está disponível nesta janela.')", "toast('Cole a chave do Gemini em Banco › Chaves deste aparelho.')")
@@ -98,6 +97,7 @@ troca("$('#app').innerHTML=f();", "qPinta(f());")
 # atalhos do zoom configuráveis (Config > Atalhos)
 troca("if(e.key==='Escape')zClose();else if(e.key==='ArrowRight')zStep(1);else if(e.key==='ArrowLeft')zStep(-1);else if(e.key==='+'||e.key==='=')zScale(1.4);else if(e.key==='-')zScale(1/1.4);else if(e.key==='0')zFit();return}",
       "if(e.key==='Escape')zClose();else if(keyIs(e,'znext'))zStep(1);else if(keyIs(e,'zprev'))zStep(-1);else if(keyIs(e,'zin')||(KEY('zin')==='+'&&e.key==='='))zScale(1.4);else if(keyIs(e,'zout'))zScale(1/1.4);else if(keyIs(e,'zfit'))zFit();return}")
+js = open(f"{R}/build/personalrad.js", encoding="utf8").read() + "\n\n" + js
 js = js + "\n\n" + open(f"{R}/build/questoes.js", encoding="utf8").read()
 # reordenar cartões arrastando (22/10/2026): botões de restaurar em Config + arrastar/segurar (build/layout.js)
 troca("${layoutUI()}${pesosUI()}", "${layoutUI()}${ordemUI()}${pesosUI()}")

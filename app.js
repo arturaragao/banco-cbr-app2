@@ -1,4 +1,4 @@
-// Banco CBR app 1.22.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.23.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1256,6 +1256,52 @@ function smNativoTarefas(){
 }
 
 
+// Metadados PersonalRad: nunca entram nas tags/classificação do app.
+function prAviso(q){return q.pr_qualidade?.needsReview===true||q.pr_qualidade?.reportsOpen>0}
+function prAvisoBloco(q){return prAviso(q)?'<small class="pr-aviso">⚠ possível erro na questão</small>':''}
+function prProvaBloco(q){
+  const p=q.pr_prova||{},nomes=[...(p.test||[]),...(p.year||[])];
+  return nomes.length?`<small class="mut pr-prova">${esc(nomes.join(' · '))}</small>`:'';
+}
+function prAlternativa(q,l,fb){
+  const p=q.pr_stats?.alternativas?.[l]?.percentual;
+  return fb&&typeof p==='number'&&Number.isFinite(p)&&p>=0&&p<=100?` <small class="pr-percentual">${p.toLocaleString('pt-BR',{maximumFractionDigits:2})}%</small>`:'';
+}
+function prNorm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function prContagens(dados){
+  const contagens={};
+  function guardar(tipo,nome,n){
+    const k=prNorm(nome);
+    if(tipo==='theme'&&k&&typeof n==='number'&&Number.isFinite(n)&&n>0)contagens[k]=Math.max(contagens[k]||0,n);
+  }
+  for(const t of dados?.termos||[])guardar(t.type,t.nome,t.questoes);
+  function visitar(no){
+    if(!no||typeof no!=='object')return;
+    if(!Array.isArray(no))guardar(no.type,no.label||no.nome||no.name,no.subtreeQuestionsActiveCount??no.questionsActiveCount);
+    for(const v of Object.values(no))if(v&&typeof v==='object')visitar(v);
+  }
+  visitar(dados?.arvores);
+  return contagens;
+}
+let _prInc=null;
+function prPesoTema(q){
+  const dados=globalThis.TAXONOMIA_PR;
+  if(!dados)return 1;
+  if(!_prInc||_prInc.dados!==dados||_prInc.qs!==Q||_prInc.n!==Q.length){
+    const contagens=prContagens(dados),nomes=new Set(Q.map(x=>prNorm(x.cl?.[0])).filter(k=>contagens[k]));
+    const valores=[...nomes].map(k=>contagens[k]),media=valores.reduce((a,b)=>a+b,0)/(valores.length||1);
+    _prInc={dados,qs:Q,n:Q.length,contagens,media};
+  }
+  const n=_prInc.contagens[prNorm(q.cl?.[0])];
+  return n&&_prInc.media?Math.min(1.25,Math.max(.8,Math.pow(n/_prInc.media,.25))):1;
+}
+function pesoPR(q){
+  // Multiplicadores suaves e cumulativos; nunca excluem uma questão.
+  const prova=(q.pr_prova?.test||[]).some(t=>/\b(cbr|t[ií]tulo|prova|seriada)\b/i.test(t)&&!/simulad|treino/i.test(t));
+  return (prAviso(q)?.6:1)*(prova?1.1:1)*prPesoTema(q);
+}
+
+
 
 // ===== util =====
 const $=s=>document.querySelector(s);
@@ -1533,8 +1579,8 @@ function prioridades(){
 }
 
 // ===== seleção de questões =====
-function sorteioPonderado(cands,w,k){
-  const pool=cands.map(q=>({q,w:Math.max(w(q),1e-6)})),out=[];
+function sorteioPonderado(cands,w,k,aplicarPR=true){
+  const pool=cands.map(q=>({q,w:Math.max(w(q)*(aplicarPR?pesoPR(q):1),1e-6)})),out=[];
   while(out.length<k&&pool.length){
     let tot=pool.reduce((a,b)=>a+b.w,0),r=Math.random()*tot,i=0;
     for(;i<pool.length-1;i++){r-=pool[i].w;if(r<=0)break}
@@ -2124,17 +2170,17 @@ function vQuiz(){
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),cut=sess.cut[q.id]||[];
   const alts=Object.entries(q.alts).map(([l,tx])=>{
     let c='';if(fb){if(l===q.gab)c='ok';else if(l===r.esc)c='bad'}else if(sel===l)c='sel';
-    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb&&verCom(q)?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
+    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${prAlternativa(q,l,fb)}${fb&&verCom(q)?comentAlt(q,l):''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
   const imgs=galeria(q,'q',fb);
   const imgsC=fb?galeria(q,'c'):'';
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
-  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q)}</b>${fb?difTag(q):''}</div>
+  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q)}</b>${difTag(q)}${prAcertoBloco(q)}${prProvaBloco(q)}</div>${prAvisoBloco(q)}
   ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
-  ${fb?`<div style="margin-top:10px"><b style="color:var(--${r.ok?'ok':'bad'})">${r.ok?'Acertou':'Errou · gabarito '+q.gab}</b> <span class="mut">(${r.conf})</span>${prAcertoBloco(q)}
+  ${fb?`<div style="margin-top:10px"><b style="color:var(--${r.ok?'ok':'bad'})">${r.ok?'Acertou':'Errou · gabarito '+q.gab}</b> <span class="mut">(${r.conf})</span>
    ${bannerResp(q,r)}${blocoFeedback(q,r,`${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}`)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
   </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
@@ -2535,13 +2581,13 @@ function prAcertoBloco(q){const ac=acertoPR(q);return ac==null?'':`<span class="
 function bCorpo(q){
   const ult={};log.forEach(l=>ult[l.q]=l);const r=ult[q.id];
   const imgs=galeria(q,'q'),imgsC=galeria(q,'c');
-  const alts=Object.entries(q.alts).map(([l,tx])=>`<div class="alt ${l===q.gab?'ok':r&&!r.ok&&r.e===l?'bad':''}"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${comentAlt(q,l)}</div></div>`).join('');
+  const alts=Object.entries(q.alts).map(([l,tx])=>`<div class="alt ${l===q.gab?'ok':r&&!r.ok&&r.e===l?'bad':''}"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${prAlternativa(q,l,true)}${comentAlt(q,l)}</div></div>`).join('');
   return `<div class="bc">
-    <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${acertoPR(q)==null&&acertoDe(q)!=null?' · acerto estimado ~'+acertoDe(q)+'%':''}</div>
+    <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${acertoPR(q)==null&&acertoDe(q)!=null?' · acerto estimado ~'+acertoDe(q)+'%':''}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
     ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
     <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
     <p style="margin:8px 0"><b>Gabarito: ${q.gab||'—'}</b>${prAcertoBloco(q)}${r?` · <span class="mut">sua última resposta: ${r.e||'?'} (${r.ok?'acertou':'errou'}, ${r.conf||''})</span>`:''}</p>
-    ${cursoBloco(q)}${claudeMdBloco(q)}${pontoDe(q)?`<div class="ponto md"><div class="kick">CCQ · Claude</div>${md(pontoDe(q))}</div>`:''}<div class="imgs">${imgsC}</div>
+    ${prVideoBloco(q)}${cursoBloco(q)}${claudeMdBloco(q)}${pontoDe(q)?`<div class="ponto md"><div class="kick">CCQ · Claude</div>${md(pontoDe(q))}</div>`:''}<div class="imgs">${imgsC}</div>
     <div class="row" style="margin-top:8px">${q.gab?`<button class="b s" onclick="iniciar(['${q.id}'],'banco')">Fazer esta questão</button>`:''}<span class="mut" style="font-size:.8rem">${q.chegou?'chegou em '+new Date(q.chegou).toLocaleDateString('pt-BR'):''}${q.origem==='extensao'?' pela extensão':''}</span></div>
   </div>`;
 }
@@ -2679,7 +2725,7 @@ function pesoVolume(q){
   const et=b.eT[b.kT(q)]||{n:0,e:0},pT=(et.e+pA*4)/(et.n+4);
   const es=b.eS[b.kS(q)]||{n:0,e:0},pS=(es.e+pT*3)/(es.n+3);
   const wErr=0.5+2.2*pS;
-  return wd*wInc*wErr;
+  return wd*wInc*wErr*pesoPR(q);
 }
 function pacoteVolume(n,filtro=()=>true){
   const vistas=new Set(all.map(l=>l.q)),maxS=+(PARAM.max_por_subtema??2),b=_pvBase();
@@ -2707,7 +2753,7 @@ function pacoteRepeteRaro(n){
   const ult={};log.forEach(l=>ult[l.q]=l);const lim=Date.now()-(+(PARAM.repete_dias??5))*DAY,cada=+(PARAM.repete_cada??25);
   const pool=Q.filter(q=>{const l=ult[q.id];return q.gab&&l&&!l.ok&&l.t<lim&&(l.conf==='certeza'||((q.classif||q.dif_pr||q._difManual)&&q._d==='f'))});
   let k=Math.floor(n/cada);if(Math.random()<n/cada-k)k++;k=Math.min(2,k,pool.length);
-  return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k).map(q=>q.id):[];
+  return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k,false).map(q=>q.id):[];
 }
 function revisaoDoDia(){
   if(!modoProva())return revisaoDoDiaOrig();
@@ -2784,7 +2830,7 @@ function metaProvaCard(){
 function pacoteErradas(k){
   const ult={};log.forEach(l=>ult[l.q]=l);
   const pool=Q.filter(q=>q.gab&&ult[q.id]&&!ult[q.id].ok&&q._d!=='d');
-  return sorteioPonderado(pool,q=>pesoVolume(q),k).map(q=>q.id);
+  return sorteioPonderado(pool,q=>pesoVolume(q),k,false).map(q=>q.id);
 }
 
 

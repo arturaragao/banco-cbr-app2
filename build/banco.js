@@ -17,13 +17,13 @@ function prAcertoBloco(q){const ac=acertoPR(q);return ac==null?'':`<span class="
 function bCorpo(q){
   const ult={};log.forEach(l=>ult[l.q]=l);const r=ult[q.id];
   const imgs=galeria(q,'q'),imgsC=galeria(q,'c');
-  const alts=Object.entries(q.alts).map(([l,tx])=>`<div class="alt ${l===q.gab?'ok':r&&!r.ok&&r.e===l?'bad':''}"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${comentAlt(q,l)}</div></div>`).join('');
+  const alts=Object.entries(q.alts).map(([l,tx])=>`<div class="alt ${l===q.gab?'ok':r&&!r.ok&&r.e===l?'bad':''}"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${prAlternativa(q,l,true)}${comentAlt(q,l)}</div></div>`).join('');
   return `<div class="bc">
-    <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${acertoPR(q)==null&&acertoDe(q)!=null?' · acerto estimado ~'+acertoDe(q)+'%':''}</div>
+    <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${acertoPR(q)==null&&acertoDe(q)!=null?' · acerto estimado ~'+acertoDe(q)+'%':''}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
     ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
     <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
     <p style="margin:8px 0"><b>Gabarito: ${q.gab||'—'}</b>${prAcertoBloco(q)}${r?` · <span class="mut">sua última resposta: ${r.e||'?'} (${r.ok?'acertou':'errou'}, ${r.conf||''})</span>`:''}</p>
-    ${cursoBloco(q)}${claudeMdBloco(q)}${pontoDe(q)?`<div class="ponto md"><div class="kick">CCQ · Claude</div>${md(pontoDe(q))}</div>`:''}<div class="imgs">${imgsC}</div>
+    ${prVideoBloco(q)}${cursoBloco(q)}${claudeMdBloco(q)}${pontoDe(q)?`<div class="ponto md"><div class="kick">CCQ · Claude</div>${md(pontoDe(q))}</div>`:''}<div class="imgs">${imgsC}</div>
     <div class="row" style="margin-top:8px">${q.gab?`<button class="b s" onclick="iniciar(['${q.id}'],'banco')">Fazer esta questão</button>`:''}<span class="mut" style="font-size:.8rem">${q.chegou?'chegou em '+new Date(q.chegou).toLocaleDateString('pt-BR'):''}${q.origem==='extensao'?' pela extensão':''}</span></div>
   </div>`;
 }
@@ -161,7 +161,7 @@ function pesoVolume(q){
   const et=b.eT[b.kT(q)]||{n:0,e:0},pT=(et.e+pA*4)/(et.n+4);
   const es=b.eS[b.kS(q)]||{n:0,e:0},pS=(es.e+pT*3)/(es.n+3);
   const wErr=0.5+2.2*pS;
-  return wd*wInc*wErr;
+  return wd*wInc*wErr*pesoPR(q);
 }
 function pacoteVolume(n,filtro=()=>true){
   const vistas=new Set(all.map(l=>l.q)),maxS=+(PARAM.max_por_subtema??2),b=_pvBase();
@@ -189,7 +189,7 @@ function pacoteRepeteRaro(n){
   const ult={};log.forEach(l=>ult[l.q]=l);const lim=Date.now()-(+(PARAM.repete_dias??5))*DAY,cada=+(PARAM.repete_cada??25);
   const pool=Q.filter(q=>{const l=ult[q.id];return q.gab&&l&&!l.ok&&l.t<lim&&(l.conf==='certeza'||((q.classif||q.dif_pr||q._difManual)&&q._d==='f'))});
   let k=Math.floor(n/cada);if(Math.random()<n/cada-k)k++;k=Math.min(2,k,pool.length);
-  return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k).map(q=>q.id):[];
+  return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k,false).map(q=>q.id):[];
 }
 function revisaoDoDia(){
   if(!modoProva())return revisaoDoDiaOrig();
@@ -266,5 +266,5 @@ function metaProvaCard(){
 function pacoteErradas(k){
   const ult={};log.forEach(l=>ult[l.q]=l);
   const pool=Q.filter(q=>q.gab&&ult[q.id]&&!ult[q.id].ok&&q._d!=='d');
-  return sorteioPonderado(pool,q=>pesoVolume(q),k).map(q=>q.id);
+  return sorteioPonderado(pool,q=>pesoVolume(q),k,false).map(q=>q.id);
 }

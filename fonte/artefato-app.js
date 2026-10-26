@@ -275,8 +275,8 @@ function prioridades(){
 }
 
 // ===== seleção de questões =====
-function sorteioPonderado(cands,w,k){
-  const pool=cands.map(q=>({q,w:Math.max(w(q),1e-6)})),out=[];
+function sorteioPonderado(cands,w,k,aplicarPR=true){
+  const pool=cands.map(q=>({q,w:Math.max(w(q)*(aplicarPR?pesoPR(q):1),1e-6)})),out=[];
   while(out.length<k&&pool.length){
     let tot=pool.reduce((a,b)=>a+b.w,0),r=Math.random()*tot,i=0;
     for(;i<pool.length-1;i++){r-=pool[i].w;if(r<=0)break}
@@ -876,12 +876,12 @@ function vQuiz(){
   const q=cur(),r=sess.resp[q.id],fb=!!r&&!sess.sim,sel=selAtual(),cut=sess.cut[q.id]||[];
   const alts=Object.entries(q.alts).map(([l,tx])=>{
     let c='';if(fb){if(l===q.gab)c='ok';else if(l===r.esc)c='bad'}else if(sel===l)c='sel';
-    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${fb&&q.coment[l]?`<div class="mut md cm" style="margin-top:6px">${md(q.coment[l])}</div>`:''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
+    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''}" tabindex="0" onclick="escolher('${l}')"><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${prAlternativa(q,l,fb)}${fb&&q.coment[l]?`<div class="mut md cm" style="margin-top:6px">${md(q.coment[l])}</div>`:''}</div><button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button></div>`}).join('');
   const imgs=(q.imgs||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" loading="lazy" alt="Imagem da questão">`).join('');
   const imgsC=fb?(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" alt="Imagem do comentário">`).join(''):'';
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
-  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q)}</b>${fb?difTag(q):''}</div>
+  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q)}</b>${difTag(q)}${prAcertoBloco(q)}${prProvaBloco(q)}</div>${prAvisoBloco(q)}
   ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}

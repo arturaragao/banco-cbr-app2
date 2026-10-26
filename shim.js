@@ -63,6 +63,7 @@
       imgsCom: (u.imgsCom || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       acerto: u.acerto ?? null, ar: u.ar || undefined, cl: u.cl || [], dif: u.dif || null,
       pr_stats: u.pr_stats || null, dif_pr: u.dif_pr || null, dificuldade_site: u.dificuldade_site ?? null,
+      pr_qualidade: u.pr_qualidade || null, pr_tags: u.pr_tags || {}, pr_video: u.pr_video ?? null, pr_prova: u.pr_prova || {},
       curso: u.curso || null, claudeMd: u.claude_md_suspeito ? "" : (u.claude_md || ""), chegou: u.chegou || null, classif: u.classif || null, origem: u.origem || null, legendas: u.legendas || [], legendasCom: u.legendasCom || [],
     }));
   }
@@ -82,14 +83,20 @@
       if (await kvGet("f:metodos.json")) { await kvSet("f:metodos.json", null); mudou = true; }
       return "";
     };
-    const [q, m, mt] = await Promise.all([pegar("questoes.json"), sha["metodologia.md"] ? pegar("metodologia.md") : "", metodos()]);
-    if (!fundo) { window.QUESTOES = adaptar(JSON.parse(q)); window.METODO = m; window.METODOS_DADOS = mt ? JSON.parse(mt) : null; }
+    const opcional = async (nome) => {
+      if (sha[nome]) return pegar(nome);
+      if (await kvGet("f:" + nome)) { await kvSet("f:" + nome, null); mudou = true; }
+      return "";
+    };
+    const [q, m, mt, tax, sim] = await Promise.all([pegar("questoes.json"), sha["metodologia.md"] ? pegar("metodologia.md") : "", metodos(), opcional("taxonomia-pr.json"), opcional("simulados-pr.json")]);
+    if (!fundo) { window.QUESTOES = adaptar(JSON.parse(q)); window.METODO = m; window.METODOS_DADOS = mt ? JSON.parse(mt) : null; window.TAXONOMIA_PR = tax ? JSON.parse(tax) : null; window.SIMULADOS_PR = sim ? JSON.parse(sim) : null; }
     return mudou;
   }
   async function dadosDoCache() {
     const q = await kvGet("f:questoes.json"), m = await kvGet("f:metodologia.md"), mt = await kvGet("f:metodos.json");
     if (!q) return false;
-    window.QUESTOES = adaptar(JSON.parse(q.txt)); window.METODO = m ? m.txt : ""; window.METODOS_DADOS = mt ? JSON.parse(mt.txt) : null; return true;
+    const tax = await kvGet("f:taxonomia-pr.json"), sim = await kvGet("f:simulados-pr.json");
+    window.QUESTOES = adaptar(JSON.parse(q.txt)); window.METODO = m ? m.txt : ""; window.METODOS_DADOS = mt ? JSON.parse(mt.txt) : null; window.TAXONOMIA_PR = tax ? JSON.parse(tax.txt) : null; window.SIMULADOS_PR = sim ? JSON.parse(sim.txt) : null; return true;
   }
 
   // ---------- progresso: o "banco" do artefato vira arquivos no GitHub ----------
