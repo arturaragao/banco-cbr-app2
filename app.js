@@ -1,4 +1,4 @@
-// Banco CBR app 1.21.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.22.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1316,16 +1316,18 @@ const AREAS=[
  {id:'fis',nome:'Física e proteção radiológica',kw:['fisica','protecao','radioprotecao','dosimetria']},
  {id:'seg',nome:'Segurança do paciente',kw:['seguranca']},
  {id:'cont',nome:'Assistência à vida e contraste',kw:['contraste','reacoes adversas','anafil','farmacolog','assistencia a vida']},
- {id:'go',nome:'US em Ginecologia e Obstetrícia',kw:['obstet','ginecolog','feto','reprodutivo','gestac','ovario','anexo','utero','endometri','pelve feminina','trompa']},
+ {id:'go',nome:'Ginecologia e Obstetrícia',kw:['obstet','ginecolog','feto','reprodutivo','gestac','ovario','anexo','utero','endometri','pelve feminina','trompa']},
  {id:'dop',nome:'Doppler',kw:['doppler','vascular','vasos']},
  {id:'tor',nome:'Tórax',kw:['torax','toracic','pulmao','respirat','mediastino','intersticial','pleura']},
- {id:'dig',nome:'Sistema digestório',kw:['digest','gastro','hepat','figado','vesicula','vias biliares','pancrea','intestin','veia porta','esofago','colon']},
- {id:'uro',nome:'Sistema urogenital',kw:['urogenital','geniturinario','rim','renal','bexiga','prostat','genital masculino','urinari','adrenal']},
+ {id:'dig',nome:'Trato gastrointestinal',kw:['digest','gastro','hepat','figado','vesicula','vias biliares','pancrea','intestin','veia porta','esofago','colon']},
+ {id:'uro',nome:'Trato urogenital',kw:['urogenital','geniturinario','rim','renal','bexiga','prostat','genital masculino','urinari','adrenal']},
  {id:'msk',nome:'Musculoesquelético',kw:['musculoesquel','osso','articul','ortoped']},
- {id:'usg',nome:'Ultrassonografia geral',kw:['ultrassonografia','ultrassom']},
 ];
 const SEM={id:'sem',nome:'Sem classificação'};
-const AREA_BY=Object.fromEntries([...AREAS,SEM].map(a=>[a.id,a]));
+// Compatibilidade com questões antigas enquanto o repositório realoca a área usg.
+const AREA_BY=Object.fromEntries([...AREAS,SEM,{...SEM,id:'usg'}].map(a=>[a.id,a]));
+const ORDEM_AREAS_ESTUDAR=['neuro','cp','tor','mama','dig','uro','go'];
+const nomeArea=s=>({'sistema digestorio':'Trato gastrointestinal','sistema urogenital':'Trato urogenital','us em ginecologia e obstetricia':'Ginecologia e Obstetrícia'}[norm(s)]||s);
 const META=new Set(['medicina','radiologia','provas cbr','titulo','titulo rddi','teorica','teorico-pratica','primeiro semestre','segundo semestre','imagem diagnostica','prova seriada','autorais']);
 const isMeta=t=>META.has(norm(t))||/^20\d\d$/.test(t);
 function areaDe(q){
@@ -1336,6 +1338,7 @@ function areaDe(q){
 }
 // Dimensões dentro de cada grande área: método de imagem, órgão, tema (doença/assunto) e tipo de conteúdo.
 const METODOS=[['TC',/tomografia|hrct|angiotomografia/],['RM',/ressonancia|\bmri\b/],['USG',/ultrassonografia|ultrassom|\busg\b|doppler/],['RX',/radiografia|raios? x\b/],['Mamografia',/mamografia|tomossintese/],['Angio/Fluoro',/angiografia|fluoroscopia|histerossalpingografia|urografia/],['Med. nuclear',/\bpet\b|cintilografia|medicina nuclear|spect/],['DXA',/absorciometria|\bdxa\b/]];
+const METODOS_DADOS=window.METODOS_DADOS&&Array.isArray(window.METODOS_DADOS.ordem)&&window.METODOS_DADOS.q&&typeof window.METODOS_DADOS.q==='object'?window.METODOS_DADOS:null;
 const RE_AREA=/^(radiologia|torax|toracico|respiratorio|pediatria|mama|neurorradiologia|densitometria ossea|cabeca e pescoco|urogenital|geniturinario|usg geral|gastrointestinal|hepatobiliar|musculoesqueletico|sistema esqueletico|sistema nervoso central|vascular|vascular e intervencionista|reprodutivo|ginecologia|obstetricia|endocrino|endocrinologia|radiologia intervencionista|ultrassom ginecologico|uro|abdome superior|pelve|oncologia)$/;
 const ORG=[['Rim e vias urinárias',/\b(rim|rins|ureteres?|bexiga|urinari\w*|renal|renais|jup)\b/],['Adrenal',/\badrenal\b/],['Fígado e vias biliares',/\b(figado|hepatic\w*|vesicula|vias biliares|biliar|porta)\b/],['Pâncreas',/\bpancreas\b/],['Trato digestório',/\b(esofago|estomago|intestino|colon|reto|apendice|gastro\w*)\b/],['Pulmão e pleura',/\b(pulmao|pleura|pulmonar)\b/],['Mediastino e coração',/\b(mediastino|mediastinal|coracao|cardiaco)\b/],['Útero, ovários e pelve',/\b(ovario|ovarios|ovariana|utero|anexo|trompas|pelve|pelvico|colo uterino|endometri\w*)\b/],['Feto e placenta',/\b(feto|fetal|placenta)\b/],['Mama',/\bmama\b/],['Hipófise',/\b(hipofise|sela turcica)\b/],['Cérebro e crânio',/\b(cerebro|encefalo|cranio|craneo)\b/],['Coluna e medula',/\b(coluna|medula)\b/],['Osso e articulações',/\b(osso|ossos|esqueleto|articulacao|articulacoes|joelho|ombro|quadril|punho|mao|pe|tornozelo|cotovelo|patela|patelar|musculo|quadriceps|tarsais)\b/],['Vasos',/\b(veia|veias|arteria|arterias|aorta|vasos|jugular)\b/],['Tireoide e pescoço',/\b(tireoide|paratireoide|pescoco|salivares)\b/],['Parede abdominal',/\bparede abdominal\b/],['Testículo, escroto e próstata',/\b(testiculo|escroto|prostata|genital masculino)\b/],['Linfonodos',/\blinfonodos?\b/]];
 const RE_TIPO=/^(anatomia radiologica|protocolo de exame|posicionamento|tecnicas?\b.*|seguimento|controle pos-procedimento|resposta terapeutica|lexico|forma|realce|teste laboratorial|preparo|indicacao|criterios de apropriabilidade|diretrizes de pratica clinica|qualidade de imagem|fisiologia|farmacologia|fisica|complicacao.*|variante anatomica)$/;
@@ -1345,7 +1348,7 @@ function taxo(t){const n=norm(t);if(_tx[n])return _tx[n];
   if(mm)r={d:'m',v:mm[0]};else if(RE_AREA.test(n))r={d:'a',v:t};else if(RE_TIPO.test(n))r={d:'p',v:t};else if(ORG.some(([,re])=>re.test(n)))r={d:'o',v:ORG.find(([,re])=>re.test(n))[0]};else r={d:'t',v:t};
   return _tx[n]=r}
 const DIMS=[['m','Método de imagem'],['o','Órgão'],['t','Tema / doença'],['p','Tipo de conteúdo']];
-function classTags(q){q._x={m:[],o:[],t:[],p:[],g:[]};q.tags.filter(t=>!isMeta(t)).forEach(t=>{const x=taxo(t);if(x.d!=='a'&&!q._x[x.d].includes(x.v))q._x[x.d].push(x.v)});if(q.cl&&q.cl.length){q._x.o=[];q._x.t=[q.cl.slice(0,2).join(' › ')]}}
+function classTags(q){q._x={m:[],o:[],t:[],p:[],g:[]};q.tags.filter(t=>!isMeta(t)).forEach(t=>{const x=taxo(t);if(x.d!=='a'&&!q._x[x.d].includes(x.v))q._x[x.d].push(x.v)});if(METODOS_DADOS)q._x.m=[...new Set((METODOS_DADOS.q[q.id]||[]).filter(v=>METODOS_DADOS.ordem.includes(v)))];if(q.cl&&q.cl.length){q._x.o=[];q._x.t=[q.cl.slice(0,2).join(' › ')]}}
 const posDe=q=>q.n??1e5; // posição da questão na página "Questões" do Notion (1 = primeira)
 const etapaDe=q=>{const t=q.tags.map(norm);return t.includes('teorico-pratica')?'prática':t.includes('teorica')?'teórica':'?'};
 const anoDe=q=>(q.tags.find(t=>/^20\d\d$/.test(t))||'');
@@ -1387,7 +1390,7 @@ const imgSrc=u=>String(u).startsWith('gh:')?(window.BCBR&&BCBR.imgPronta(String(
 let cfg=normCfg(load('cbr_cfg',{}));
 // nomes que você deu às grandes áreas e aos temas (só o rótulo muda; as tags das questões ficam como estão)
 const dn=(d,v)=>cfg.nomes[d+'|'+v]||v;
-function aplicaNomes(){AREAS.concat(SEM).forEach(a=>{if(a._n===undefined)a._n=a.nome;a.nome=cfg.nomes['a|'+a.id]||a._n})}
+function aplicaNomes(){AREAS.concat(SEM).forEach(a=>{if(a._n===undefined)a._n=a.nome;a.nome=nomeArea(cfg.nomes['a|'+a.id]||a._n)})}
 aplicaNomes();
 let estU=load('cbr_u',0),resetAt=load('cbr_reset',0);
 let srs={};                          // derivado do log
@@ -1396,7 +1399,7 @@ const ERRO_D=14; // erro: volta só daqui a 14 dias (e reentra na caixa 1, não 
 let QID=Object.fromEntries(Q.map(q=>[q.id,q]));
 lerManual(metodo);
 Q.sort((a,b)=>posDe(a)-posDe(b));
-function refQ(q){classTags(q);q.enunciado=[...new Set(q.enunciado.replace(/#WO#/g,"").split(/\n/).map(s=>s.trim()))].filter(Boolean).join("\n");q._a=areaDe(q);q._d=difDe(q)}
+function refQ(q){q.tags=q.tags.map(nomeArea);classTags(q);q.enunciado=[...new Set(q.enunciado.replace(/#WO#/g,"").split(/\n/).map(s=>s.trim()))].filter(Boolean).join("\n");q._a=areaDe(q);q._d=difDe(q)}
 // edições do usuário (enunciado, alternativas, gabarito, comentários, tags, acerto): guardadas em pon['e:ID'] e sincronizadas junto com os pontos de ensino
 function aplicaEd(q){
   if(!q._b)q._b=JSON.parse(JSON.stringify({enunciado:q.enunciado,alts:q.alts,gab:q.gab,coment:q.coment,tags:q.tags,acerto:q.acerto,imgs:q.imgs||[],imgsCom:q.imgsCom||[],cl:q.cl||[],dif:q.dif||null}));
@@ -1843,7 +1846,7 @@ function opPainel(){
   return o.k==='ren'
    ?`<div class="iab" style="margin:10px 0"><div class="kick">Renomear tag · ${n} questões</div><div class="row" style="margin-top:6px"><input id="op_in" value="${esc(fl.opv)}" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter')tagOpOk();else if(event.key==='Escape'){fl.op=null;render()}"><button class="b" onclick="tagOpOk()">Salvar</button><button class="b s" onclick="fl.op=null;render()">Cancelar</button></div><p class="mut" style="margin:6px 0 0;font-size:.8rem">Se já existir uma tag com o novo nome, elas são unidas.</p></div>`
    :`<div class="iab" style="margin:10px 0"><div class="kick">Remover tag</div><p style="margin:6px 0">Remover <b>${esc(o.v)}</b> de ${n} questões? As questões continuam no banco.</p><div class="row"><button class="b" onclick="tagOpOk()">Remover</button><button class="b s" onclick="fl.op=null;render()">Cancelar</button></div></div>`}
-const AN0=new Set([...AREAS.map(a=>norm(a.nome)),'sistema digestorio','sistema urogenital','ginecologia e obstetricia','usg geral','us em ginecologia e obstetricia']);
+const AN0=new Set([...AREAS.map(a=>norm(a.nome)),'sistema digestorio','sistema urogenital','ginecologia e obstetricia','ultrassonografia geral','usg geral','us em ginecologia e obstetricia']);
 const AN={has:n=>AN0.has(n)||AREAS.some(a=>norm(a.nome)===n)};
 const XSVG='<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg>';
 const stp=e=>e.stopPropagation();
@@ -1855,7 +1858,7 @@ function selBar(){
 // ---- árvore: grande área > tema > subtema > assunto (campo "cl" de cada questão) ----
 function arvoreTags(){
   const qn=norm(fl.tagq||''),R={};
-  Q.forEach(q=>{if(!q.gab)return;const a=q._a;if(fl.area&&a!==fl.area)return;
+  Q.forEach(q=>{if(!q.gab)return;const a=q._a;if(a==='usg'||!AREA_BY[a]?.nome||fl.area&&a!==fl.area)return;
     let N=R,k='';[a,...(q.cl&&q.cl.length?q.cl:['Sem classificação'])].forEach(s=>{k+=s+'|';const n=N[s]??={k,s,ids:new Set(),c:{}};n.ids.add(q.id);N=n.c})});
   const nm=(n,d)=>d===0?AREA_BY[n.s].nome:n.s,mt=(n,d)=>!!qn&&norm(nm(n,d)).includes(qn);
   const hit=(n,d)=>mt(n,d)||Object.values(n.c).some(c=>hit(c,d+1));
@@ -1868,7 +1871,8 @@ function arvoreTags(){
     const cls=d===0?'ar':d===1?'og':'sg';
     return `<div class="trw ${cls} ${open?'op':''}" role="button" tabindex="0" onclick="tgl(${key})"><i>▸</i><span class="nm">${esc(nm(n,d))}</span>${ops}<span class="ct">${n.ids.size}</span>${d>0?ck:''}</div>`+
       (open?`<div class="${d===0?'trb':'trl'}">${kids.map(c=>node(c,d+1,anc||me)).join('')||'<span class="mut">Sem temas.</span>'}</div>`:'')};
-  const html=Object.values(R).sort((x,y)=>(x.s==='sem'?1:0)-(y.s==='sem'?1:0)||y.ids.size-x.ids.size).map(n=>node(n,0,false)).join('');
+  const pos=a=>{const i=ORDEM_AREAS_ESTUDAR.indexOf(a);return i<0?ORDEM_AREAS_ESTUDAR.length:i};
+  const html=Object.values(R).sort((x,y)=>pos(x.s)-pos(y.s)||y.ids.size-x.ids.size).map(n=>node(n,0,false)).join('');
   return `${opPainel()}${selBar()}<div class="arv">${html||'<p class="mut">Nenhum tema encontrado.</p>'}</div>`}
 const clParse=s=>String(s||'').split('>').map(x=>x.trim()).filter(Boolean);
 function clOp(k){fl.op={k:'cl',v:k};fl.opv=k.split('|').filter(Boolean).pop();render();setTimeout(()=>{const e=$('#op_in');if(e){e.focus();e.select()}},0)}
@@ -1884,9 +1888,10 @@ function clOpOk(o){const nm=($('#op_in').value||'').trim();if(!nm){toast('Digite
 
 function outrosFiltros(){
   const qn=norm(fl.tagq||'');
-  return DIMS.filter(([d])=>d==='m'||d==='p').map(([d,nome])=>{const c={};Q.filter(q=>q.gab&&(!fl.area||q._a===fl.area)).forEach(q=>q._x[d].forEach(v=>c[v]=(c[v]||0)+1));
+  return DIMS.filter(([d])=>d==='m').map(([d,nome])=>{const c={};Q.filter(q=>q.gab&&(!fl.area||q._a===fl.area)).forEach(q=>q._x[d].forEach(v=>c[v]=(c[v]||0)+1));
     const sel=fl.sel[d].map(v=>[v,c[v]||0]),rest=Object.entries(c).filter(([v])=>!fl.sel[d].includes(v)&&(!qn||norm(v).includes(qn))).sort((a,b)=>b[1]-a[1]).slice(0,30);
-    return sel.length+rest.length?`<div class="dimg"><div class="kick">${nome}</div>${[...sel,...rest].map(([v,n])=>tgChip(d,v,n)).join('')}</div>`:''}).join('')}
+    const itens=METODOS_DADOS?METODOS_DADOS.ordem.filter(v=>(c[v]||fl.sel[d].includes(v))&&(fl.sel[d].includes(v)||!qn||norm(v).includes(qn))).map(v=>[v,c[v]||0]):[...sel,...rest];
+    return itens.length?`<div class="dimg"><div class="kick">${nome}</div>${itens.map(([v,n])=>tgChip(d,v,n)).join('')}</div>`:''}).join('')}
 function vEstudar(){
   const S=statsPor(q=>q._a);
   return `<div class="card"><h2>Estudar</h2>${bannerEst()}<div class="row">

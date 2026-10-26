@@ -75,14 +75,20 @@
       if (c && c.sha === sha[nome]) return c.txt;
       const txt = await raw(sha[nome]); mudou = true; await kvSet("f:" + nome, { sha: sha[nome], txt }); return txt;
     };
-    const [q, m] = await Promise.all([pegar("questoes.json"), sha["metodologia.md"] ? pegar("metodologia.md") : ""]);
-    if (!fundo) { window.QUESTOES = adaptar(JSON.parse(q)); window.METODO = m; }
+    const metodos = async () => {
+      if (sha["metodos.json"]) return pegar("metodos.json");
+      // Apaga a cópia antiga se o arquivo deixou de existir no repositório.
+      if (await kvGet("f:metodos.json")) { await kvSet("f:metodos.json", null); mudou = true; }
+      return "";
+    };
+    const [q, m, mt] = await Promise.all([pegar("questoes.json"), sha["metodologia.md"] ? pegar("metodologia.md") : "", metodos()]);
+    if (!fundo) { window.QUESTOES = adaptar(JSON.parse(q)); window.METODO = m; window.METODOS_DADOS = mt ? JSON.parse(mt) : null; }
     return mudou;
   }
   async function dadosDoCache() {
-    const q = await kvGet("f:questoes.json"), m = await kvGet("f:metodologia.md");
+    const q = await kvGet("f:questoes.json"), m = await kvGet("f:metodologia.md"), mt = await kvGet("f:metodos.json");
     if (!q) return false;
-    window.QUESTOES = adaptar(JSON.parse(q.txt)); window.METODO = m ? m.txt : ""; return true;
+    window.QUESTOES = adaptar(JSON.parse(q.txt)); window.METODO = m ? m.txt : ""; window.METODOS_DADOS = mt ? JSON.parse(mt.txt) : null; return true;
   }
 
   // ---------- progresso: o "banco" do artefato vira arquivos no GitHub ----------
