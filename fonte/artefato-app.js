@@ -780,12 +780,13 @@ Gabarito: ${q.gab}${q.ponto?'\nCCQ (Conceito Chave da Questão): '+pontoDe(q).sl
 }
 
 // ---- quiz ----
-function tituloQ(q){
+function tituloQ(q,comArea=true){
   const e=etapaDe(q),et=e==='prática'?'Prática':e==='teórica'?'Teórica':'',ano=anoDe(q),au=q.tags.some(t=>norm(t)==='autorais');
-  return esc(['CBR',au?'Autoral':'',et,ano].filter(Boolean).join(' ')+' - '+AREA_BY[q._a].nome);
+  return esc(['CBR',au?'Autoral':'',et,ano].filter(Boolean).join(' ')+(comArea?' - '+AREA_BY[q._a].nome:''));
 }
 const TES='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/></svg>';
 function nvBloco(){
+  if(!sess.resp[sess.ids[sess.i]]||sess.sim)return '';
   const D={f:{t:0,n:0,ok:0},m:{t:0,n:0,ok:0},d:{t:0,n:0,ok:0}};
   sess.ids.forEach(id=>{const q=QID[id],r=sess.resp[id];D[q._d].t++;if(r){D[q._d].n++;if(r.ok)D[q._d].ok++}});
   const open=!!sess.nvOpen,fb=!sess.sim;
@@ -881,7 +882,7 @@ function vQuiz(){
   const imgsC=fb?(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" alt="Imagem do comentário">`).join(''):'';
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
-  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q)}</b>${difTag(q)}${prAcertoBloco(q)}${prProvaBloco(q)}</div>${prAvisoBloco(q)}
+  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?difTag(q)+prAcertoBloco(q):''}${prProvaBloco(q)}</div>${fb?prAvisoBloco(q):''}
   ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}

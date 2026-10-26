@@ -171,30 +171,39 @@ test('percentuais só após resposta; 0% é válido; metadados não viram tags',
   assert.equal(executar(c,'adaptar(entrada)[0].pr_qualidade.needsReview'),true);
 });
 
-for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}: correta verde, marcada errada vermelha e as outras neutras`,()=>{
+for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}: pistas só com gabarito; correta verde, marcada errada vermelha e demais neutras`,()=>{
   const c=contexto();preparar(c);
   executar(c,`const esc=String,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[],TES='';
-    const tituloQ=()=>'',posDe=()=>1,keyLab=()=>'',tgHtml=q=>'Tags Claude',painelNav=()=>'',
-      precisaConf=()=>false,imgSrc=()=>false,pontoBloco=()=>'',iaBloco=()=>'',cur=()=>q,selAtual=()=>null;
+    const etapaDe=()=>'',anoDe=()=>'',norm=x=>x,posDe=()=>1,keyLab=()=>'',tgHtml=q=>'Tags Claude',
+      barra=()=>'',pct=()=>0,
+    precisaConf=()=>false,imgSrc=()=>false,pontoBloco=()=>'',iaBloco=()=>'',cur=()=>q,selAtual=()=>sess.sel||null;
     const galeria=()=>'',comentAlt=()=>'',cursoBloco=()=>'',claudeMdBloco=()=>'',bannerResp=()=>'',
       blocoFeedback=(q,r,s)=>s,verCom=()=>true;
     const difTag=q=>'<span class="dif '+q._d+'">Dif</span>';
-    let sess={i:0,ids:['q1'],resp:{},cut:{}};
+    let sess={i:0,ids:['q1'],resp:{},cut:{},nvOpen:true};
     q.alts={A:'Certa',B:'Errada marcada',C:'Outra errada'};q.gab='A';q.cl=['Tema Claude'];q.coment={};
     q.pr_stats.alternativas={A:{percentual:60},B:{percentual:30},C:{percentual:10}};
     q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['NÃO EXIBIR']};`);
+  executar(c,trecho(script,'function tituloQ(q','const TES='));
+  executar(c,trecho(script,'function nvBloco(){','const DIFV='));
+  executar(c,`const QID={q1:q};DIF.d.nome='Difícil';`);
   executar(c,trecho(script,'function vQuiz(){','function reclass('));
   const antes=executar(c,'vQuiz()');
-  assert.match(antes,/class="dif d"/);
-  assert.match(antes,/acerto dos alunos 20%/);
-  assert.match(antes,/possível erro na questão/);
-  assert.doesNotMatch(antes,/pr-percentual|NÃO EXIBIR/);
+  assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|NÃO EXIBIR|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);
+  executar(c,`sess.sel='B'`);
+  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);
   executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
   const depois=executar(c,'vQuiz()');
+  assert.match(depois,/class="dif d"/);
+  assert.match(depois,/acerto dos alunos 20%/);
+  assert.match(depois,/possível erro na questão/);
+  for(const texto of ['Tags Claude','Tema Claude','Neuro','por dificuldade','Difícil'])assert.ok(depois.includes(texto),texto);
   assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
   assert.match(depois,/class="alt bad [^"]*"[^]*?Errada marcada[^]*?30%/);
   assert.match(depois,/class="alt  [^"]*"[^]*?Outra errada[^]*?10%/);
   assert.doesNotMatch(depois,/NÃO EXIBIR/);
+  executar(c,'sess.sim=true');
+  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);
 });
 
 test('pesos do site são aplicados uma vez também no sorteio de revisões',()=>{
