@@ -3,7 +3,7 @@
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mdI=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g,'$1<i>$2</i>').replace(/^✔/,'<span class="ok">✔</span>').replace(/^✘/,'<span class="no">✘</span>');
-function md(s){const L=String(s??'').replace(/\r/g,'').split('\n');let h='',i=0;
+function md(s){const L=String(s??'').replace(/\r/g,'').split('\n').map(l=>(l.match(/\*\*/g)||[]).length%2?l+'**':l);let h='',i=0;
   while(i<L.length){const l=L[i];
     if(/^\s*\|/.test(l)){const rows=[];while(i<L.length&&/^\s*\|/.test(L[i]))rows.push(L[i++]);
       const cel=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());const sep=rows[1]&&/^[\s|:-]+$/.test(rows[1]);
@@ -95,14 +95,14 @@ const posDe=q=>+q.id.slice(1); // posição da questão na página "Questões" d
 const etapaDe=q=>{const t=q.tags.map(norm);return t.includes('teorico-pratica')?'prática':t.includes('teorica')?'teórica':'?'};
 const anoDe=q=>(q.tags.find(t=>/^20\d\d$/.test(t))||'');
 
-// ===== dificuldade (edição manual > PersonalRad com 15+ respostas > classificação existente) =====
+// ===== dificuldade exclusivamente pelo percentual dos alunos no PersonalRad =====
 const DIF={f:{nome:'Fácil',meta:95,w:1.5},m:{nome:'Média',meta:75,w:1.2},d:{nome:'Difícil',meta:20,w:0.5}};
 const PARAM_DEF={facil_min:60,dificil_max:30,meta_facil:95,meta_media:75,meta_dificil:20,freq_ri:5,freq_rt:2,rev_pct:15,ia_estilo:''};
 let PARAM={...PARAM_DEF};
-const acertoPR=q=>typeof q.pr_stats?.acerto==='number'&&Number.isFinite(q.pr_stats.acerto)&&q.pr_stats.acerto>=0&&q.pr_stats.acerto<=100&&q.pr_stats.respostas>0?q.pr_stats.acerto:null;
+const acertoPR=q=>{const ac=prStats(q).acerto;return typeof ac==='number'&&Number.isFinite(ac)&&ac>=0&&ac<=100?ac:null};
 const acertoDe=q=>q._acertoManual?q.acerto:acertoPR(q)??q.acerto;
-const difAcerto=ac=>ac==null?'m':ac>=PARAM.facil_min?'f':ac<=PARAM.dificil_max?'d':'m';
-const difDe=q=>q._difManual&&DIF[q.dif]?q.dif:q._acertoManual?difAcerto(acertoDe(q)):q.pr_stats?.respostas>=15&&acertoPR(q)!=null?(DIF[q.dif_pr]?q.dif_pr:difAcerto(acertoDe(q))):q.dif&&DIF[q.dif]?q.dif:difAcerto(q.acerto);
+const difAcerto=ac=>ac==null?null:ac>60?'f':ac<30?'d':'m';
+const difDe=q=>difAcerto(acertoPR(q));
 let metoU=0,metodo=window.METODO||'',metEdit=false;
 try{const _m=JSON.parse(localStorage.getItem('cbr_metodo'));if(_m&&_m.t){metodo=_m.t;metoU=_m.u||0}}catch(e){}
 function lerManual(txt){
@@ -332,7 +332,7 @@ function revisaoDoDia(n=cfg.diario,exclui=new Set()){
       fac=q._d==='f'?1+1.5*(1-ua):q._d==='d'?.7:1;
     return area*err*fac};
   const revs=sorteioPonderado(venc,wRev,nRev);
-  const w=q=>(P[q._a]??med)*DIF[q._d].w;
+  const w=q=>(P[q._a]??med)*DIF[q._d??'m'].w;
   const novos=sorteioPonderado(novas,w,n-revs.length);
   let ids=[...novos,...revs];
   if(ids.length<n){const t=new Set(ids.map(q=>q.id));ids=ids.concat(banco.filter(q=>q.gab&&!t.has(q.id)&&srs[q.id]&&(now-(U[q.id]?.t||0))>7*DAY).sort((a,b)=>srs[a.id].due-srs[b.id].due).slice(0,n-ids.length))}
@@ -345,7 +345,7 @@ function temas(){
   const now=Date.now(),M={};
   Q.filter(q=>q.gab).forEach(q=>[...q._x.t,...q._x.o].forEach(t=>(M[t]??={t,qs:[],n:0,ok:0,ew:0,tw:0,last:0}).qs.push(q)));
   log.forEach(l=>{const q=QID[l.q];if(!q)return;[...q._x.t,...q._x.o].forEach(t=>{const x=M[t];if(!x)return;
-    const w=DIF[q._d].w;x.n++;x.tw+=w;if(l.ok)x.ok++;else x.ew+=w;x.last=Math.max(x.last,l.t)})});
+    const w=DIF[q._d??'m'].w;x.n++;x.tw+=w;if(l.ok)x.ok++;else x.ew+=w;x.last=Math.max(x.last,l.t)})});
   const tot=Q.filter(q=>q.gab).length||1;
   return Object.values(M).map(x=>{
     const inc=x.qs.length/tot*100,erro=(x.ew+0.5)/(x.tw+1),dias=x.last?(now-x.last)/DAY:30;
@@ -358,7 +358,7 @@ function questoesTema(t){   // prioriza questões ainda não vistas; só entram 
   const ult={};log.forEach(l=>ult[l.q]=l);const now=Date.now(),nova=q=>!ult[q.id];
   let sel=sorteioPonderado(base.filter(nova),()=>1,10);
   if(sel.length<10){const ids=new Set(sel.map(q=>q.id)),areas=new Set(base.map(q=>q._a));
-    const rev=sorteioPonderado(base.filter(q=>!ids.has(q.id)&&ult[q.id]&&!ult[q.id].ok&&now-ult[q.id].t>=ERRO_D*DAY),q=>DIF[q._d].w,Math.min(10-sel.length,3));
+    const rev=sorteioPonderado(base.filter(q=>!ids.has(q.id)&&ult[q.id]&&!ult[q.id].ok&&now-ult[q.id].t>=ERRO_D*DAY),q=>DIF[q._d??'m'].w,Math.min(10-sel.length,3));
     rev.forEach(q=>ids.add(q.id));sel=sel.concat(rev);
     if(sel.length<10){const extra=embaralha(Q.filter(q=>q.gab&&!ids.has(q.id)&&nova(q)));
       extra.sort((a,b)=>(areas.has(b._a)?1:0)-(areas.has(a._a)?1:0));sel=sel.concat(extra.slice(0,10-sel.length))}}
@@ -451,7 +451,7 @@ function render(){
 const pct=(a,b)=>b?Math.round(a/b*100):0;
 const barra=(v,cls='',meta)=>`<div class="bar ${cls}"><i style="width:${Math.max(0,Math.min(100,v))}%"></i>${meta!=null?`<u style="left:${meta}%"></u>`:''}</div>`;
 const corAc=v=>v>=70?'g':v>=60?'w':'r';
-const difTag=q=>`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome}${acertoPR(q)==null&&acertoDe(q)!=null?' · ~'+acertoDe(q)+'%':''}</span>`;
+const difTag=q=>q._d?`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome} · ${acertoPR(q).toLocaleString('pt-BR',{maximumFractionDigits:2})}%</span>`:'';
 const hoje0=()=>new Date().setHours(0,0,0,0);
 const idxHoje=()=>(new Date().getDay()+6)%7;
 const CK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
@@ -737,7 +737,7 @@ function pontoBloco(q){
   return `${t?`<div class="ponto md"><div class="kick">CCQ: Conceito Chave da Questão${pon[q.id]&&pon[q.id].t!=null?' · editado':''}</div>${md(t)}</div>`:''}<div class="row" style="margin-top:6px"><button class="b s" style="padding:5px 12px;font-size:.82rem" onclick="pEdita('${q.id}')">${t?'Editar':'Adicionar'} CCQ</button></div>`;
 }
 function iaBloco(q){const t=ia[q.id],P=t?iaParse(t):null;
-  return `<div class="ia">${t?`${P.ccq?`<div class="ccq"><div class="ccqh">${KEYSVG} CCQ · Conceito-chave</div><div class="ccqt">${esc(P.ccq)}</div></div>`:''}${P.rest.trim()?`<div class="iab md">${mdlite(P.rest)}</div>`:''}`:''}
+  return `<div class="ia">${t?`${P.ccq?`<div class="ccq"><div class="ccqh">${KEYSVG} CCQ · Conceito-chave</div><div class="ccqt">${md(P.ccq)}</div></div>`:''}${P.rest.trim()?`<div class="iab md">${mdlite(P.rest)}</div>`:''}`:''}
   <div class="row"><button class="b s" ${iaBusy?'disabled':''} onclick="gerarIA('${q.id}')">${iaBusy===q.id?'Gerando…':t?'Gerar de novo':'CCQ e resumo rápido com o Claude ('+keyLab('ia')+')'}</button>${P&&P.fl?`<button class="b s" onclick="iaFlash('${q.id}')">Criar flashcard do CCQ</button>`:''}<button class="b s" onclick="fcNovo('${q.id}')">Criar flashcard</button></div>${fcEd&&fcEd.q===q.id?fcEdForm():''}</div>`;
 }
 let fcEd=null;
@@ -788,7 +788,7 @@ const TES='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="c
 function nvBloco(){
   if(!sess.resp[sess.ids[sess.i]]||sess.sim)return '';
   const D={f:{t:0,n:0,ok:0},m:{t:0,n:0,ok:0},d:{t:0,n:0,ok:0}};
-  sess.ids.forEach(id=>{const q=QID[id],r=sess.resp[id];D[q._d].t++;if(r){D[q._d].n++;if(r.ok)D[q._d].ok++}});
+  sess.ids.forEach(id=>{const q=QID[id],r=sess.resp[id];if(!q._d)return;D[q._d].t++;if(r){D[q._d].n++;if(r.ok)D[q._d].ok++}});
   const open=!!sess.nvOpen,fb=!sess.sim;
   return `<div style="margin-top:12px"><button class="b s" style="padding:6px 12px;font-size:.82rem;width:100%" onclick="sess.nvOpen=!sess.nvOpen;render()">${open?'Ocultar':'Ver'} por dificuldade</button>${open?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">${Object.entries(DIF).map(([k,v])=>{const x=D[k],er=x.n-x.ok;return `<div><div class="row" style="gap:8px;justify-content:space-between"><span class="dif ${k}"><i></i>${v.nome}</span><b style="font-size:.85rem">${x.n}/${x.t} feitas</b></div>${fb&&x.n?`<div class="mut" style="font-size:.8rem;margin-top:2px"><span style="color:var(--ok)">✓ ${x.ok} (${pct(x.ok,x.n)}%)</span> &nbsp; <span style="color:var(--bad)">✗ ${er} (${pct(er,x.n)}%)</span></div>`:''}</div>`}).join('')}</div>`:''}</div>`;
 }
@@ -882,8 +882,8 @@ function vQuiz(){
   const imgsC=fb?(q.imgsCom||[]).filter(imgSrc).map(u=>`<img src="${imgSrc(u)}" onclick="zoom('${u}')" alt="Imagem do comentário">`).join(''):'';
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
-  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?difTag(q)+prAcertoBloco(q):''}${prProvaBloco(q)}</div>${fb?prAvisoBloco(q):''}
-  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
+  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?difTag(q)+prAcertoBloco(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
+  ${q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
@@ -891,7 +891,7 @@ function vQuiz(){
    ${pontoBloco(q)}${iaBloco(q)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
   </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
-  ${fb?`<select title="Dificuldade desta questão" onchange="if(this.value)setDif('${q.id}',this.value)"><option value="">Dificuldade: ${DIF[q._d].nome}</option>${Object.entries(DIF).map(([k,v])=>`<option value="${k}">${v.nome}</option>`).join('')}</select>`:''}
+
   <button class="b s" onclick="qEdita('${q.id}')">✎ Editar questão</button></div></div>${painelNav()}</div>`;
 }
 function reclass(id,a){if(!a)return;over[id]=a;QID[id]._a=a;persist('_est');render()}
@@ -1240,8 +1240,8 @@ function vReforcar(){
 }
 function vDificuldade(){
   const D={f:{n:0,ok:0},m:{n:0,ok:0},d:{n:0,ok:0}};
-  log.forEach(l=>{const q=QID[l.q];if(!q)return;const x=D[q._d];x.n++;if(l.ok)x.ok++});
-  const nb={f:0,m:0,d:0};Q.forEach(q=>nb[q._d]++);
+  log.forEach(l=>{const q=QID[l.q];if(!q?._d)return;const x=D[q._d];x.n++;if(l.ok)x.ok++});
+  const nb={f:0,m:0,d:0};Q.forEach(q=>{if(q._d)nb[q._d]++});
   const alerta=D.f.n>=5&&pct(D.f.ok,D.f.n)<90?`<p class="ponto">Você está acertando ${pct(D.f.ok,D.f.n)}% das fáceis (meta ${DIF.f.meta}%). Errar fácil custa mais caro: priorize rever essas.</p>`:'';
   return `<div class="card"><h2>Desempenho por dificuldade</h2><p class="mut">A linha marca a sua meta para cada dificuldade.</p>
   <div class="tw"><table><tr><th>Nível</th><th>Banco</th><th>Resp.</th><th>Seu acerto</th><th>Meta</th></tr>${Object.entries(DIF).map(([k,v])=>{const x=D[k],a=pct(x.ok,x.n);

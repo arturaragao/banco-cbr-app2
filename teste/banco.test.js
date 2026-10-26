@@ -8,8 +8,8 @@ function contexto(){
   const c=vm.createContext({console});
   vm.runInContext(`const esc=String,md=String,isMeta=()=>false,verCom=()=>true;
     const AREA_BY={neuro:{nome:'Neuro'}},difTag=()=>'<span class="dif f">Fácil · ~70%</span>',
-      acertoPR=()=>null,acertoDe=()=>70,prProvaBloco=()=>'',prAvisoBloco=()=>'',
-      prAlternativa=()=>'',pontoDe=q=>q.ponto,iaParse=s=>({rest:s});
+      prStats=()=>({}),acertoPR=()=>null,acertoDe=()=>70,prProvaBloco=()=>'',prAvisoBloco=()=>'',
+      prDadosBloco=()=>'',prAlternativa=()=>'',pontoDe=q=>q.ponto,iaParse=s=>({rest:s});
     let log=[],QID={},q={id:'q1',_a:'neuro',_d:'f',classif:'claude',cl:['Tema','Subtema'],
       enunciado:'Enunciado completo',alts:{A:'Correta',B:'Errada',C:'C',D:'D',E:'E'},gab:'A',tags:['tag'],
       curso:{ponto:'PersonalRad',coment:{A:'Explicação do curso'}},coment:{A:'Explicação Claude'},

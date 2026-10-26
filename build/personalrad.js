@@ -1,4 +1,31 @@
 // Metadados PersonalRad: nunca entram nas tags/classificação do app.
+function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
+function prStats(q){
+  const s={...(q.pr_stats||{})},texto=prLinhas(q).join('\n');
+  const m=texto.match(/Acerto dos alunos:\s*([\d.,]+)%\s*\((\d+) respostas(?:, (\d+) alunos)?/i);
+  if(m){s.acerto??=Number(m[1].replace(',','.'));s.respostas??=+m[2];if(m[3])s.respondentes??=+m[3]}
+  s.alternativas={...(s.alternativas||{})};
+  for(const [l,t] of Object.entries(q.alts||{})){
+    const p=t.match(/·\s*(?:✓\s*)?([\d.,]+)%\s*$/);
+    if(p&&!s.alternativas[l])s.alternativas[l]={percentual:Number(p[1].replace(',','.'))};
+  }
+  for(const linha of prLinhas(q).filter(l=>/^Alternativas marcadas:/i.test(l.trim())))
+    for(const p of linha.matchAll(/\b([A-E])\s*(?:✓\s*)?([\d.,]+)%/g))
+      if(!s.alternativas[p[1]])s.alternativas[p[1]]={percentual:Number(p[2].replace(',','.'))};
+  return s;
+}
+function prDadosBloco(q){
+  const s=prStats(q),linhas=[];
+  if(acertoPR(q)!=null)linhas.push(`Acerto dos alunos: ${acertoPR(q).toLocaleString('pt-BR')}%`);
+  if(s.respostas!=null)linhas.push(`Respostas: ${s.respostas}`);
+  if(s.respondentes!=null)linhas.push(`Alunos: ${s.respondentes}`);
+  const alts=Object.entries(s.alternativas||{}).filter(([,v])=>Number.isFinite(v.percentual)).map(([l,v])=>`${l}: ${v.percentual.toLocaleString('pt-BR')}%${v.respostas!=null?' ('+v.respostas+' respostas)':''}`);
+  if(alts.length)linhas.push('Alternativas marcadas: '+alts.join(' · '));
+  const tempos=Object.entries(s.tempos||{}).filter(([,v])=>Number.isFinite(v)).map(([k,v])=>`${k}: ${v.toLocaleString('pt-BR')} ${k==='amostra'?'respostas':'s'}`);
+  if(tempos.length)linhas.push('Tempo: '+tempos.join(' · '));
+  else linhas.push(...prLinhas(q).filter(l=>/^Tempo:/i.test(l.trim())));
+  return linhas.length?`<div class="ponto md pr-dados"><div class="kick">Dados do site</div>${linhas.map(l=>`<p>${esc(l)}</p>`).join('')}</div>`:'';
+}
 function prAviso(q){return q.pr_qualidade?.needsReview===true||q.pr_qualidade?.reportsOpen>0}
 function prAvisoBloco(q){return prAviso(q)?'<small class="pr-aviso">⚠ possível erro na questão</small>':''}
 function prProvaBloco(q){
@@ -6,8 +33,8 @@ function prProvaBloco(q){
   return nomes.length?`<small class="mut pr-prova">${esc(nomes.join(' · '))}</small>`:'';
 }
 function prAlternativa(q,l,fb){
-  const p=q.pr_stats?.alternativas?.[l]?.percentual;
-  return fb&&typeof p==='number'&&Number.isFinite(p)&&p>=0&&p<=100?` <small class="pr-percentual">${p.toLocaleString('pt-BR',{maximumFractionDigits:2})}%</small>`:'';
+  const p=prStats(q).alternativas?.[l]?.percentual;
+  return fb&&typeof p==='number'&&Number.isFinite(p)&&p>=0&&p<=100?` <small class="pr-percentual">· ${l===q.gab?'✓ ':''}${p.toLocaleString('pt-BR',{maximumFractionDigits:2})}%</small>`:'';
 }
 function prNorm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function prContagens(dados){

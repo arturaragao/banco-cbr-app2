@@ -22,6 +22,49 @@ function contexto(){
   return c;
 }
 const executar=(c,s)=>vm.runInContext(s,c);
+test('sem percentual não ganha selo nem entra nas médias do Banco, painel e estatísticas',()=>{
+  const c=contexto();preparar(c,'pr_stats:null');
+  executar(c,`const esc=String,norm=s=>String(s||''),isMeta=()=>false,
+    AREA_BY={neuro:{nome:'Neuro'}},AREAS=[],pct=(a,b)=>b?Math.round(a/b*100):0,barra=()=>'';
+    const QID={q1:q};let sess={ids:['q1'],i:0,resp:{q1:{ok:true}},nvOpen:true};
+    q.cl=[];q.imgs=[];q.coment={};log=[{q:'q1',ok:true}];`);
+  executar(c,trecho(fonte,'const difTag=','const hoje0='));
+  executar(c,trecho(banco,"let bq=",'function comentAlt('));
+  executar(c,trecho(banco,'function bStatus(','function prAcertoBloco('));
+  executar(c,trecho(banco,'function vBanco(){','// ===== comentário novo'));
+  executar(c,trecho(fonte,'function nvBloco(){','function painelNav(){'));
+  executar(c,trecho(fonte,'function vDificuldade(){','function vSub('));
+  executar(c,"function qDificuldade(q){return difTag(q)}");
+  assert.equal(executar(c,'difTag(q)'),'');
+  const h=executar(c,'vBanco()');
+  assert.match(h,/Questão —/);assert.doesNotMatch(h,/class="dif |~85%|undefined|NaN/);
+  assert.match(executar(c,'nvBloco()'),/0\/0 feitas/);
+  assert.doesNotMatch(executar(c,'vDificuldade()'),/undefined|NaN/);
+  executar(c,"bf.d='m'");assert.doesNotMatch(executar(c,'vBanco()'),/<details/);
+  executar(c,"q.pr_stats={acerto:85};aplicaEd(q);q.classif=null;bf.d='f'");
+  const com=executar(c,'vBanco()');assert.match(com,/<details/);assert.match(com,/Fácil · 85%/);
+});
+test('dados textuais do site recuperam acerto e percentuais; cabeçalho vazio desaparece e markdown incompleto renderiza',()=>{
+  const c=contexto();
+  executar(c,trecho(fonte,'const esc=','// ===== texto formatado'));
+  executar(c,trecho(banco,'function cursoBloco(q){','function bStatus('));
+  executar(c,`let q={alts:{A:'Correta · ✓ 85%',B:'Errada · 3%'},gab:'A',
+    curso:{ponto:'**Conceito de ensino.',secoes:{outros:[
+      '📊 Acerto dos alunos: 85% (60 respostas, 50 alunos) · Dificuldade: média',
+      'Alternativas marcadas: A ✓ 85% · B 3% · C 12%','Tempo: mediana 55 s','Dados do site']}}};`);
+  assert.equal(executar(c,'difDe(q)'),'f');
+  assert.match(executar(c,"prAlternativa(q,'A',true)"),/· ✓ 85%/);
+  assert.match(executar(c,"prAlternativa(q,'B',true)"),/· 3%/);
+  assert.match(executar(c,"prAlternativa(q,'C',true)"),/· 12%/);
+  const h=executar(c,'cursoBloco(q)');
+  for(const texto of ['<b>Conceito de ensino.</b>','Acerto dos alunos: 85%','Respostas: 60','Alunos: 50','Alternativas marcadas: A: 85%','Tempo: mediana 55 s'])assert.ok(h.includes(texto),texto);
+  assert.equal((h.match(/Dados do site/g)||[]).length,1);
+  assert.ok(h.indexOf('Dados do site')>h.indexOf('Conceito de ensino.'));
+  executar(c,"q={alts:{},curso:{secoes:{outros:['Dados do site']}}}");
+  assert.equal(executar(c,'cursoBloco(q)'),'');
+  executar(c,'q={pr_stats:{acerto:0,respostas:1,respondentes:1,tempos:{mediana:0}},alts:{}}');
+  assert.match(executar(c,'cursoBloco(q)'),/Acerto dos alunos: 0%/);
+});
 function preparar(c,extra=''){
   executar(c,`let q={id:'q1',ar:'neuro',tags:[],enunciado:'Teste',alts:{A:'A'},gab:'A',classif:'claude',dif:'f',acerto:85,pr_stats:{acerto:20,respostas:15},dif_pr:'d',${extra}};aplicaEd(q);Q=[q]`);
 }
@@ -33,17 +76,17 @@ test('estatística prevalece sobre classificação antiga; peso e meta usam difi
   assert.equal(executar(c,'_restantesFM()'),0);
   const pesoD=executar(c,'pesoVolume(q)');
   executar(c,`pon['e:q1']={e:{dif:'f'}};aplicaEd(q)`);
-  assert.equal(executar(c,'q._d'),'f');
-  assert.equal(executar(c,'_restantesFM()'),1);
-  assert.equal(executar(c,'pesoVolume(q)')/pesoD,40);
-  assert.equal(executar(c,'DIF[q._d].meta'),95);
+  assert.equal(executar(c,'q._d'),'d');
+  assert.equal(executar(c,'_restantesFM()'),0);
+  assert.equal(executar(c,'pesoVolume(q)'),pesoD);
+  assert.equal(executar(c,'DIF[q._d].meta'),20);
 });
 
-test('edição manual persiste ao reaplicar; removê-la restaura PersonalRad',()=>{
+test('edição manual de dificuldade é ignorada ao reaplicar',()=>{
   const c=contexto();preparar(c);
   executar(c,`pon['e:q1']={e:{dif:'m'}};aplicaEd(q);aplicaEd(q)`);
-  assert.equal(executar(c,'q._d'),'m');
-  assert.equal(executar(c,'DIF[q._d].meta'),75);
+  assert.equal(executar(c,'q._d'),'d');
+  assert.equal(executar(c,'DIF[q._d].meta'),20);
   executar(c,`pon['e:q1']={e:null};aplicaEd(q)`);
   assert.equal(executar(c,'q._d'),'d');
   assert.equal(executar(c,'DIF[q._d].meta'),20);
@@ -51,15 +94,17 @@ test('edição manual persiste ao reaplicar; removê-la restaura PersonalRad',()
   assert.equal(executar(c,'q.acerto'),85);
 });
 
-test('14 respostas preservam nível; cortes incluem exatamente 30 e 60',()=>{
-  const c=contexto();preparar(c,'pr_stats:{acerto:20,respostas:14}');
-  assert.equal(executar(c,'q._d'),'f');
-  executar(c,`q.dif_pr=null;q.pr_stats.respostas=15`);
-  for(const [acerto,dif] of [[0,'d'],[30,'d'],[30.01,'m'],[59.99,'m'],[60,'f'],[70,'f'],[100,'f']]){
-    assert.equal(executar(c,`q.pr_stats.acerto=${acerto};difDe(q)`),dif);
+test('dificuldade só do site: 61→f, 60→m, 30→m, 29→d e sem %→nenhuma',()=>{
+  const c=contexto();preparar(c,'pr_stats:{acerto:20,respostas:1}');
+  for(const [ac,dif] of [[61,'f'],[60,'m'],[30,'m'],[29,'d'],[0,'d'],[null,null]]){
+    executar(c,`q.pr_stats.acerto=${ac};q.dif_pr='f';pon['e:q1']={e:{dif:'f',acerto:99,acertoManual:true}};aplicaEd(q)`);
+    assert.equal(executar(c,'q._d'),dif);
   }
-  executar(c,'q.pr_stats.acerto=null');
-  assert.equal(executar(c,'difDe(q)'),'f');
+  executar(c,'q.pr_stats=null;aplicaEd(q)');
+  assert.equal(executar(c,'q._d'),null);
+  const peso=executar(c,'pesoVolume(q)');
+  executar(c,"q.pr_stats={acerto:45};aplicaEd(q)");
+  assert.equal(executar(c,'pesoVolume(q)'),peso);
 });
 
 test('salvar texto não transforma acerto antigo em edição manual; acerto editado tem prioridade',()=>{
@@ -68,9 +113,9 @@ test('salvar texto não transforma acerto antigo em edição manual; acerto edit
   assert.equal(executar(c,'q._d'),'d');
   executar(c,`pon['e:q1'].e.acerto=80;aplicaEd(q)`);
   assert.equal(executar(c,'acertoDe(q)'),80);
-  assert.equal(executar(c,'q._d'),'f');
+  assert.equal(executar(c,'q._d'),'d');
   executar(c,`pon['e:q1'].e.dif='m';aplicaEd(q)`);
-  assert.equal(executar(c,'q._d'),'m');
+  assert.equal(executar(c,'q._d'),'d');
 });
 
 test('sem classificação por IA também usa dificuldade real e peso correspondente',()=>{
@@ -82,7 +127,7 @@ test('sem classificação por IA também usa dificuldade real e peso corresponde
   assert.equal(executar(c,'pesoVolume(q)'),peso);
 });
 
-test('ação no campo de acerto prevalece mesmo ao voltar ao original e após recarga',()=>{
+test('edição de acerto persiste, mas não muda a dificuldade do site',()=>{
   const c=contexto();preparar(c);
   executar(c,`const QID={q1:q};let sess={};
     const persist=()=>{},hk=()=>0,render=()=>{},toast=()=>{},clParse=()=>[];
@@ -101,7 +146,7 @@ test('ação no campo de acerto prevalece mesmo ao voltar ao original e após re
     executar(c,input[1]);
     executar(c,`qSalva('q1');pon=JSON.parse(JSON.stringify(pon));delete q._acertoManual;aplicaEd(q)`);
     assert.equal(executar(c,'acertoDe(q)'),acerto);
-    assert.equal(executar(c,'q._d'),acerto===0?'d':'f');
+    assert.equal(executar(c,'q._d'),'d');
     assert.equal(executar(c,`pon['e:q1'].e.acertoManual`),true);
   }
   // Restaurar original remove a prioridade; tocar o campo já em 85% a registra de novo.
@@ -110,7 +155,7 @@ test('ação no campo de acerto prevalece mesmo ao voltar ao original e após re
   executar(c,input[1]);
   executar(c,`qSalva('q1');qEdita('q1');qSalva('q1');aplicaEd(q)`);
   assert.equal(executar(c,'acertoDe(q)'),85);
-  assert.equal(executar(c,'q._d'),'f');
+  assert.equal(executar(c,'q._d'),'d');
 });
 
 test('gabarito mostra somente acerto e N, incluindo 0%; sem dados não mostra nada',()=>{
@@ -119,7 +164,7 @@ test('gabarito mostra somente acerto e N, incluindo 0%; sem dados não mostra na
   executar(c,'q.pr_stats.acerto=0');
   assert.match(executar(c,'prAcertoBloco(q)'),/acerto dos alunos 0% \(15\)/);
   executar(c,'q.pr_stats.respostas=0');
-  assert.equal(executar(c,'prAcertoBloco(q)'),'');
+  assert.match(executar(c,'prAcertoBloco(q)'),/0%/);
   executar(c,'q.pr_stats=null');
   assert.equal(executar(c,'prAcertoBloco(q)'),'');
 });
@@ -160,7 +205,7 @@ test('percentuais só após resposta; 0% é válido; metadados não viram tags',
     q.pr_stats.alternativas={A:{percentual:0},B:{percentual:87.65}};
     q.pr_prova={test:['Título CBR'],year:['2026']}`);
   assert.equal(executar(c,"prAlternativa(q,'A',false)"),'');
-  assert.match(executar(c,"prAlternativa(q,'A',true)"),/>0%</);
+  assert.match(executar(c,"prAlternativa(q,'A',true)"),/· ✓ 0%</);
   assert.match(executar(c,"prAlternativa(q,'B',true)"),/87,65%/);
   assert.equal(executar(c,"prAlternativa(q,'C',true)"),'');
   assert.match(executar(c,'prProvaBloco(q)'),/Título CBR · 2026/);
@@ -193,13 +238,14 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   }
   executar(c,trecho(script,'function vQuiz(){','function reclass('));
   const antes=executar(c,'vQuiz()');
-  assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|NÃO EXIBIR|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);
+  assert.match(antes,/Classificação: Neuro › Tema Claude/);
+  assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|NÃO EXIBIR|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.sel='B'`);
-  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);
+  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
   const depois=executar(c,'vQuiz()');
   assert.match(depois,/class="dif d"/);
-  assert.match(depois,/acerto dos alunos 20%/);
+  assert.match(depois,nome==='app gerado'?/class="dif d"/:/acerto dos alunos 20%/);
   assert.match(depois,/possível erro na questão/);
   for(const texto of ['Tags Claude','Tema Claude','Neuro','por dificuldade','Difícil'])assert.ok(depois.includes(texto),texto);
   assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
@@ -207,7 +253,7 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   assert.match(depois,/class="alt  [^"]*"[^]*?Outra errada[^]*?10%/);
   assert.doesNotMatch(depois,/NÃO EXIBIR/);
   executar(c,'sess.sim=true');
-  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);
+  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
 });
 
 test('pesos do site são aplicados uma vez também no sorteio de revisões',()=>{

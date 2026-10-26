@@ -1,4 +1,4 @@
-// Banco CBR app 1.24.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.25.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1257,6 +1257,33 @@ function smNativoTarefas(){
 
 
 // Metadados PersonalRad: nunca entram nas tags/classificação do app.
+function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
+function prStats(q){
+  const s={...(q.pr_stats||{})},texto=prLinhas(q).join('\n');
+  const m=texto.match(/Acerto dos alunos:\s*([\d.,]+)%\s*\((\d+) respostas(?:, (\d+) alunos)?/i);
+  if(m){s.acerto??=Number(m[1].replace(',','.'));s.respostas??=+m[2];if(m[3])s.respondentes??=+m[3]}
+  s.alternativas={...(s.alternativas||{})};
+  for(const [l,t] of Object.entries(q.alts||{})){
+    const p=t.match(/·\s*(?:✓\s*)?([\d.,]+)%\s*$/);
+    if(p&&!s.alternativas[l])s.alternativas[l]={percentual:Number(p[1].replace(',','.'))};
+  }
+  for(const linha of prLinhas(q).filter(l=>/^Alternativas marcadas:/i.test(l.trim())))
+    for(const p of linha.matchAll(/\b([A-E])\s*(?:✓\s*)?([\d.,]+)%/g))
+      if(!s.alternativas[p[1]])s.alternativas[p[1]]={percentual:Number(p[2].replace(',','.'))};
+  return s;
+}
+function prDadosBloco(q){
+  const s=prStats(q),linhas=[];
+  if(acertoPR(q)!=null)linhas.push(`Acerto dos alunos: ${acertoPR(q).toLocaleString('pt-BR')}%`);
+  if(s.respostas!=null)linhas.push(`Respostas: ${s.respostas}`);
+  if(s.respondentes!=null)linhas.push(`Alunos: ${s.respondentes}`);
+  const alts=Object.entries(s.alternativas||{}).filter(([,v])=>Number.isFinite(v.percentual)).map(([l,v])=>`${l}: ${v.percentual.toLocaleString('pt-BR')}%${v.respostas!=null?' ('+v.respostas+' respostas)':''}`);
+  if(alts.length)linhas.push('Alternativas marcadas: '+alts.join(' · '));
+  const tempos=Object.entries(s.tempos||{}).filter(([,v])=>Number.isFinite(v)).map(([k,v])=>`${k}: ${v.toLocaleString('pt-BR')} ${k==='amostra'?'respostas':'s'}`);
+  if(tempos.length)linhas.push('Tempo: '+tempos.join(' · '));
+  else linhas.push(...prLinhas(q).filter(l=>/^Tempo:/i.test(l.trim())));
+  return linhas.length?`<div class="ponto md pr-dados"><div class="kick">Dados do site</div>${linhas.map(l=>`<p>${esc(l)}</p>`).join('')}</div>`:'';
+}
 function prAviso(q){return q.pr_qualidade?.needsReview===true||q.pr_qualidade?.reportsOpen>0}
 function prAvisoBloco(q){return prAviso(q)?'<small class="pr-aviso">⚠ possível erro na questão</small>':''}
 function prProvaBloco(q){
@@ -1264,8 +1291,8 @@ function prProvaBloco(q){
   return nomes.length?`<small class="mut pr-prova">${esc(nomes.join(' · '))}</small>`:'';
 }
 function prAlternativa(q,l,fb){
-  const p=q.pr_stats?.alternativas?.[l]?.percentual;
-  return fb&&typeof p==='number'&&Number.isFinite(p)&&p>=0&&p<=100?` <small class="pr-percentual">${p.toLocaleString('pt-BR',{maximumFractionDigits:2})}%</small>`:'';
+  const p=prStats(q).alternativas?.[l]?.percentual;
+  return fb&&typeof p==='number'&&Number.isFinite(p)&&p>=0&&p<=100?` <small class="pr-percentual">· ${l===q.gab?'✓ ':''}${p.toLocaleString('pt-BR',{maximumFractionDigits:2})}%</small>`:'';
 }
 function prNorm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function prContagens(dados){
@@ -1307,7 +1334,7 @@ function pesoPR(q){
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mdI=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g,'$1<i>$2</i>').replace(/^✔/,'<span class="ok">✔</span>').replace(/^✘/,'<span class="no">✘</span>');
-function md(s){const L=String(s??'').replace(/\r/g,'').split('\n');let h='',i=0;
+function md(s){const L=String(s??'').replace(/\r/g,'').split('\n').map(l=>(l.match(/\*\*/g)||[]).length%2?l+'**':l);let h='',i=0;
   while(i<L.length){const l=L[i];
     if(/^\s*\|/.test(l)){const rows=[];while(i<L.length&&/^\s*\|/.test(L[i]))rows.push(L[i++]);
       const cel=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());const sep=rows[1]&&/^[\s|:-]+$/.test(rows[1]);
@@ -1399,14 +1426,14 @@ const posDe=q=>q.n??1e5; // posição da questão na página "Questões" do Noti
 const etapaDe=q=>{const t=q.tags.map(norm);return t.includes('teorico-pratica')?'prática':t.includes('teorica')?'teórica':'?'};
 const anoDe=q=>(q.tags.find(t=>/^20\d\d$/.test(t))||'');
 
-// ===== dificuldade (edição manual > PersonalRad com 15+ respostas > classificação existente) =====
+// ===== dificuldade exclusivamente pelo percentual dos alunos no PersonalRad =====
 const DIF={f:{nome:'Fácil',meta:95,w:1.5},m:{nome:'Média',meta:75,w:1.2},d:{nome:'Difícil',meta:20,w:0.5}};
 const PARAM_DEF={facil_min:60,dificil_max:30,meta_facil:95,meta_media:75,meta_dificil:20,freq_ri:5,freq_rt:2,rev_pct:15,ia_estilo:''};
 let PARAM={...PARAM_DEF};
-const acertoPR=q=>typeof q.pr_stats?.acerto==='number'&&Number.isFinite(q.pr_stats.acerto)&&q.pr_stats.acerto>=0&&q.pr_stats.acerto<=100&&q.pr_stats.respostas>0?q.pr_stats.acerto:null;
+const acertoPR=q=>{const ac=prStats(q).acerto;return typeof ac==='number'&&Number.isFinite(ac)&&ac>=0&&ac<=100?ac:null};
 const acertoDe=q=>q._acertoManual?q.acerto:acertoPR(q)??q.acerto;
-const difAcerto=ac=>ac==null?'m':ac>=PARAM.facil_min?'f':ac<=PARAM.dificil_max?'d':'m';
-const difDe=q=>q._difManual&&DIF[q.dif]?q.dif:q._acertoManual?difAcerto(acertoDe(q)):q.pr_stats?.respostas>=15&&acertoPR(q)!=null?(DIF[q.dif_pr]?q.dif_pr:difAcerto(acertoDe(q))):q.dif&&DIF[q.dif]?q.dif:difAcerto(q.acerto);
+const difAcerto=ac=>ac==null?null:ac>60?'f':ac<30?'d':'m';
+const difDe=q=>difAcerto(acertoPR(q));
 let metoU=0,metodo=window.METODO||'',metEdit=false;
 try{const _m=JSON.parse(localStorage.getItem('cbr_metodo'));if(_m&&_m.t){metodo=_m.t;metoU=_m.u||0}}catch(e){}
 function lerManual(txt){
@@ -1636,7 +1663,7 @@ function revisaoDoDiaOrig(n=cfg.diario,exclui=new Set()){
       fac=q._d==='f'?1+1.5*(1-ua):q._d==='d'?.7:1;
     return area*err*fac};
   const revs=sorteioPonderado(venc,wRev,nRev);
-  const w=q=>(P[q._a]??med)*DIF[q._d].w;
+  const w=q=>(P[q._a]??med)*DIF[q._d??'m'].w;
   const novos=sorteioPonderado(novas,w,n-revs.length);
   let ids=[...novos,...revs];
   if(ids.length<n){const t=new Set(ids.map(q=>q.id));ids=ids.concat(banco.filter(q=>q.gab&&!t.has(q.id)&&srs[q.id]&&(now-(U[q.id]?.t||0))>7*DAY).sort((a,b)=>srs[a.id].due-srs[b.id].due).slice(0,n-ids.length))}
@@ -1649,7 +1676,7 @@ function temas(){
   const now=Date.now(),M={};
   Q.filter(q=>q.gab).forEach(q=>[...q._x.t,...q._x.o].forEach(t=>(M[t]??={t,qs:[],n:0,ok:0,ew:0,tw:0,last:0}).qs.push(q)));
   log.forEach(l=>{const q=QID[l.q];if(!q)return;[...q._x.t,...q._x.o].forEach(t=>{const x=M[t];if(!x)return;
-    const w=DIF[q._d].w;x.n++;x.tw+=w;if(l.ok)x.ok++;else x.ew+=w;x.last=Math.max(x.last,l.t)})});
+    const w=DIF[q._d??'m'].w;x.n++;x.tw+=w;if(l.ok)x.ok++;else x.ew+=w;x.last=Math.max(x.last,l.t)})});
   const tot=Q.filter(q=>q.gab).length||1;
   return Object.values(M).map(x=>{
     const inc=(modoProva()?x.qs.reduce((a,q)=>a+({f:1,m:.6,d:.05}[q._d]??.6),0):x.qs.length)/tot*100,erro=(x.ew+0.5)/(x.tw+1),dias=x.last?(now-x.last)/DAY:30;
@@ -1662,7 +1689,7 @@ function questoesTemaOrig(t){   // prioriza questões ainda não vistas; só ent
   const ult={};log.forEach(l=>ult[l.q]=l);const now=Date.now(),nova=q=>!ult[q.id];
   let sel=sorteioPonderado(base.filter(nova),()=>1,10);
   if(sel.length<10){const ids=new Set(sel.map(q=>q.id)),areas=new Set(base.map(q=>q._a));
-    const rev=sorteioPonderado(base.filter(q=>!ids.has(q.id)&&ult[q.id]&&!ult[q.id].ok&&now-ult[q.id].t>=ERRO_D*DAY),q=>DIF[q._d].w,Math.min(10-sel.length,3));
+    const rev=sorteioPonderado(base.filter(q=>!ids.has(q.id)&&ult[q.id]&&!ult[q.id].ok&&now-ult[q.id].t>=ERRO_D*DAY),q=>DIF[q._d??'m'].w,Math.min(10-sel.length,3));
     rev.forEach(q=>ids.add(q.id));sel=sel.concat(rev);
     if(sel.length<10){const extra=embaralha(Q.filter(q=>q.gab&&!ids.has(q.id)&&nova(q)));
       extra.sort((a,b)=>(areas.has(b._a)?1:0)-(areas.has(a._a)?1:0));sel=sel.concat(extra.slice(0,10-sel.length))}}
@@ -1755,7 +1782,7 @@ function render(){aplicaLayout();
 const pct=(a,b)=>b?Math.round(a/b*100):0;
 const barra=(v,cls='',meta)=>`<div class="bar ${cls}"><i style="width:${Math.max(0,Math.min(100,v))}%"></i>${meta!=null?`<u style="left:${meta}%"></u>`:''}</div>`;
 const corAc=v=>v>=70?'g':v>=60?'w':'r';
-const difTag=q=>`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome}${acertoPR(q)==null&&acertoDe(q)!=null?' · ~'+acertoDe(q)+'%':''}</span>`;
+const difTag=q=>q._d?`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome} · ${acertoPR(q).toLocaleString('pt-BR',{maximumFractionDigits:2})}%</span>`:'';
 const hoje0=()=>new Date().setHours(0,0,0,0);
 const idxHoje=()=>(new Date().getDay()+6)%7;
 const CK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
@@ -2041,7 +2068,7 @@ function pontoBloco(q){
   return `${t?`<div class="ponto md"><div class="kick">CCQ: Conceito Chave da Questão${pon[q.id]&&pon[q.id].t!=null?' · editado':''}</div>${md(t)}</div>`:''}<div class="row" style="margin-top:6px"><button class="b s" style="padding:5px 12px;font-size:.82rem" onclick="pEdita('${q.id}')">${t?'Editar':'Adicionar'} CCQ</button></div>`;
 }
 function iaBloco(q){const t=ia[q.id],P=t?iaParse(t):null;
-  return `<div class="ia">${t?`${P.ccq?`<div class="ccq"><div class="ccqh">${KEYSVG} CCQ · Conceito-chave</div><div class="ccqt">${esc(P.ccq)}</div></div>`:''}${P.rest.trim()?`<div class="iab md">${mdlite(P.rest)}</div>`:''}`:''}
+  return `<div class="ia">${t?`${P.ccq?`<div class="ccq"><div class="ccqh">${KEYSVG} CCQ · Conceito-chave</div><div class="ccqt">${md(P.ccq)}</div></div>`:''}${P.rest.trim()?`<div class="iab md">${mdlite(P.rest)}</div>`:''}`:''}
   <div class="row"><button class="b s" ${iaBusy?'disabled':''} onclick="gerarIA('${q.id}')">${iaBusy===q.id?'Gerando…':t?'Gerar de novo':'CCQ e resumo rápido com IA ('+keyLab('ia')+')'}</button>${P&&P.fl?`<button class="b s" onclick="iaFlash('${q.id}')">Criar flashcard do CCQ</button>`:''}<button class="b s" onclick="fcNovo('${q.id}')">Criar flashcard</button></div>${fcEd&&fcEd.q===q.id?fcEdForm():''}</div>`;
 }
 let fcEd=null;
@@ -2082,7 +2109,7 @@ const TES='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="c
 function nvBloco(){
   if(!sess.resp[sess.ids[sess.i]]||sess.sim)return '';
   const D={f:{t:0,n:0,ok:0},m:{t:0,n:0,ok:0},d:{t:0,n:0,ok:0}};
-  sess.ids.forEach(id=>{const q=QID[id],r=sess.resp[id];D[q._d].t++;if(r){D[q._d].n++;if(r.ok)D[q._d].ok++}});
+  sess.ids.forEach(id=>{const q=QID[id],r=sess.resp[id];if(!q._d)return;D[q._d].t++;if(r){D[q._d].n++;if(r.ok)D[q._d].ok++}});
   const open=!!sess.nvOpen,fb=!sess.sim;
   return `<div style="margin-top:12px"><button class="b s" style="padding:6px 12px;font-size:.82rem;width:100%" onclick="sess.nvOpen=!sess.nvOpen;render()">${open?'Ocultar':'Ver'} por dificuldade</button>${open?`<div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">${Object.entries(DIF).map(([k,v])=>{const x=D[k],er=x.n-x.ok;return `<div><div class="row" style="gap:8px;justify-content:space-between"><span class="dif ${k}"><i></i>${v.nome}</span><b style="font-size:.85rem">${x.n}/${x.t} feitas</b></div>${fb&&x.n?`<div class="mut" style="font-size:.8rem;margin-top:2px"><span style="color:var(--ok)">✓ ${x.ok} (${pct(x.ok,x.n)}%)</span> &nbsp; <span style="color:var(--bad)">✗ ${er} (${pct(er,x.n)}%)</span></div>`:''}</div>`}).join('')}</div>`:''}</div>`;
 }
@@ -2174,8 +2201,8 @@ function vQuiz(){
   const imgsC=fb?galeria(q,'c'):'';
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
-  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?qDificuldade(q):''}${prProvaBloco(q)}</div>${fb?prAvisoBloco(q):''}
-  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
+  <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?qDificuldade(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
+  ${q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   ${qEnunciado(q,imgs)}${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
@@ -2183,7 +2210,7 @@ function vQuiz(){
    ${bannerResp(q,r)}${blocoFeedback(q,r,`${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}`)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
   </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
-  ${fb?`<select title="Dificuldade desta questão" onchange="if(this.value)setDif('${q.id}',this.value)"><option value="">Dificuldade: ${DIF[q._d].nome}</option>${Object.entries(DIF).map(([k,v])=>`<option value="${k}">${v.nome}</option>`).join('')}</select>`:''}
+
   <button class="b s" onclick="qEdita('${q.id}')">✎ Editar questão</button></div></div>${painelNav()}</div>`;
 }
 function reclass(id,a){if(!a)return;over[id]=a;QID[id]._a=a;persist('_est');render()}
@@ -2533,8 +2560,8 @@ function vReforcar(){
 }
 function vDificuldade(){
   const D={f:{n:0,ok:0},m:{n:0,ok:0},d:{n:0,ok:0}};
-  log.forEach(l=>{const q=QID[l.q];if(!q)return;const x=D[q._d];x.n++;if(l.ok)x.ok++});
-  const nb={f:0,m:0,d:0};Q.forEach(q=>nb[q._d]++);
+  log.forEach(l=>{const q=QID[l.q];if(!q?._d)return;const x=D[q._d];x.n++;if(l.ok)x.ok++});
+  const nb={f:0,m:0,d:0};Q.forEach(q=>{if(q._d)nb[q._d]++});
   const alerta=D.f.n>=5&&pct(D.f.ok,D.f.n)<90?`<p class="ponto">Você está acertando ${pct(D.f.ok,D.f.n)}% das fáceis (meta ${DIF.f.meta}%). Errar fácil custa mais caro: priorize rever essas.</p>`:'';
   return `<div class="card"><h2>Desempenho por dificuldade</h2><p class="mut">A linha marca a sua meta para cada dificuldade.</p>
   <div class="tw"><table><tr><th>Nível</th><th>Banco</th><th>Resp.</th><th>Seu acerto</th><th>Meta</th></tr>${Object.entries(DIF).map(([k,v])=>{const x=D[k],a=pct(x.ok,x.n);
@@ -2570,19 +2597,19 @@ function comentAlt(q,l){
   return `<div class="cmw">${c?`<div class="mut md cm cmc"><span class="src">Curso</span>${md(c)}</div>`:''}${k?`<div class="mut md cm cmk"><span class="src">Claude</span>${md(k)}</div>`:''}</div>`;
 }
 function cursoBloco(q){
-  const c=q.curso;if(!c)return'';
-  const sec=Object.entries(c.secoes||{}).filter(([k,v])=>v&&v.length&&!/alternativ/i.test(k));
-  if(!c.ponto&&!sec.length)return'';
-  return `<div class="ponto md pcurso"><div class="kick">Ponto de ensino · Curso (PersonalRad)</div>${c.ponto?md(c.ponto):''}${sec.map(([k,v])=>`<div class="kick" style="margin-top:8px">${esc(k)}</div>${md(v.join('\n\n'))}`).join('')}</div>`;
+  const c=q.curso;if(!c)return prDadosBloco(q);
+  const sec=Object.entries(c.secoes||{}).map(([k,v])=>[k,(v||[]).filter(t=>!/^\s*(?:📊|Acerto dos alunos:|Alternativas marcadas:|Tempo:|Dados do site\s*$)/i.test(t))]).filter(([k,v])=>v&&v.length&&!/alternativ/i.test(k));
+  if(!c.ponto&&!sec.length)return prDadosBloco(q);
+  return `<div class="ponto md pcurso"><div class="kick">Ponto de ensino · Curso (PersonalRad)</div>${c.ponto?md(c.ponto):''}${sec.map(([k,v])=>`<div class="kick" style="margin-top:8px">${esc(k)}</div>${md(v.join('\n\n'))}`).join('')}</div>${prDadosBloco(q)}`;
 }
 function bStatus(q,ult){const l=ult[q.id];return l?(l.ok?'<span class="bok">✓</span>':'<span class="bbad">✗</span>'):'<span class="mut">·</span>'}
-function prAcertoBloco(q){const ac=acertoPR(q);return ac==null?'':`<span class="mut" style="font-size:.82rem"> · acerto dos alunos ${ac.toLocaleString('pt-BR',{maximumFractionDigits:2})}% (${q.pr_stats.respostas})</span>`}
+function prAcertoBloco(q){const ac=acertoPR(q),n=prStats(q).respostas;return ac==null?'':`<span class="mut" style="font-size:.82rem"> · acerto dos alunos ${ac.toLocaleString('pt-BR',{maximumFractionDigits:2})}%${n!=null?' ('+n+')':''}</span>`}
 function bCorpo(q){
   const ult={};log.forEach(l=>ult[l.q]=l);const r=ult[q.id];
   const imgs=galeria(q,'q'),imgsC=galeria(q,'c');
   const alts=qAlternativas(q,{r,fb:true,leitura:true});
   return `<div class="bc">
-    <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${acertoPR(q)==null&&acertoDe(q)!=null?' · acerto estimado ~'+acertoDe(q)+'%':''}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
+    <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
     ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
     <div class="row">${qDificuldade(q)}<span class="mut">${r?'Feita · '+(r.ok?'acertou':'errou'):'Não feita'}</span></div>
     ${qEnunciado(q,imgs)}${alts}
@@ -2602,15 +2629,15 @@ async function bBaixar(){const el=$('#b_dl');if(el)el.disabled=true;
 function vBanco(){
   const n=norm(bq),ult={};log.forEach(l=>ult[l.q]=l);
   const L=Q.filter(q=>(!n||norm((q.n??'')+' '+q.enunciado+' '+q.tags.join(' ')+' '+(q.cl||[]).join(' ')).includes(n))
-    &&(!bf.a||q._a===bf.a)&&(!bf.d||q.classif&&q._d===bf.d)
+    &&(!bf.a||q._a===bf.a)&&(!bf.d||q._d===bf.d)
     &&(!bf.s||(bf.s==='nao'?!ult[q.id]:bf.s==='ok'?ult[q.id]&&ult[q.id].ok:ult[q.id]&&!ult[q.id].ok))
     &&(!bf.c||(bf.c==='sem'?!q.classif:recente(q))));
   const sg=Q.filter(q=>!q.gab).length,semc=Q.filter(q=>!q.classif).length,nov=Q.filter(recente).length,feitas=Q.filter(q=>ult[q.id]).length;
   const sel=(id,k,ops)=>`<select id="${id}" onchange="bf.${k}=this.value;bLim=150;render()">${ops.map(([v,t])=>`<option value="${v}" ${bf[k]===v?'selected':''}>${t}</option>`).join('')}</select>`;
   const linhas=L.slice(0,bLim).map(q=>`<details class="bq" ${bAbertos.has(q.id)?'open':''} ontoggle="bTog('${q.id}',this)"><summary>
-      <span class="bn">${q.n??'—'}</span><span class="bs">${bStatus(q,ult)}</span>
-      <span class="bm"><span class="be">${esc(q.enunciado.slice(0,130))}${q.enunciado.length>130?'…':''}</span>
-      <span class="bl"><span class="ba">${AREA_BY[q._a].nome}</span>${q.classif?`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome}</span>`:'<span class="tag">sem classificação</span>'}${q.tags.filter(t=>!isMeta(t)).slice(0,4).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}${q.imgs&&q.imgs.length?'<span class="tag">🖼 '+q.imgs.length+'</span>':''}${recente(q)?'<span class="nova">nova</span>':''}${q.gab?'':'<span class="tag">sem gabarito</span>'}</span></span>
+      <span class="bs">${bStatus(q,ult)}</span>
+      <span class="bm"><span class="be"><b>Questão ${q.n??'—'}</b> · ${esc(q.enunciado.slice(0,130))}${q.enunciado.length>130?'…':''} ${q._d?' · '+qDificuldade(q):''}</span>
+      <span class="bl"><span class="ba">${AREA_BY[q._a].nome}</span>${q.classif?'':'<span class="tag">sem classificação</span>'}${q.tags.filter(t=>!isMeta(t)).slice(0,4).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}${q.imgs&&q.imgs.length?'<span class="tag">🖼 '+q.imgs.length+'</span>':''}${recente(q)?'<span class="nova">nova</span>':''}${q.gab?'':'<span class="tag">sem gabarito</span>'}</span></span>
     </summary>${bAbertos.has(q.id)?bCorpo(q):''}</details>`).join('');
   return `<div class="card"><h2>Banco (${Q.length} questões)</h2>
   <p class="mut">${feitas} feitas · ${semc} sem classificação · ${sg} sem gabarito (não entram nos estudos) · ${nov} novas nos últimos 7 dias</p>
@@ -2718,7 +2745,7 @@ function _pvBase(){
 }
 function pesoVolume(q){
   const b=_pvBase(),dif={f:+(PARAM.peso_facil??6),m:+(PARAM.peso_media??3),d:+(PARAM.peso_dificil??0.15)};
-  const wd=q.classif||q.dif_pr||q._difManual?(dif[q._d]??dif.m):dif.m*.8;
+  const wd=dif[q._d]??dif.m;
   const r=(I,k,ex)=>k&&I.m[k]?Math.pow(I.m[k]/I.me,ex):1;
   const wInc=Math.min(4,Math.max(.3,r(b.iA,b.kA(q),.5)*r(b.iT,b.kT(q),.5)*r(b.iS,b.kS(q),.25)));
   // erro: média bayesiana — subtema puxado para o tema, tema puxado para a área, área para 35%
@@ -2744,15 +2771,15 @@ function pacoteVolume(n,filtro=()=>true){
 function riDesc(devidas){
   if(!modoProva())return `${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.`;
   const ids=riHoje(),ini=hoje0(),vistas=new Set(log.filter(l=>l.t<ini).map(l=>l.q)),rep=ids.filter(i=>vistas.has(i)).length,nov=ids.length-rep;
-  const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q._d]=(cnt[q._d]||0)+1});
+  const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0,sem:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q._d??'sem']++});
   const reta=emReta();
   return `<b>${nov} questões novas</b>${reta?'':' (a meta de hoje)'}${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
-   `${cnt.f} fáceis · ${cnt.m} médias${cnt.d?' · '+cnt.d+(cnt.d>1?' difíceis':' difícil'):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
+   `${cnt.f} fáceis · ${cnt.m} médias${cnt.sem?' · '+cnt.sem+' sem dificuldade':''}${cnt.d?' · '+cnt.d+(cnt.d>1?' difíceis':' difícil'):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
 }
 // repetidas eventuais (pedido do Artur, 22/10/2026): ~1 a cada 25, no máx. 2 por RI — só erradas COM CERTEZA ou erradas FÁCEIS, última resposta errada há 5+ dias
 function pacoteRepeteRaro(n){
   const ult={};log.forEach(l=>ult[l.q]=l);const lim=Date.now()-(+(PARAM.repete_dias??5))*DAY,cada=+(PARAM.repete_cada??25);
-  const pool=Q.filter(q=>{const l=ult[q.id];return q.gab&&l&&!l.ok&&l.t<lim&&(l.conf==='certeza'||((q.classif||q.dif_pr||q._difManual)&&q._d==='f'))});
+  const pool=Q.filter(q=>{const l=ult[q.id];return q.gab&&l&&!l.ok&&l.t<lim&&(l.conf==='certeza'||q._d==='f')});
   let k=Math.floor(n/cada);if(Math.random()<n/cada-k)k++;k=Math.min(2,k,pool.length);
   return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k,false).map(q=>q.id):[];
 }
@@ -3048,12 +3075,12 @@ function qPulaGrade1(){   // topo do cartão da questão logo abaixo da barra fi
   document.querySelectorAll('body>*,body>*>*').forEach(e=>{if(e.id==='app')return;const p=getComputedStyle(e).position;if(p!=='sticky'&&p!=='fixed')return;const r=e.getBoundingClientRect();if(r.top<=0.5&&r.bottom>0&&r.bottom<innerHeight/2&&r.width>innerWidth/2)off=Math.max(off,r.bottom)});
   scrollTo(0,Math.max(0,c.getBoundingClientRect().top+scrollY-off-8))}
 // Corpo compartilhado pelo quiz e pela consulta no Banco (sem sessão artificial).
-function qDificuldade(q){return difTag(q)+prAcertoBloco(q)}
+function qDificuldade(q){return difTag(q)}
 function qEnunciado(q,imgs){return `<div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>`}
 function qAlternativas(q,{r=null,fb=false,sel=null,cut=[],leitura=false}={}){
   return Object.entries(q.alts||{}).map(([l,tx])=>{
     let c='';if(fb){if(l===q.gab)c='ok';else if(l===(r?.esc??r?.e))c='bad'}else if(sel===l)c='sel';
-    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}"${leitura?'':' tabindex="0" onclick="escolher(\''+l+'\')"'}><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${prAlternativa(q,l,fb)}${fb&&verCom(q)?comentAlt(q,l):''}</div>${leitura?'':`<button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button>`}</div>`;
+    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}"${leitura?'':' tabindex="0" onclick="escolher(\''+l+'\')"'}><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx.replace(/\s*·\s*(?:✓\s*)?(?:[\d.,]+%\s*)?$/,''))}</span>${prAlternativa(q,l,fb)}${fb&&verCom(q)?comentAlt(q,l):''}</div>${leitura?'':`<button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button>`}</div>`;
   }).join('');
 }
 
