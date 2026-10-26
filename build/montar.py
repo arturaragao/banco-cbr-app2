@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.23.1"
+VERSAO = "1.24.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -46,6 +46,13 @@ js = js[:i0] + "${pesosUI()}" + js[i1:]
 troca("function render(){", "function render(){aplicaLayout();")
 troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();qRola(k==='ArrowDown'?1:-1);return}   // depois de responder: rolagem suave da página (build/questoes.js)\n  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();")
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
+# Quiz e Banco compartilham o corpo da questão; Banco usa alternativas somente para leitura.
+i0 = js.index("  const alts=Object.entries(q.alts).map", js.index("function vQuiz(){"))
+i1 = js.index("  const imgs=", i0)
+js = js[:i0] + "  const alts=qAlternativas(q,{r,fb,sel,cut});\n" + js[i1:]
+troca('<div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}',
+      '${qEnunciado(q,imgs)}${alts}')
+troca("${fb?difTag(q)+prAcertoBloco(q):''}", "${fb?qDificuldade(q):''}")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
 troca("function revisaoDoDia(n=cfg.diario,exclui=new Set()){", "function revisaoDoDiaOrig(n=cfg.diario,exclui=new Set()){")
@@ -59,7 +66,6 @@ troca("`<p class=\"mut\">${cfg.diario} questões do dia (a lista só muda à 00:
 js = js.replace("${layoutUI()}${pesosUI()}", "${modoProvaUI()}${layoutUI()}${pesosUI()}", 1)
 # sugestões 1–5
 troca("all.push(l);log.push(l);aplicaSrs(l);syncEst();persist(wkKey(l.t));", "all.push(l);log.push(l);aplicaSrs(l);syncEst();persist(wkKey(l.t));posResposta(q,l);")
-troca("${fb?comentAlt(q,l):''}", "${fb&&verCom(q)?comentAlt(q,l):''}")
 troca("${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}", "${bannerResp(q,r)}${blocoFeedback(q,r,`${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}`)}")
 troca("  ${chipsHoje(agendados)}", "  ${metaProvaCard()}${chipsHoje(agendados)}")
 troca("const inc=x.qs.length/tot*100,", "const inc=(modoProva()?x.qs.reduce((a,q)=>a+({f:1,m:.6,d:.05}[q._d]??.6),0):x.qs.length)/tot*100,")

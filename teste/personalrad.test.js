@@ -187,6 +187,10 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   executar(c,trecho(script,'function tituloQ(q','const TES='));
   executar(c,trecho(script,'function nvBloco(){','const DIFV='));
   executar(c,`const QID={q1:q};DIF.d.nome='Difícil';`);
+  if(nome==='app gerado'){
+    const helpers=fs.readFileSync(path.join(__dirname,'../build/questoes.js'),'utf8');
+    executar(c,helpers.slice(helpers.indexOf('function qDificuldade(q)')));
+  }
   executar(c,trecho(script,'function vQuiz(){','function reclass('));
   const antes=executar(c,'vQuiz()');
   assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|NÃO EXIBIR|Tags Claude|Tema Claude|Neuro|por dificuldade|Difícil/);

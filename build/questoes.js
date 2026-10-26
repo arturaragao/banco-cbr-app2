@@ -154,3 +154,12 @@ function qPulaGrade1(){   // topo do cartão da questão logo abaixo da barra fi
   const c=document.querySelector('#app .qlay .card');if(!c)return;let off=0;
   document.querySelectorAll('body>*,body>*>*').forEach(e=>{if(e.id==='app')return;const p=getComputedStyle(e).position;if(p!=='sticky'&&p!=='fixed')return;const r=e.getBoundingClientRect();if(r.top<=0.5&&r.bottom>0&&r.bottom<innerHeight/2&&r.width>innerWidth/2)off=Math.max(off,r.bottom)});
   scrollTo(0,Math.max(0,c.getBoundingClientRect().top+scrollY-off-8))}
+// Corpo compartilhado pelo quiz e pela consulta no Banco (sem sessão artificial).
+function qDificuldade(q){return difTag(q)+prAcertoBloco(q)}
+function qEnunciado(q,imgs){return `<div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>`}
+function qAlternativas(q,{r=null,fb=false,sel=null,cut=[],leitura=false}={}){
+  return Object.entries(q.alts||{}).map(([l,tx])=>{
+    let c='';if(fb){if(l===q.gab)c='ok';else if(l===(r?.esc??r?.e))c='bad'}else if(sel===l)c='sel';
+    return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}"${leitura?'':' tabindex="0" onclick="escolher(\''+l+'\')"'}><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx)}</span>${prAlternativa(q,l,fb)}${fb&&verCom(q)?comentAlt(q,l):''}</div>${leitura?'':`<button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button>`}</div>`;
+  }).join('');
+}
