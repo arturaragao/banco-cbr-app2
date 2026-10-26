@@ -486,23 +486,17 @@ function smFracosCard(){
    ${SM.fr.length?`<p class="mut">Últimos 14 dias no banco (3+ respostas, menos de 70%).</p><div class="sm-fr">${SM.fr.map((x,i)=>`<div class="sm-frl"><span>${esc(x.t)}</span><span class="sm-q">${x.ok}/${x.n}</span><button class="b s" onclick="smTreinar(${i})">Treinar</button></div>`).join('')}</div>`:''}
    ${man.length?`<p class="mut">Que você marcou nas anotações:</p><ul class="sm-notas">${man.map(n=>`<li>${esc(n.texto)}</li>`).join('')}</ul>`:''}</div>`;
 }
-try{SM.aba=localStorage.getItem('sm_aba')==='calendario'?'calendario':'tarefas'}catch(e){SM.aba='tarefas'}
-function smAba(aba){SM.aba=aba==='calendario'?'calendario':'tarefas';try{localStorage.setItem('sm_aba',SM.aba)}catch(e){}smkIni();render()}
-function smTarefas(){
-  const hj=smHoje(),lista=SM.d.tarefas.slice();
-  const grupos=agruparTarefas(lista,hj);
-  if(!grupos.some(g=>g.dia===hj))grupos.unshift({dia:hj,titulo:'Hoje',l:[]});
-  if(!grupos.some(g=>g.dia==='sem'))grupos.push({dia:'sem',titulo:'Sem data',l:[]});
-  return `<button class="b s" onclick="qaAbre()">+ Nova tarefa</button>`+grupos.map(g=>`<div class="card ${g.dia===hj?'sm-hoje1':g.dia==='sem'?'sm-sd':''}" data-drop="${g.dia}"><span class="kick">${esc(g.titulo)}</span>${smGrupos(g.l)}${g.dia===hj||g.dia==='sem'?smAddLinha(g.dia):''}</div>`).join('');
-}
 function vSemana(){
   if(!SM.ok)return `<div class="card"><p class="mut">Carregando o calendário…</p></div>`;
   if(!SM.d)return `<div class="card"><p class="mut">Calendário ainda vazio.</p></div>`;
-  setTimeout(smAuto,0);
+  setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=SM.d.tarefas.filter(t=>t.dia!=='proxima'&&t.dia<hj&&t.dia>=smMais(hj,-7)&&!t.feito);
   return `<div class="sm">
    ${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}
-   <div class="sm-seg" role="group" aria-label="Semana"><button aria-pressed="${SM.aba==='tarefas'}" onclick="smAba('tarefas')">Tarefas</button><button aria-pressed="${SM.aba==='calendario'}" onclick="smAba('calendario')">Calendário</button></div>
-   ${SM.aba==='calendario'?smCalendario()+smHojeGrande():smTarefas()}
+   ${smSemData()}
+   ${smCalendario()}
+   ${smHojeGrande()}
+   ${atr.length?`<div class="card"><span class="kick" style="color:var(--bad)">Ficou para trás (últimos 7 dias)</span>${atr.map(t=>`<div class="sm-frl"><span>${esc(tituloTarefa(t.texto))} <span class="sm-tag">${smRot(t.dia)}</span></span><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button></div>`).join('')}</div>`:''}
+   ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
   </div>`;
 }
 // cartão na aba Hoje: itens de hoje com check, sem sair da tela
@@ -693,7 +687,7 @@ window.addEventListener('keydown',e=>{
 // (pedido do Artur, 24/10/2026). SMK.id = tarefa selecionada fora de Hoje/Tarefas (outros dias); SMK.cel = célula sem tarefa marcada.
 const SMK={on:false,i:-1,id:null,cel:'hoje'};
 function smkIni(){SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel='hoje'}
-const smkItens=dia=>SM.aba==='tarefas'?smItensDe(dia):smVisiveis(dia);
+const smkItens=dia=>smVisiveis(dia);
 const smkNh=()=>smAgrupa(smkItens(smHoje())).flatMap(g=>g.l).length;
 function smkSelecionada(id){if(!SMK.on)return false;if(SMK.id)return SMK.id===id;const x=smkLista()[SMK.i];return !!x&&x.id===id}
 function smkSeleciona(id){const i=smkLista().findIndex(t=>t.id===id);SMK.on=true;SMK.cel=null;if(i>=0){SMK.i=i;SMK.id=null}else{SMK.i=-1;SMK.id=id}smkPinta()}
@@ -816,7 +810,6 @@ function smAtalhosInicia(){
     });
     return;
   }
-  SM.aba='tarefas';try{localStorage.setItem('sm_aba','tarefas')}catch(e){}
   go('semana');
   const abre=()=>{qaAbre();if(acao==='voz'&&qaVozAPI())qaVoz()};
   if(r&&r.salvar){smCarga.then(()=>SM.fila).then(abre);return}
