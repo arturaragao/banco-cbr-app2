@@ -21,6 +21,7 @@ function qCarrega(k){
 }
 // chamado por go('questoes'): devolve true quando já levou para a questão
 function qAbre(){
+  if(sess&&sess.modo==='hoje'){iniciaRI();return tela==='quiz'}
   if(sess&&!sess.fim){go('quiz');return true}
   const L=qBlocos();if(!L.length)return false;
   qCarrega(L[0].k);return tela==='quiz';

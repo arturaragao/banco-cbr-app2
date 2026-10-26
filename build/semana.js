@@ -85,10 +85,12 @@ function smMetaDe(iso){
   if(smTipo(iso)!=='estudo')return 0;
   const hj=smHoje(),r=smRetaIni(),p=smProvaIso();
   if(p&&iso>=p)return 0;
-  if(iso<hj)return smDia(iso).meta??cfg.diario;
-  if(r&&iso>=r)return cfg.diario;
-  if(iso===hj)return metaHoje();   // = tamanho da Revisão do dia (uma meta só em todo o app)
-  return metaDia()||cfg.diario;
+  if(!p)return cfg.diario;
+  // Ritmo atual do banco, sem usar a meta gravada nem a lista de revisão congelada.
+  // Reserva a reta final; quando ela começa, distribui o restante até a prova.
+  const fim=r&&hj<r?r:p;let dias=0;
+  for(let x=hj;x<fim;x=smMais(x,1))if(smTipo(x)==='estudo')dias++;
+  return Math.ceil(_restantesFM()/Math.max(1,dias));
 }
 function smQ(dia){let n=0,ok=0;log.forEach(l=>{if(dKey(l.t)===dia){n++;if(l.ok)ok++}});return{n,ok}}
 const smMeta=t=>{if((t.area||'estudo')!=='estudo'||t.dia==='sem')return 0;const s=String(t.texto),m=s.match(/(\d+)\s*quest/i);return m?+m[1]:/quest/i.test(s)&&t.dia!=='proxima'?smMetaDe(t.dia):0};
@@ -99,12 +101,11 @@ function smRolaAplica(d,hj){let n=0;const hoje=new Set(d.tarefas.filter(t=>t.dia
   if(sai.size)d.tarefas=d.tarefas.filter(t=>!sai.has(t.id));return n}
 function smRola(){if(!SM.d)return;const hj=smHoje(),n=smRolaAplica(JSON.parse(JSON.stringify(SM.d)),hj);if(!n)return;
   smMudar(d=>smRolaAplica(d,hj),'pendentes passaram para hoje');toast(n===1?'1 tarefa pendente passou para hoje':n+' tarefas pendentes passaram para hoje')}
-function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta do dia; grava a meta de hoje 1x
+function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta do dia
   if(!SM.d)return;const hj=smHoje(),marcar=[];
   SM.d.tarefas.forEach(t=>{const m=smMeta(t);if(!m||t.feito||t.dia>hj||SM.auto.has(t.id))return;if(smQ(t.dia).n>=m){SM.auto.add(t.id);marcar.push(t.id)}});
   const feitoEm=new Date().toISOString();
   if(marcar.length)smMudar(d=>marcar.forEach(id=>{d.tarefas=concluirTarefa(d.tarefas,id,feitoEm,hj);const t=d.tarefas.find(t=>t.id===id);if(t)t.auto=true}),'questões do dia (automático)');
-  if(smTipo(hj)==='estudo'&&!SM.auto.has('meta'+hj)){const m=metaHoje();if(m){SM.auto.add('meta'+hj);if(smDia(hj).meta!==m)smMudar(d=>{d.dias[hj]=d.dias[hj]||{};d.dias[hj].meta=m},'meta do dia')}}
 }
 function smCor(iso){
   const hj=smHoje();if(iso>hj||smTipo(iso)!=='estudo')return'';
@@ -148,7 +149,7 @@ function smAgrupa(its){
   const ord=smTipos().map(t=>t.id);its.forEach(t=>{const a=t.area||'estudo';if(!ord.includes(a))ord.push(a)});const out=[];
   ord.forEach(a=>{const l=its.filter(t=>(t.area||'estudo')===a);if(!l.length)return;const subs=smTipoDe(a).subs||[];
     const ks=['',...subs];l.forEach(t=>{if(t.sub&&!ks.includes(t.sub))ks.push(t.sub)});
-    ks.forEach(k=>{const m=l.filter(t=>(t.sub||'')===k).sort((a,b)=>Number(!!b.urg)-Number(!!a.urg));if(m.length)out.push({a,sub:k,l:m})})});
+    ks.forEach(k=>{const m=ordenarTarefas(l.filter(t=>(t.sub||'')===k));if(m.length)out.push({a,sub:k,l:m})})});
   return out;
 }
 
@@ -354,8 +355,8 @@ function smItem(t){
    <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${smMetadados(t)}${ab?`<div class="sm-conteudo"><div class="sm-det" role="textbox" aria-label="Nota da tarefa (clique para editar)" onclick="smDetIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smDetFim(this,'${t.id}')">${esc(t.det||'')}</div>${smSubHtml(t)}${smAnexosHtml(t)}</div>`:''}`;
 }
 function smGrupos(its){
-  if(!its.length)return'';
-  return `<div class="sm-gs"><div class="sm-grp">${ordenarTarefas(its).map(smItem).join('')}</div></div>`;
+  const g=smAgrupa(its);if(!g.length)return'';
+  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}"><span class="sm-lbl">${smTipoIco(x.a)} ${esc(smTipoDe(x.a).nome)}${x.sub?` <i>› ${esc(x.sub)}</i>`:''}</span>${x.l.map(smItem).join('')}</div>`).join('')}</div>`;
 }
 function smAddDet(dia){SM.addDet=SM.addDet||{};SM.addDet[dia]=!SM.addDet[dia];render();const i=document.getElementById(SM.addDet[dia]?'sm_det_'+dia:'sm_add_'+dia);i&&i.focus()}
 function smTg(id){SM.ab.has(id)?SM.ab.delete(id):SM.ab.add(id);render()}
@@ -421,7 +422,11 @@ function smEstagioEdita(mes){
 }
 function smNoite(iso){   // BR = plantão Ecomax · HSI = sobreaviso HSI · '' = nada
   const x=smDia(iso);if(x.noite!=null)return x.noite;const a=x.agenda||'';
-  return /sobreaviso|hsi/i.test(a)?'HSI':/plant|\bBR\b/i.test(a)?'BR':'';
+  return smPlantao({t:a})||[...(x.ev||[]),...dedupeAgenda(SM.agenda||[],[],iso)].map(smPlantao).find(Boolean)||'';
+}
+function smPlantao(e){
+  const tipo=e.tipo||String(e.c||'').replace(/^escala-/,''),titulo=e.titulo||e.t||'';
+  return tipo==='hsi'||/sobreaviso|\bhsi\b/i.test(titulo)?'HSI':['br','br-manha'].includes(tipo)||/plantão|plantao|\bBR\b/i.test(titulo)?'BR':'';
 }
 function smPascoa(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dd=(h+l-7*m+114)%31+1;return dKey(+new Date(y,mo-1,dd,12))}
 const SM_FER={'01-01':'Confraternização','04-21':'Tiradentes','05-01':'Dia do Trabalho','09-02':'Aniversário de Blumenau','09-07':'Independência','10-12':'N. Sra. Aparecida','11-02':'Finados','11-15':'Proclamação da República','11-20':'Consciência Negra','12-25':'Natal'};
@@ -462,18 +467,9 @@ function smCalVai(k){if(SM.vis!=='semana'){smMesVai(k);return}SM.semana=smMais(S
 SM.vis='semana';
 function smCalendario(){
   const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smSeg(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smSeg(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
-  const corpo=sem?smQuadroSemana(seg):SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
+  const corpo=SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${SM.plan?smPainelMes():''}${corpo}
    <p class="mut sm-dica">Toque num dia para editar (tema, foco, noite, feriado, itens) · <button class="sm-tagb" onclick="smSem('${sem?seg:smSeg(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar. Plantões e sobreavisos vêm do Google Agenda na revisão de domingo.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
-}
-function smQuadroSemana(seg){
-  const velho=document.getElementById('sm_quadro');
-  SM.scrollSem=SM.scrollSem||{};if(velho)SM.scrollSem[velho.dataset.semana]=velho.scrollLeft;
-  setTimeout(()=>{const el=document.getElementById('sm_quadro');if(!el||el.dataset.semana!==seg)return;
-    const hj=el.querySelector('.sm-dia.hoje');el.scrollLeft=SM.scrollSem[seg]??(hj?hj.offsetLeft-el.firstElementChild.offsetLeft:0);
-  },0);
-  const dias=smSemana(seg),hj=smHoje();
-  return `<div id="sm_quadro" class="sm-quadro" data-semana="${seg}" role="region" aria-label="Semana de segunda a domingo" tabindex="0"><div class="sm-colunas">${dias.map(d=>`<section class="sm-dia ${d===hj?'hoje sm-hoje1':''}" data-drop="${d}"><header><button class="sm-tagb" onclick="smSel('${d}')">${smRotL(d)}${d===hj?' · hoje':''}</button>${smFeitasBotao(d)}</header><div class="sm-eventos">${smEvs(d)}${smDia(d).agenda?`<span class="sm-agenda-texto">${esc(smDia(d).agenda)}</span>`:''}${smFeriado(d)?`<small>${esc(smFeriado(d))}</small>`:''}</div><div class="sm-dia-tarefas">${smGrupos(smVisiveis(d))||'<p class="mut">Sem tarefas</p>'}</div><footer>${smSelo(d,true)}<button class="sm-tagb" onclick="qaAbreDia('${d}')">+ tarefa</button></footer></section>`).join('')}</div></div>${SM.sem===seg?smPainelSemana(seg):''}${dias.includes(SM.sel)?smPainelDia(SM.sel):''}`;
 }
 function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
@@ -526,7 +522,7 @@ function vSemana(){
    ${atr.length?`<div class="card sm-atrasadas"><div class="row"><span class="kick">Atrasadas · ${atr.length}</span><button class="b s sm-ghost" onclick="smRola()">Passar tudo para hoje</button></div>${atr.map(t=>`<div><small>${smRotL(t.dia)}</small>${smItem(t)}</div>`).join('')}</div>`:''}
    ${SM.avisosAgenda?.length?`<details class="sm-avisos"><summary>Avisos da escala · ${SM.avisosAgenda.length}</summary>${SM.avisosAgenda.map(a=>`<p>${esc(a)}</p>`).join('')}</details>`:''}
    ${smCalendario()}
-   ${SM.vis!=='semana'?smHojeGrande():''}
+   ${smHojeGrande()}
    ${smSemData()}
    ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
    ${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}
@@ -784,7 +780,7 @@ document.addEventListener('click',e=>{if(tela!=='semana')return;const t=e.target
 // dias[iso].ev = [{id, t, c}] · c = cor (roxo, azul, laranja, rosa, turquesa, cinza). Criar/apagar no painel do dia.
 const SM_EVC=[['roxo','Roxo'],['azul','Azul'],['laranja','Laranja'],['rosa','Rosa'],['turquesa','Turquesa'],['cinza','Cinza']];
 const SM_AGENDA_TIPOS=['br','norte','hsi','br-manha','almoco','estagio','cobre-pos'];
-const smEvL=iso=>{const manuais=smDia(iso).ev||[];return [...manuais,...dedupeAgenda(SM.agenda||[],[...manuais,{t:smDia(iso).agenda}],iso).map(e=>({t:e.titulo,c:SM_AGENDA_TIPOS.includes(e.tipo)?'escala-'+e.tipo:'escala',leitura:true,inicio:e.inicio,fim:e.fim,diaInteiro:e.diaInteiro,local:e.local}))]};
+const smEvL=iso=>{const manuais=smDia(iso).ev||[];return [...manuais,...dedupeAgenda(SM.agenda||[],[...manuais,{t:smDia(iso).agenda}],iso).map(e=>({t:e.titulo,tipo:e.tipo,c:SM_AGENDA_TIPOS.includes(e.tipo)?'escala-'+e.tipo:'escala',leitura:true,inicio:e.inicio,fim:e.fim,diaInteiro:e.diaInteiro,local:e.local}))].filter(e=>!smPlantao(e))};
 const smEvs=iso=>smEvL(iso).map(v=>`<span class="sm-ev c-${esc(v.c||'roxo')}" title="${esc(v.t+(v.leitura?' · escala automática (somente leitura)':''))}">${esc(v.t)}${v.leitura?`<small>${v.diaInteiro?'Dia inteiro':esc(String(v.inicio).slice(11,16)+(v.fim?' – '+String(v.fim).slice(11,16):''))}${v.local?' · '+esc(v.local):''}</small>`:''}</span>`).join('');
 function smEvEditor(iso){
   const c=SM.evc||'roxo';

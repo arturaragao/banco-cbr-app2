@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.21.0"
+VERSAO = "1.21.1"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -48,12 +48,11 @@ troca("  if(!fb&&(k==='ArrowDown'||k==='ArrowUp')){e.preventDefault();", "  if(f
 troca("return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''}\"", "return `<div class=\"alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}\"")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
-troca("function revisaoDoDia(){", "function revisaoDoDiaOrig(){")
+troca("function revisaoDoDia(n=cfg.diario,exclui=new Set()){", "function revisaoDoDiaOrig(n=cfg.diario,exclui=new Set()){")
 troca("function questoesTema(t){", "function questoesTemaOrig(t){")
 troca("function simulado(et){", "function simuladoOrig(et){")
 troca("function novasArea(id){", "function novasAreaOrig(id){")
 troca("function comecaFiltro(){", "function comecaFiltroOrig(){")
-troca("cfg.ri.v!==4", "cfg.ri.v!==6||riRefaz()"); troca("cfg.ri={d:dKey(Date.now()),v:4,", "cfg.ri={d:dKey(Date.now()),v:6,cal:!!(typeof SM!=='undefined'&&SM.d),")   # cal: lista feita já com o calendário (senão é refeita, ver riRefaz)
 # cartão da RI: texto e contador seguem a lista de verdade (22/10/2026)
 troca("ALVO={ri:()=>cfg.diario,", "ALVO={ri:()=>metaHoje(),")
 troca("`<p class=\"mut\">${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.</p>", "`<p class=\"mut\">${riDesc(devidas)}</p>")

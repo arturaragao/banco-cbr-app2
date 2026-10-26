@@ -1,4 +1,4 @@
-// Banco CBR app 1.21.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.21.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -316,10 +316,12 @@ function smMetaDe(iso){
   if(smTipo(iso)!=='estudo')return 0;
   const hj=smHoje(),r=smRetaIni(),p=smProvaIso();
   if(p&&iso>=p)return 0;
-  if(iso<hj)return smDia(iso).meta??cfg.diario;
-  if(r&&iso>=r)return cfg.diario;
-  if(iso===hj)return metaHoje();   // = tamanho da Revisão do dia (uma meta só em todo o app)
-  return metaDia()||cfg.diario;
+  if(!p)return cfg.diario;
+  // Ritmo atual do banco, sem usar a meta gravada nem a lista de revisão congelada.
+  // Reserva a reta final; quando ela começa, distribui o restante até a prova.
+  const fim=r&&hj<r?r:p;let dias=0;
+  for(let x=hj;x<fim;x=smMais(x,1))if(smTipo(x)==='estudo')dias++;
+  return Math.ceil(_restantesFM()/Math.max(1,dias));
 }
 function smQ(dia){let n=0,ok=0;log.forEach(l=>{if(dKey(l.t)===dia){n++;if(l.ok)ok++}});return{n,ok}}
 const smMeta=t=>{if((t.area||'estudo')!=='estudo'||t.dia==='sem')return 0;const s=String(t.texto),m=s.match(/(\d+)\s*quest/i);return m?+m[1]:/quest/i.test(s)&&t.dia!=='proxima'?smMetaDe(t.dia):0};
@@ -330,12 +332,11 @@ function smRolaAplica(d,hj){let n=0;const hoje=new Set(d.tarefas.filter(t=>t.dia
   if(sai.size)d.tarefas=d.tarefas.filter(t=>!sai.has(t.id));return n}
 function smRola(){if(!SM.d)return;const hj=smHoje(),n=smRolaAplica(JSON.parse(JSON.stringify(SM.d)),hj);if(!n)return;
   smMudar(d=>smRolaAplica(d,hj),'pendentes passaram para hoje');toast(n===1?'1 tarefa pendente passou para hoje':n+' tarefas pendentes passaram para hoje')}
-function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta do dia; grava a meta de hoje 1x
+function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta do dia
   if(!SM.d)return;const hj=smHoje(),marcar=[];
   SM.d.tarefas.forEach(t=>{const m=smMeta(t);if(!m||t.feito||t.dia>hj||SM.auto.has(t.id))return;if(smQ(t.dia).n>=m){SM.auto.add(t.id);marcar.push(t.id)}});
   const feitoEm=new Date().toISOString();
   if(marcar.length)smMudar(d=>marcar.forEach(id=>{d.tarefas=concluirTarefa(d.tarefas,id,feitoEm,hj);const t=d.tarefas.find(t=>t.id===id);if(t)t.auto=true}),'questões do dia (automático)');
-  if(smTipo(hj)==='estudo'&&!SM.auto.has('meta'+hj)){const m=metaHoje();if(m){SM.auto.add('meta'+hj);if(smDia(hj).meta!==m)smMudar(d=>{d.dias[hj]=d.dias[hj]||{};d.dias[hj].meta=m},'meta do dia')}}
 }
 function smCor(iso){
   const hj=smHoje();if(iso>hj||smTipo(iso)!=='estudo')return'';
@@ -379,7 +380,7 @@ function smAgrupa(its){
   const ord=smTipos().map(t=>t.id);its.forEach(t=>{const a=t.area||'estudo';if(!ord.includes(a))ord.push(a)});const out=[];
   ord.forEach(a=>{const l=its.filter(t=>(t.area||'estudo')===a);if(!l.length)return;const subs=smTipoDe(a).subs||[];
     const ks=['',...subs];l.forEach(t=>{if(t.sub&&!ks.includes(t.sub))ks.push(t.sub)});
-    ks.forEach(k=>{const m=l.filter(t=>(t.sub||'')===k).sort((a,b)=>Number(!!b.urg)-Number(!!a.urg));if(m.length)out.push({a,sub:k,l:m})})});
+    ks.forEach(k=>{const m=ordenarTarefas(l.filter(t=>(t.sub||'')===k));if(m.length)out.push({a,sub:k,l:m})})});
   return out;
 }
 
@@ -585,8 +586,8 @@ function smItem(t){
    <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${smMetadados(t)}${ab?`<div class="sm-conteudo"><div class="sm-det" role="textbox" aria-label="Nota da tarefa (clique para editar)" onclick="smDetIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smDetFim(this,'${t.id}')">${esc(t.det||'')}</div>${smSubHtml(t)}${smAnexosHtml(t)}</div>`:''}`;
 }
 function smGrupos(its){
-  if(!its.length)return'';
-  return `<div class="sm-gs"><div class="sm-grp">${ordenarTarefas(its).map(smItem).join('')}</div></div>`;
+  const g=smAgrupa(its);if(!g.length)return'';
+  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}"><span class="sm-lbl">${smTipoIco(x.a)} ${esc(smTipoDe(x.a).nome)}${x.sub?` <i>› ${esc(x.sub)}</i>`:''}</span>${x.l.map(smItem).join('')}</div>`).join('')}</div>`;
 }
 function smAddDet(dia){SM.addDet=SM.addDet||{};SM.addDet[dia]=!SM.addDet[dia];render();const i=document.getElementById(SM.addDet[dia]?'sm_det_'+dia:'sm_add_'+dia);i&&i.focus()}
 function smTg(id){SM.ab.has(id)?SM.ab.delete(id):SM.ab.add(id);render()}
@@ -652,7 +653,11 @@ function smEstagioEdita(mes){
 }
 function smNoite(iso){   // BR = plantão Ecomax · HSI = sobreaviso HSI · '' = nada
   const x=smDia(iso);if(x.noite!=null)return x.noite;const a=x.agenda||'';
-  return /sobreaviso|hsi/i.test(a)?'HSI':/plant|\bBR\b/i.test(a)?'BR':'';
+  return smPlantao({t:a})||[...(x.ev||[]),...dedupeAgenda(SM.agenda||[],[],iso)].map(smPlantao).find(Boolean)||'';
+}
+function smPlantao(e){
+  const tipo=e.tipo||String(e.c||'').replace(/^escala-/,''),titulo=e.titulo||e.t||'';
+  return tipo==='hsi'||/sobreaviso|\bhsi\b/i.test(titulo)?'HSI':['br','br-manha'].includes(tipo)||/plantão|plantao|\bBR\b/i.test(titulo)?'BR':'';
 }
 function smPascoa(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),dd=(h+l-7*m+114)%31+1;return dKey(+new Date(y,mo-1,dd,12))}
 const SM_FER={'01-01':'Confraternização','04-21':'Tiradentes','05-01':'Dia do Trabalho','09-02':'Aniversário de Blumenau','09-07':'Independência','10-12':'N. Sra. Aparecida','11-02':'Finados','11-15':'Proclamação da República','11-20':'Consciência Negra','12-25':'Natal'};
@@ -693,18 +698,9 @@ function smCalVai(k){if(SM.vis!=='semana'){smMesVai(k);return}SM.semana=smMais(S
 SM.vis='semana';
 function smCalendario(){
   const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smSeg(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smSeg(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
-  const corpo=sem?smQuadroSemana(seg):SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
+  const corpo=SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${SM.plan?smPainelMes():''}${corpo}
    <p class="mut sm-dica">Toque num dia para editar (tema, foco, noite, feriado, itens) · <button class="sm-tagb" onclick="smSem('${sem?seg:smSeg(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar. Plantões e sobreavisos vêm do Google Agenda na revisão de domingo.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
-}
-function smQuadroSemana(seg){
-  const velho=document.getElementById('sm_quadro');
-  SM.scrollSem=SM.scrollSem||{};if(velho)SM.scrollSem[velho.dataset.semana]=velho.scrollLeft;
-  setTimeout(()=>{const el=document.getElementById('sm_quadro');if(!el||el.dataset.semana!==seg)return;
-    const hj=el.querySelector('.sm-dia.hoje');el.scrollLeft=SM.scrollSem[seg]??(hj?hj.offsetLeft-el.firstElementChild.offsetLeft:0);
-  },0);
-  const dias=smSemana(seg),hj=smHoje();
-  return `<div id="sm_quadro" class="sm-quadro" data-semana="${seg}" role="region" aria-label="Semana de segunda a domingo" tabindex="0"><div class="sm-colunas">${dias.map(d=>`<section class="sm-dia ${d===hj?'hoje sm-hoje1':''}" data-drop="${d}"><header><button class="sm-tagb" onclick="smSel('${d}')">${smRotL(d)}${d===hj?' · hoje':''}</button>${smFeitasBotao(d)}</header><div class="sm-eventos">${smEvs(d)}${smDia(d).agenda?`<span class="sm-agenda-texto">${esc(smDia(d).agenda)}</span>`:''}${smFeriado(d)?`<small>${esc(smFeriado(d))}</small>`:''}</div><div class="sm-dia-tarefas">${smGrupos(smVisiveis(d))||'<p class="mut">Sem tarefas</p>'}</div><footer>${smSelo(d,true)}<button class="sm-tagb" onclick="qaAbreDia('${d}')">+ tarefa</button></footer></section>`).join('')}</div></div>${SM.sem===seg?smPainelSemana(seg):''}${dias.includes(SM.sel)?smPainelDia(SM.sel):''}`;
 }
 function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
@@ -757,7 +753,7 @@ function vSemana(){
    ${atr.length?`<div class="card sm-atrasadas"><div class="row"><span class="kick">Atrasadas · ${atr.length}</span><button class="b s sm-ghost" onclick="smRola()">Passar tudo para hoje</button></div>${atr.map(t=>`<div><small>${smRotL(t.dia)}</small>${smItem(t)}</div>`).join('')}</div>`:''}
    ${SM.avisosAgenda?.length?`<details class="sm-avisos"><summary>Avisos da escala · ${SM.avisosAgenda.length}</summary>${SM.avisosAgenda.map(a=>`<p>${esc(a)}</p>`).join('')}</details>`:''}
    ${smCalendario()}
-   ${SM.vis!=='semana'?smHojeGrande():''}
+   ${smHojeGrande()}
    ${smSemData()}
    ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
    ${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}
@@ -1015,7 +1011,7 @@ document.addEventListener('click',e=>{if(tela!=='semana')return;const t=e.target
 // dias[iso].ev = [{id, t, c}] · c = cor (roxo, azul, laranja, rosa, turquesa, cinza). Criar/apagar no painel do dia.
 const SM_EVC=[['roxo','Roxo'],['azul','Azul'],['laranja','Laranja'],['rosa','Rosa'],['turquesa','Turquesa'],['cinza','Cinza']];
 const SM_AGENDA_TIPOS=['br','norte','hsi','br-manha','almoco','estagio','cobre-pos'];
-const smEvL=iso=>{const manuais=smDia(iso).ev||[];return [...manuais,...dedupeAgenda(SM.agenda||[],[...manuais,{t:smDia(iso).agenda}],iso).map(e=>({t:e.titulo,c:SM_AGENDA_TIPOS.includes(e.tipo)?'escala-'+e.tipo:'escala',leitura:true,inicio:e.inicio,fim:e.fim,diaInteiro:e.diaInteiro,local:e.local}))]};
+const smEvL=iso=>{const manuais=smDia(iso).ev||[];return [...manuais,...dedupeAgenda(SM.agenda||[],[...manuais,{t:smDia(iso).agenda}],iso).map(e=>({t:e.titulo,tipo:e.tipo,c:SM_AGENDA_TIPOS.includes(e.tipo)?'escala-'+e.tipo:'escala',leitura:true,inicio:e.inicio,fim:e.fim,diaInteiro:e.diaInteiro,local:e.local}))].filter(e=>!smPlantao(e))};
 const smEvs=iso=>smEvL(iso).map(v=>`<span class="sm-ev c-${esc(v.c||'roxo')}" title="${esc(v.t+(v.leitura?' · escala automática (somente leitura)':''))}">${esc(v.t)}${v.leitura?`<small>${v.diaInteiro?'Dia inteiro':esc(String(v.inicio).slice(11,16)+(v.fim?' – '+String(v.fim).slice(11,16):''))}${v.local?' · '+esc(v.local):''}</small>`:''}</span>`).join('');
 function smEvEditor(iso){
   const c=SM.evc||'roxo';
@@ -1464,7 +1460,11 @@ function mergeRemote(docs){
   const est=docs.find(d=>d.id==='estado');
   if(est){const x=est.data()||{};
     if((x.resetAt||0)>resetAt){resetAt=x.resetAt;const n=all.length;all=all.filter(l=>l.t>=resetAt);if(all.length!==n)changed=true}
-    if((x.u||0)>estU){over=x.over||{};cfg=normCfg(x.cfg);aplicaNomes();estU=x.u;saveL('cbr_u',estU);reArea();aplicaTema();changed=true}
+    if((x.u||0)>estU){
+      const nova=normCfg(x.cfg),ri=riPreserva(cfg.ri,nova.ri),republica=JSON.stringify(ri)!==JSON.stringify(nova.ri);
+      nova.ri=ri;over=x.over||{};cfg=nova;aplicaNomes();estU=x.u;saveL('cbr_u',estU);reArea();aplicaTema();changed=true;
+      if(republica)persist('_est');
+    }
     else if((x.u||0)<estU)estDirty=true;
   }else estDirty=true;
   const idx=new Map(all.map(l=>[l.q+'|'+l.t,l]));
@@ -1536,27 +1536,45 @@ function sorteioPonderado(cands,w,k){
 }
 const embaralha=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const dKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-function riHoje(){ // a lista só muda à 00:00
-  if(!cfg.ri||cfg.ri.v!==6||riRefaz()||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:6,cal:!!(typeof SM!=='undefined'&&SM.d),ids:revisaoDoDia()};persist('_est')}
+function riPreserva(local,remota){
+  const hoje=dKey(Date.now()),valida=r=>r&&r.d===hoje&&Array.isArray(r.ids);
+  if(!valida(local))return remota;
+  if(!valida(remota))return local;
+  return {...local,meta:Math.max(local.meta||0,remota.meta||0),ids:[...new Set([...local.ids,...remota.ids])]};
+}
+function riHoje(){ // no mesmo dia, só acrescenta ao fim; nunca invalida a lista salva
+  const d=dKey(Date.now()),meta=modoProva()?tamanhoRI():cfg.diario;
+  let mudou=false;
+  if(!cfg.ri||cfg.ri.d!==d||!Array.isArray(cfg.ri.ids)){
+    cfg.ri={d,meta,ids:revisaoDoDia()};mudou=true;
+  }
+  const r=cfg.ri,alvo=Math.max(r.meta||0,meta,r.ids.length);
+  if(r.meta!==alvo){r.meta=alvo;mudou=true}
+  if(r.ids.length<alvo){
+    const exclui=new Set(r.ids),n=alvo-r.ids.length;
+    const extras=modoProva()?pacoteVolume(n,q=>!exclui.has(q.id)):revisaoDoDiaOrig(n,exclui);
+    extras.forEach(id=>{if(!exclui.has(id)){r.ids.push(id);exclui.add(id);mudou=true}});
+  }
+  if(mudou)persist('_est');
   return cfg.ri.ids;
 }
 function iniciaRI(){
   const ids=riHoje(),h=hoje0(),done={};
   log.forEach(l=>{if(l.t>=h&&l.modo==='hoje'&&ids.includes(l.q))done[l.q]=l});
-  const first=ids.findIndex(i=>!done[i]);
+  const disponiveis=ids.filter(i=>QID[i]&&QID[i].gab);
+  if(!disponiveis.length)return;
   iniciar(ids,'hoje');if(!sess)return;
-  if(first>0||(first>=0&&Object.keys(done).length)){
-    Object.values(done).forEach(l=>{sess.resp[l.q]={esc:l.e||null,conf:l.conf,ok:l.ok,t:l.t}});
-    sess.i=first;render();
-  }
+  Object.values(done).forEach(l=>{sess.resp[l.q]={esc:l.e||null,conf:l.conf,ok:l.ok,t:l.t}});
+  const first=sess.ids.findIndex(i=>!done[i]);
+  sess.i=first<0?0:first;render();
 }
-function revisaoDoDiaOrig(){
+function revisaoDoDiaOrig(n=cfg.diario,exclui=new Set()){
   // prioridade: 1) questões ainda não respondidas; 2) repetição só do que já venceu, puxando erros,
   // temas mais incidentes (área) e questões fáceis que você erra
-  const n=cfg.diario,now=Date.now(),{P}=prioridades();
+  const now=Date.now(),{P}=prioridades(),banco=Q.filter(q=>!exclui.has(q.id));
   const U={};log.forEach(l=>{const u=U[l.q]??={n:0,ok:0,t:0,last:true};u.n++;if(l.ok)u.ok++;if(l.t>=u.t){u.t=l.t;u.last=l.ok}});
-  const novas=Q.filter(q=>q.gab&&!srs[q.id]);
-  const venc=Q.filter(q=>q.gab&&srs[q.id]&&srs[q.id].due<=now);
+  const novas=banco.filter(q=>q.gab&&!srs[q.id]);
+  const venc=banco.filter(q=>q.gab&&srs[q.id]&&srs[q.id].due<=now);
   const cap=Math.max(1,Math.ceil(n*(+PARAM.rev_pct||15)/100)),nRev=Math.min(venc.length,Math.max(cap,n-novas.length)); // prioridade: questões novas; revisões limitadas a rev_pct% do dia (só sobem se faltarem novas)
   const med=Object.values(P).reduce((a,b)=>a+b,0)/(Object.keys(P).length||1)||1;
   const wRev=q=>{const u=U[q.id]||{n:0,ok:0,last:true},ua=(u.ok+1)/(u.n+2);
@@ -1567,7 +1585,7 @@ function revisaoDoDiaOrig(){
   const w=q=>(P[q._a]??med)*DIF[q._d].w;
   const novos=sorteioPonderado(novas,w,n-revs.length);
   let ids=[...novos,...revs];
-  if(ids.length<n){const t=new Set(ids.map(q=>q.id));ids=ids.concat(Q.filter(q=>q.gab&&!t.has(q.id)&&srs[q.id]&&(now-(U[q.id]?.t||0))>7*DAY).sort((a,b)=>srs[a.id].due-srs[b.id].due).slice(0,n-ids.length))}
+  if(ids.length<n){const t=new Set(ids.map(q=>q.id));ids=ids.concat(banco.filter(q=>q.gab&&!t.has(q.id)&&srs[q.id]&&(now-(U[q.id]?.t||0))>7*DAY).sort((a,b)=>srs[a.id].due-srs[b.id].due).slice(0,n-ids.length))}
   return embaralha(ids).map(q=>q.id);
 }
 
@@ -2772,7 +2790,7 @@ function cfgGeral(){
   <label>Cartões novos por dia <input id="c_fn" type="number" min="0" max="500" value="${cfg.fcNovos}" onchange="cfg.fcNovos=+this.value;persist('_est')" style="width:80px"></label>
   <label>Máx. revisões de cartões por dia <input id="c_fm" type="number" min="10" max="2000" value="${cfg.fcMax}" onchange="cfg.fcMax=+this.value;persist('_est')" style="width:90px"></label>
   <label>Data da prova <input id="c_p" type="date" value="${cfg.prova}" onchange="cfg.prova=this.value;persist('_est');render()"></label></p>
-  <p class="mut">A lista da Revisão Inteligente de hoje já foi montada; mudanças em "questões" valem a partir de amanhã.</p>
+  <p class="mut">A lista de hoje é preservada. Aumentar a meta só acrescenta questões ao fim; reduzir vale a partir de amanhã.</p>
   ${modoProvaUI()}${layoutUI()}${ordemUI()}${pesosUI()}</div>`;
 }
 function cfgAtalhos(){
@@ -2838,6 +2856,7 @@ function qCarrega(k){
 }
 // chamado por go('questoes'): devolve true quando já levou para a questão
 function qAbre(){
+  if(sess&&sess.modo==='hoje'){iniciaRI();return tela==='quiz'}
   if(sess&&!sess.fim){go('quiz');return true}
   const L=qBlocos();if(!L.length)return false;
   qCarrega(L[0].k);return tela==='quiz';

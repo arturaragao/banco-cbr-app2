@@ -202,7 +202,11 @@ function mergeRemote(docs){
   const est=docs.find(d=>d.id==='estado');
   if(est){const x=est.data()||{};
     if((x.resetAt||0)>resetAt){resetAt=x.resetAt;const n=all.length;all=all.filter(l=>l.t>=resetAt);if(all.length!==n)changed=true}
-    if((x.u||0)>estU){over=x.over||{};cfg=normCfg(x.cfg);aplicaNomes();estU=x.u;saveL('cbr_u',estU);reArea();aplicaTema();changed=true}
+    if((x.u||0)>estU){
+      const nova=normCfg(x.cfg),ri=riPreserva(cfg.ri,nova.ri),republica=JSON.stringify(ri)!==JSON.stringify(nova.ri);
+      nova.ri=ri;over=x.over||{};cfg=nova;aplicaNomes();estU=x.u;saveL('cbr_u',estU);reArea();aplicaTema();changed=true;
+      if(republica)persist('_est');
+    }
     else if((x.u||0)<estU)estDirty=true;
   }else estDirty=true;
   const idx=new Map(all.map(l=>[l.q+'|'+l.t,l]));
@@ -274,27 +278,45 @@ function sorteioPonderado(cands,w,k){
 }
 const embaralha=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const dKey=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-function riHoje(){ // a lista só muda à 00:00
-  if(!cfg.ri||cfg.ri.v!==4||cfg.ri.d!==dKey(Date.now())||!cfg.ri.ids.every(i=>QID[i])){cfg.ri={d:dKey(Date.now()),v:4,ids:revisaoDoDia()};persist('_est')}
+function riPreserva(local,remota){
+  const hoje=dKey(Date.now()),valida=r=>r&&r.d===hoje&&Array.isArray(r.ids);
+  if(!valida(local))return remota;
+  if(!valida(remota))return local;
+  return {...local,meta:Math.max(local.meta||0,remota.meta||0),ids:[...new Set([...local.ids,...remota.ids])]};
+}
+function riHoje(){ // no mesmo dia, só acrescenta ao fim; nunca invalida a lista salva
+  const d=dKey(Date.now()),meta=modoProva()?tamanhoRI():cfg.diario;
+  let mudou=false;
+  if(!cfg.ri||cfg.ri.d!==d||!Array.isArray(cfg.ri.ids)){
+    cfg.ri={d,meta,ids:revisaoDoDia()};mudou=true;
+  }
+  const r=cfg.ri,alvo=Math.max(r.meta||0,meta,r.ids.length);
+  if(r.meta!==alvo){r.meta=alvo;mudou=true}
+  if(r.ids.length<alvo){
+    const exclui=new Set(r.ids),n=alvo-r.ids.length;
+    const extras=modoProva()?pacoteVolume(n,q=>!exclui.has(q.id)):revisaoDoDiaOrig(n,exclui);
+    extras.forEach(id=>{if(!exclui.has(id)){r.ids.push(id);exclui.add(id);mudou=true}});
+  }
+  if(mudou)persist('_est');
   return cfg.ri.ids;
 }
 function iniciaRI(){
   const ids=riHoje(),h=hoje0(),done={};
   log.forEach(l=>{if(l.t>=h&&l.modo==='hoje'&&ids.includes(l.q))done[l.q]=l});
-  const first=ids.findIndex(i=>!done[i]);
+  const disponiveis=ids.filter(i=>QID[i]&&QID[i].gab);
+  if(!disponiveis.length)return;
   iniciar(ids,'hoje');if(!sess)return;
-  if(first>0||(first>=0&&Object.keys(done).length)){
-    Object.values(done).forEach(l=>{sess.resp[l.q]={esc:l.e||null,conf:l.conf,ok:l.ok,t:l.t}});
-    sess.i=first;render();
-  }
+  Object.values(done).forEach(l=>{sess.resp[l.q]={esc:l.e||null,conf:l.conf,ok:l.ok,t:l.t}});
+  const first=sess.ids.findIndex(i=>!done[i]);
+  sess.i=first<0?0:first;render();
 }
-function revisaoDoDia(){
+function revisaoDoDia(n=cfg.diario,exclui=new Set()){
   // prioridade: 1) questões ainda não respondidas; 2) repetição só do que já venceu, puxando erros,
   // temas mais incidentes (área) e questões fáceis que você erra
-  const n=cfg.diario,now=Date.now(),{P}=prioridades();
+  const now=Date.now(),{P}=prioridades(),banco=Q.filter(q=>!exclui.has(q.id));
   const U={};log.forEach(l=>{const u=U[l.q]??={n:0,ok:0,t:0,last:true};u.n++;if(l.ok)u.ok++;if(l.t>=u.t){u.t=l.t;u.last=l.ok}});
-  const novas=Q.filter(q=>q.gab&&!srs[q.id]);
-  const venc=Q.filter(q=>q.gab&&srs[q.id]&&srs[q.id].due<=now);
+  const novas=banco.filter(q=>q.gab&&!srs[q.id]);
+  const venc=banco.filter(q=>q.gab&&srs[q.id]&&srs[q.id].due<=now);
   const cap=Math.max(1,Math.ceil(n*(+PARAM.rev_pct||15)/100)),nRev=Math.min(venc.length,Math.max(cap,n-novas.length)); // prioridade: questões novas; revisões limitadas a rev_pct% do dia (só sobem se faltarem novas)
   const med=Object.values(P).reduce((a,b)=>a+b,0)/(Object.keys(P).length||1)||1;
   const wRev=q=>{const u=U[q.id]||{n:0,ok:0,last:true},ua=(u.ok+1)/(u.n+2);
@@ -305,7 +327,7 @@ function revisaoDoDia(){
   const w=q=>(P[q._a]??med)*DIF[q._d].w;
   const novos=sorteioPonderado(novas,w,n-revs.length);
   let ids=[...novos,...revs];
-  if(ids.length<n){const t=new Set(ids.map(q=>q.id));ids=ids.concat(Q.filter(q=>q.gab&&!t.has(q.id)&&srs[q.id]&&(now-(U[q.id]?.t||0))>7*DAY).sort((a,b)=>srs[a.id].due-srs[b.id].due).slice(0,n-ids.length))}
+  if(ids.length<n){const t=new Set(ids.map(q=>q.id));ids=ids.concat(banco.filter(q=>q.gab&&!t.has(q.id)&&srs[q.id]&&(now-(U[q.id]?.t||0))>7*DAY).sort((a,b)=>srs[a.id].due-srs[b.id].due).slice(0,n-ids.length))}
   return embaralha(ids).map(q=>q.id);
 }
 
@@ -1257,7 +1279,7 @@ function cfgGeral(){
   <label>Cartões novos por dia <input id="c_fn" type="number" min="0" max="500" value="${cfg.fcNovos}" onchange="cfg.fcNovos=+this.value;persist('_est')" style="width:80px"></label>
   <label>Máx. revisões de cartões por dia <input id="c_fm" type="number" min="10" max="2000" value="${cfg.fcMax}" onchange="cfg.fcMax=+this.value;persist('_est')" style="width:90px"></label>
   <label>Data da prova <input id="c_p" type="date" value="${cfg.prova}" onchange="cfg.prova=this.value;persist('_est');render()"></label></p>
-  <p class="mut">A lista da Revisão Inteligente de hoje já foi montada; mudanças em "questões" valem a partir de amanhã.</p>
+  <p class="mut">A lista de hoje é preservada. Aumentar a meta só acrescenta questões ao fim; reduzir vale a partir de amanhã.</p>
   <h3>Peso das áreas na prova (%)</h3><p class="mut">Vazio = usa a incidência no banco. Preencha com o peso real quando tiver.</p>
   <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} <input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${(S[a.id]?.banco/(Q.length||1)*100||0).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)"></label>`).join('')}</div></div>`;
 }

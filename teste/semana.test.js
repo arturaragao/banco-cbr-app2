@@ -41,7 +41,7 @@ test('Semana mantém calendário e tarefas juntos, sem sub-aba nem cartões remo
   const trecho = fonte.slice(fonte.indexOf('function vSemana(){'), fonte.indexOf('function smCardHoje()'));
   assert.ok(trecho.includes('${smSemData()}'));
   assert.ok(trecho.includes('${smCalendario()}'));
-  assert.ok(trecho.includes("SM.vis!=='semana'?smHojeGrande():''"));
+  assert.ok(trecho.includes('${smHojeGrande()}'));
   assert.ok(!trecho.includes('sm-seg'));
   assert.ok(!fonte.includes("localStorage.getItem('sm_aba')"));
   assert.ok(!fonte.includes("localStorage.setItem('sm_aba'"));

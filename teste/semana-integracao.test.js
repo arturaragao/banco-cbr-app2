@@ -28,19 +28,20 @@ async function app(tarefas=[],nativo=false){
       if(path.endsWith('semana/agenda.json')&&estado.agenda)return {sha:'agenda'+JSON.stringify(estado.agenda).length,content:Buffer.from(JSON.stringify(estado.agenda)).toString('base64')};
       throw Object.assign(new Error('não existe'),{status:404});
     }},
-    tela:'semana',render(){},toast:m=>avisos.push(m),cfg:{diario:10},PARAM:{},log:[],DAY:86400000,metaHoje:()=>10,metaDia:()=>10,
+    tela:'semana',render(){},toast:m=>avisos.push(m),cfg:{diario:10},PARAM:{},log:[],DAY:86400000,metaHoje:()=>10,metaDia:()=>10,_restantesFM:()=>100,
     esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),URL,Blob,
   });
   vm.runInContext(fonte,c);await vm.runInContext('smCarga',c);await new Promise(r=>setImmediate(r));
   return{c,estado,salvos,avisos,recebidos,confirmados,elementos,tempos,mem,lista:()=>copia(vm.runInContext('SM.d.tarefas',c)),fila:()=>vm.runInContext('SM.fila',c)};
 }
-test('quadro tem sete dias seg→dom, tarefas ordenadas, eventos antes e faixa no topo',async()=>{
+test('semana usa grade ampliada, mantém Hoje e faixa de atrasadas e ordena tarefas',async()=>{
   const a=await app([{id:'baixa',dia:'2026-10-26',texto:'Baixa',prioridade:'baixa'},{id:'u',dia:'2026-10-26',texto:'Urgente',urg:true},{id:'velha',dia:'2020-01-01',texto:'Vencida'}]);
   vm.runInContext("SM.d.dias['2026-10-26']={ev:[{id:'e',t:'Evento',c:'azul'}]}",a.c);
-  const html=a.c.vSemana();assert.equal((html.match(/<section class="sm-dia /g)||[]).length,7);
-  assert.ok(html.indexOf('Seg 26/10')<html.indexOf('Dom 1/11'));
+  const html=a.c.vSemana();assert.equal((html.match(/class="sm-cel /g)||[]).length,7);
+  assert.ok(html.includes('sm-grid sm-vsem'));assert.ok(!html.includes('sm-colunas'));assert.ok(!html.includes('sm_quadro'));
+  assert.ok(html.indexOf('data-drop="2026-10-26"')<html.indexOf('data-drop="2026-11-01"'));
   assert.ok(html.indexOf('Evento')<html.indexOf('Urgente'));assert.ok(html.indexOf('Urgente')<html.indexOf('Baixa'));
-  assert.ok(html.indexOf('Passar tudo para hoje')<html.indexOf('id="sm_quadro"'));
+  assert.ok(html.indexOf('Passar tudo para hoje')<html.indexOf('sm-grid sm-vsem'));
   assert.ok(!html.includes('Temas fracos'));assert.ok(!html.includes('💡'));assert.equal(a.lista()[2].dia,'2020-01-01');
   a.c.smRola();await a.fila();assert.equal(a.lista()[2].dia,'2026-10-26');
 });
@@ -128,16 +129,68 @@ test('campos de Nova tarefa persistem no rascunho e entram na gravação pendent
   assert.match(a.c.qaPrevTxt(),/27\/10 · 08:30 · média · toda semana/);
   a.c.smRascPend();await a.fila();const t=a.lista()[0];assert.equal(t.dia,'2026-10-27');assert.equal(t.prioridade,'media');assert.equal(t.lembrete,60);assert.deepEqual(t.repetir.dias,[2,4]);
 });
-test('agenda atual usa cor por tipo, local, avisos recolhíveis e dedupe dos manuais',async()=>{
+test('agenda mantém eventos e avisos; plantões viram apenas etiquetas sem horário',async()=>{
   const a=await app();
   const tipos=['br','norte','hsi','br-manha','almoco','estagio','cobre-pos'];
   a.estado.agenda={atualizado:'2026-10-26T09:00:00Z',eventos:tipos.map(tipo=>({titulo:'Evento '+tipo,local:'Hospital',inicio:'2026-10-26T08:00',fim:'2026-10-26T09:00',tipo})),avisos:['Confirmar <troca>']};
   await a.c.smAgendaPuxar();const html=a.c.vSemana();
-  for(const tipo of tipos)assert.ok(html.includes('c-escala-'+tipo));
+  for(const tipo of tipos.filter(t=>!['br','hsi','br-manha'].includes(t)))assert.ok(html.includes('c-escala-'+tipo));
+  for(const tipo of ['br','hsi','br-manha'])assert.ok(!html.includes('c-escala-'+tipo+'"'));
+  assert.ok(html.includes('class="sm-nt br">BR</span>'));
   assert.ok(html.includes('Hospital'));assert.ok(html.includes('<details class="sm-avisos">'));assert.ok(html.includes('Confirmar &lt;troca>'));assert.ok(!html.includes('<details class="sm-avisos" open'));
-  vm.runInContext("SM.d.dias['2026-10-26']={ev:[{id:'manual',t:'Evento br',c:'azul'}]}",a.c);
-  const eventos=copia(vm.runInContext("smEvL('2026-10-26')",a.c));assert.equal(eventos.filter(e=>e.t==='Evento br').length,1);assert.equal(eventos[0].c,'azul');
+  vm.runInContext("SM.d.dias['2026-10-26']={ev:[{id:'manual',t:'Evento norte',c:'azul'}]}",a.c);
+  const eventos=copia(vm.runInContext("smEvL('2026-10-26')",a.c));assert.equal(eventos.filter(e=>e.t==='Evento norte').length,1);assert.equal(eventos[0].c,'azul');
   const editor=a.c.smEvEditor('2026-10-26');assert.ok(editor.includes('Escala · somente leitura'));assert.equal((editor.match(/onclick="smEvDel/g)||[]).length,1);
   assert.equal(JSON.parse(a.mem.get('sm_agenda')).avisos.length,1);
   delete a.estado.agenda;await a.c.smAgendaPuxar();assert.equal(vm.runInContext("smEvL('2026-10-26').length",a.c),1);assert.ok(!a.c.vSemana().includes('sm-avisos'));
+});
+
+test('HSI de sexta 13/11 a sábado 14/11 usa a mesma etiqueta, sem cartão nem horário',async()=>{
+  const a=await app();
+  a.estado.agenda={eventos:[{titulo:'Sobreaviso HSI',tipo:'hsi',inicio:'2026-11-13T22:00',fim:'2026-11-14T23:00'}]};
+  await a.c.smAgendaPuxar();
+  vm.runInContext("SM.d.dias['2026-11-13']={agenda:'Sobreaviso HSI 22h–7h30'};SM.semana='2026-11-09'",a.c);
+  const html=a.c.smCalendario();
+  for(const dia of ['2026-11-13','2026-11-14']){
+    const cel=html.slice(html.indexOf('data-drop="'+dia+'"')).split('</button>')[0];
+    assert.ok(cel.includes('<span class="sm-nt hsi">HSI</span>'));
+    assert.ok(!cel.includes('class="sm-ev '));assert.ok(!cel.includes('<small>22:00'));
+  }
+  assert.equal(vm.runInContext("smNoite('2026-11-14')",a.c),'HSI');
+  vm.runInContext("SM.d.dias['2026-11-14']={noite:''}",a.c);
+  assert.equal(vm.runInContext("smNoite('2026-11-14')",a.c),'');
+});
+
+test('dia e Tarefas sem data recuperam grupos, ícones e cores, com prioridades e campos novos',async()=>{
+  const tarefas=['2026-10-26','sem'].flatMap(dia=>[
+    {id:dia+'b',dia,area:'estudo',texto:'Baixa',prioridade:'baixa'},
+    {id:dia+'u',dia,area:'estudo',texto:'Urgente',urg:true},
+    {id:dia+'f',dia,area:'ferramenta',texto:'Ferramenta',hora:'09:00',repetir:{tipo:'diaria'}},
+    {id:dia+'t',dia,area:'tarefas',texto:'Tarefa',subtarefas:[{texto:'Uma etapa',feito:true}],anexos:[{nome:'Foto'}]},
+  ]);
+  const a=await app(tarefas);
+  for(const html of [a.c.smPainelDia('2026-10-26'),a.c.smSemData()]){
+    for(const [tipo,icone] of [['estudo','📚'],['ferramenta','🛠️'],['tarefas','✅']]){
+      assert.ok(html.includes('sm-grp sm-'+tipo));assert.ok(html.includes(icone));
+    }
+    assert.ok(html.indexOf('Urgente')<html.indexOf('Baixa'));
+    for(const texto of ['09:00','↻','1/1','1 anexo(s)'])assert.ok(html.includes(texto));
+  }
+});
+
+test('meta do calendário recalcula saldo e dias de estudo, ignora valor salvo e não grava meta',async()=>{
+  const a=await app();let restantes=100;a.c._restantesFM=()=>restantes;
+  vm.runInContext("cfg.prova='2026-11-16';PARAM.revisao_final_dias=14;SM.d.dias['2026-10-26']={meta:999}",a.c);
+  assert.equal(a.c.smMetaDe('2026-10-26'),20); // cinco dias úteis até a reta final em 2/11
+  assert.equal(a.c.smMetaDe('2026-10-27'),20);
+  restantes=50;assert.equal(a.c.smMetaDe('2026-10-26'),10);
+  vm.runInContext("SM.d.dias['2026-10-27']={tipo:'descanso'}",a.c);
+  assert.equal(a.c.smMetaDe('2026-10-26'),13);assert.equal(a.c.smMetaDe('2026-10-27'),0);
+  vm.runInContext("SM.d.dias['2026-10-31']={noite:'BR'}",a.c);
+  assert.equal(a.c.smMetaDe('2026-10-26'),10);assert.equal(a.c.smMetaDe('2026-10-31'),10);
+  assert.equal(a.c.smMetaDe('2026-11-16'),0);assert.equal(a.c.smMetaDe('2026-11-17'),0);
+  restantes=0;assert.equal(a.c.smMetaDe('2026-10-26'),0);
+  a.c.smAuto();await a.fila();assert.equal(a.salvos.length,0);
+  vm.runInContext("cfg.prova='2026-10-30'",a.c);restantes=30;
+  assert.equal(a.c.smMetaDe('2026-10-26'),10); // reta final: seg, qua e qui
 });
