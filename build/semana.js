@@ -123,51 +123,6 @@ function smFracos(){   // últimos 14 dias, temas com 3+ respostas e menos de 70
 function smTreinar(i){const x=SM.fr[i];if(x)iniciar(questoesTema(x.t),'estudo')}
 const smAgCurta=a=>/sobreaviso|hsi/i.test(a||'')?'S':/plant|ecomax 7|ecomax.*18/i.test(a||'')?'P':'';
 
-// ---------- lista de prioridades (memoria/PRIORIDADES.md) → item "ferramenta" automático de cada dia (pedido do Artur, 21/10/2026) ----------
-// Lê direto do repo memoria (se a chave do app tiver acesso de leitura a ele); senão usa a cópia semana/prioridades.md deste repo.
-// Dia que está na tabela "Semana" da lista: usa a coluna Ferramenta (— = nada). Depois da tabela: projeto nº 1 da fila + próximo passo,
-// nos dias de plantão BR (no máximo 2 por semana, regra do orçamento de ferramentas). Marcar feito grava dias[d].ferrOk.
-const SMP={txt:null,sha:null,fonte:'',aberto:false};
-try{const c=JSON.parse(localStorage.getItem('sm_pri')||'null');if(c){SMP.txt=c.txt;SMP.sha=c.sha;SMP.fonte=c.fonte}}catch(e){}
-async function smPriPuxar(){
-  for(const [repo,arq,fonte] of [['arturaragao/memoria','PRIORIDADES.md','memoria'],[BCBR.REPO,'semana/prioridades.md','copia']]){
-    try{const f=await BCBR.api(`/repos/${repo}/contents/${arq}`);
-      if(f.sha!==SMP.sha||SMP.fonte!==fonte){SMP.txt=smDec(f.content);SMP.sha=f.sha;SMP.fonte=fonte;SMP._p=null;try{localStorage.setItem('sm_pri',JSON.stringify({txt:SMP.txt,sha:SMP.sha,fonte}))}catch(e){}smRender()}
-      return}catch(e){}
-  }
-}
-const smLimpaMd=s=>String(s||'').replace(/\*\*/g,'').replace(/`/g,'').trim();
-function smPriParse(){
-  if(SMP._p)return SMP._p;const P={dias:{},fim:null,proj:'',passo:''};if(!SMP.txt)return P;
-  const L=SMP.txt.split('\n'),cel=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(x=>x.trim());
-  const fi=L.findIndex(l=>/^##\s*Fila/i.test(l));
-  if(fi>=0)for(let i=fi+1;i<L.length&&!/^##\s/.test(L[i]);i++){const c=cel(L[i]);if(c[0]==='1'){P.proj=smLimpaMd(c[1]).replace(/\s*\(.*?\)\s*/g,' ').trim();const ps=smLimpaMd(c[3]),k=ps.search(/Próximo:/i);let t=k>=0?ps.slice(k+9).trim():ps;if(t.length>110)t=t.slice(0,107).replace(/\s+\S*$/,'')+'…';P.passo=t;break}}
-  const si=L.findIndex(l=>/^##\s*Semana\s+\d+/i.test(l));
-  if(si>=0){const m=L[si].match(/(\d{1,2})\s*[–-]\s*(\d{1,2})\/(\d{1,2})/);
-    if(m){const hj=smHoje(),y=+hj.slice(0,4),mf=+m[3],di=+m[1],df=+m[2],mi=di>df?mf-1:mf;
-      const ini=dKey(+new Date(y,mi-1,di,12));P.fim=dKey(+new Date(y,mf-1,df,12));
-      for(let i=si+1;i<L.length&&!/^##\s/.test(L[i]);i++){const c=cel(L[i]),dm=smLimpaMd(c[0]).match(/(\d{1,2})/);if(!dm||c.length<4)continue;
-        const n=+dm[1],iso=dKey(+new Date(y,(n<di?mf:mi)-1,n,12));if(iso<ini||iso>P.fim)continue;const t=smLimpaMd(c[3]);P.dias[iso]=t&&t!=='—'&&t!=='-'&&!/^revisão semanal/i.test(t)?t:''}}}
-  return SMP._p=P;
-}
-function smPriItem(iso){
-  if(!SMP.txt||iso<smHoje())return null;const P=smPriParse();let t=null;
-  if(P.fim&&iso<=P.fim){t=P.dias[iso]||null}
-  else if(P.proj&&smNoite(iso)==='BR'){const br=smSemana(iso).filter(x=>smNoite(x)==='BR'&&(!P.fim||x>P.fim));if(br.indexOf(iso)>-1&&br.indexOf(iso)<2)t=P.proj+(P.passo?': '+P.passo:'')}
-  if(!t)return null;
-  return {id:'pf'+iso,dia:iso,texto:t,area:'ferramenta',feito:!!smDia(iso).ferrOk,feitoEm:SM_FEITAS_PRI[iso]||(iso+'T00:00:00'),pri:true,ordem:900};
-}
-function smPriCheck(iso,v){if(v)SM_FEITAS_PRI[iso]=new Date().toISOString();else delete SM_FEITAS_PRI[iso];try{localStorage.setItem('sm_feitas_pri',JSON.stringify(SM_FEITAS_PRI))}catch(e){}smMudar(d=>{const x=d.dias[iso]=d.dias[iso]||{};if(v)x.ferrOk=true;else delete x.ferrOk},v?'ferramenta feita':'ferramenta desmarcada')}
-function smPriHtml(){   // markdown simples da lista (títulos, tabelas, listas)
-  const s=String(SMP.txt||'').replace(/^---[\s\S]*?\n---\n/,'');
-  return s.replace(/`/g,'').replace(/\[\[([^\]]+)\]\]/g,'$1').split('\n').map(l=>/^#{1,4}\s/.test(l)?'**'+l.replace(/^#+\s*/,'')+'**':l.replace(/^>\s?/,'')).join('\n');
-}
-function smPriCard(){
-  const url='https://github.com/arturaragao/memoria/blob/main/PRIORIDADES.md';
-  return `<div class="card sm-pri"><div class="row" style="justify-content:space-between;align-items:center"><button class="b s ${SMP.aberto?'':'sm-ghost'}" onclick="SMP.aberto=!SMP.aberto;render()">📋 Lista de prioridades</button><a class="mut" href="${url}" target="_blank" rel="noopener" style="font-size:.8rem">abrir no GitHub ↗</a></div>
-   ${SMP.aberto?(SMP.txt?`<div class="sm-prit">${md(smPriHtml())}</div><p class="mut" style="font-size:.75rem;margin:6px 0 0">${SMP.fonte==='memoria'?'Direto do GitHub (memoria/PRIORIDADES.md), atualiza sozinho.':'Cópia no banco-cbr-app (atualizada pelo Claude a cada sessão de ferramenta e na revisão de domingo).'}</p>`:'<p class="mut">Carregando a lista…</p>'):''}</div>`;
-}
-
 // ---------- tipos e subtemas (Estudo, Ferramenta, Tarefas + os que o Artur criar pela tela) ----------
 const SM_TIPOS0=[{id:'estudo',nome:'Estudo'},{id:'ferramenta',nome:'Ferramenta'},{id:'tarefas',nome:'Tarefas',subs:['Casamento']}];
 const smTipos=()=>(SM.d&&Array.isArray(SM.d.tipos)&&SM.d.tipos.length?SM.d.tipos:SM_TIPOS0);
@@ -198,14 +153,13 @@ function smAgrupa(its){
 // ---------- ações ----------
 const smTar=id=>SM.d&&SM.d.tarefas.find(t=>t.id===id);
 const smGrupo=t=>t.grupo?SM.d.tarefas.filter(x=>x.grupo===t.grupo):[t];
-const smItensDe=dia=>{const l=SM.d.tarefas.filter(t=>t.dia===dia),p=dia!=='proxima'&&dia!=='sem'&&smPriItem(dia);if(p)l.push(p);return l.sort((a,b)=>(a.ordem??0)-(b.ordem??0))};
+const smItensDe=dia=>SM.d.tarefas.filter(t=>t.dia===dia).sort((a,b)=>(a.ordem??0)-(b.ordem??0));
 function smSel(iso){SM.sel=SM.sel===iso?null:iso;SM.ed=null;render()}
 function smSem(seg){SM.sem=SM.sem===seg?null:seg;SM.semAdd=null;SM.conf=null;render()}
 function smMesVai(k){const[y,m]=(SM.mes||smHoje().slice(0,7)).split('-').map(Number),x=new Date(y,m-1+k,1,12);SM.mes=dKey(+x).slice(0,7);render()}
 // O prazo usa feitoEm, inclusive para itens concluídos automaticamente ou em outro aparelho.
-const SM_FEITAS={},SM_FEITAS_PRI={};
+const SM_FEITAS={};
 try{Object.assign(SM_FEITAS,JSON.parse(localStorage.getItem('sm_feitas')||'{}'))}catch(e){}
-try{Object.assign(SM_FEITAS_PRI,JSON.parse(localStorage.getItem('sm_feitas_pri')||'{}'))}catch(e){}
 let smFeitasTimer,smFeitasPrazo=Infinity;
 const smFeitaHoje=t=>!!t.feito&&!!t.feitoEm&&dKey(+new Date(t.feitoEm))===smHoje();
 function smVisiveis(dia){
@@ -333,7 +287,7 @@ function smEditor(t){
   const rd=smRascEd(t.id)||{};
   const g=smGrupo(t),lig=g.length>1,todos=!lig||SM.ed.esc==='todos',prox=t.dia==='proxima'||t.dia==='sem',sem=smSemana(prox?smHoje():t.dia),outras=g.filter(x=>!sem.includes(x.dia)).length;
   return `<div class="sm-ed">
-   <div class="row"><input id="sm_ed_txt" value="${esc(rd.texto??t.texto)}" style="flex:1 1 200px;min-width:0" oninput="smRascEdSalva('${t.id}')" onkeydown="if(event.key==='Enter')smSalvar();if(event.key==='Escape')smEdFecha()" aria-label="Texto">
+   <div class="row"><input id="sm_ed_txt" value="${esc(tituloTarefa(rd.texto??t.texto))}" style="flex:1 1 200px;min-width:0" oninput="smRascEdSalva('${t.id}')" onkeydown="if(event.key==='Enter')smSalvar();if(event.key==='Escape')smEdFecha()" aria-label="Texto">
      <select id="sm_ed_area" aria-label="Tipo" onchange="smRascEdSalva('${t.id}')">${smOpcoes(rd.area??(t.sub?(t.area||'estudo')+'|'+t.sub:(t.area||'estudo')))}</select><button type="button" id="sm_ed_urg" class="sm-tagb" aria-label="Urgente" aria-pressed="${rd.urg??!!t.urg}" onclick="this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')!=='true');smRascEdSalva('${t.id}')">! urgente</button></div>
    <textarea id="sm_ed_det" class="sm-detin" rows="3" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa (▸)" aria-label="Detalhes" oninput="smRascEdSalva('${t.id}')">${esc(rd.det??t.det??'')}</textarea>
    ${!lig||SM.ed.esc==='este'?`<div class="row"><span class="sm-lbl">Data</span><input type="date" id="sm_ed_dia" class="sm-date" value="${rd.dia!=null?rd.dia:/^\d{4}-/.test(t.dia)?t.dia:''}" aria-label="Data" onchange="smRascEdSalva('${t.id}')"><button type="button" class="sm-tagb" onclick="document.getElementById('sm_ed_dia').value='';smRascEdSalva('${t.id}')">sem data</button>${t.dia==='proxima'?'<span class="mut">(hoje: sem dia, semana nova)</span>':''}</div>`:''}
@@ -359,7 +313,7 @@ function smEditavel(ev,el,texto){
     if(!r){r=document.createRange();r.selectNodeContents(el);r.collapse(false)}
     r.collapse(true);const sel=getSelection();sel.removeAllRanges();sel.addRange(r)}catch(e){}
 }
-function smTxtIni(ev,el,id){const t=smTar(id);if(!t)return;if(tela==='semana'&&!el.isContentEditable&&!smkSelecionada(id)){smkSeleciona(id);return}smEditavel(ev,el,t.texto)}   // 1º clique seleciona, 2º edita
+function smTxtIni(ev,el,id){const t=smTar(id);if(!t)return;if(tela==='semana'&&!el.isContentEditable&&!smkSelecionada(id)){smkSeleciona(id);return}smEditavel(ev,el,tituloTarefa(t.texto))}   // 1º clique seleciona, 2º edita
 function smTxtFim(el,id){
   el.removeAttribute('contenteditable');el.classList.remove('ed');
   const v=el.textContent.trim(),cancela=el.dataset.cancela==='1';delete el.dataset.cancela;
@@ -372,10 +326,9 @@ function smDetFim(el,id){
   if(cancela||v===el.dataset.original){render();return}
   smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x){if(v)x.det=v;else delete x.det}},'editou detalhes');
 }
-function smTexto(t){return `<span class="sm-texto" role="textbox" aria-label="Texto da tarefa (clique para editar)" spellcheck="true" onclick="smTxtIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smTxtFim(this,'${t.id}')">${esc(t.texto)}</span>`}
+function smTexto(t){return `<span class="sm-texto" role="textbox" aria-label="Texto da tarefa (clique para editar)" spellcheck="true" onclick="smTxtIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smTxtFim(this,'${t.id}')">${esc(tituloTarefa(t.texto))}</span>`}
 function smItem(t){
   const g=t.grupo?SM.d.tarefas.filter(x=>x.grupo===t.grupo):[t],ed=SM.ed&&SM.ed.id===t.id,m=smMeta(t),q=m&&t.dia!=='proxima'&&t.dia!=='sem'?smQ(t.dia):null;
-  if(t.pri)return `<div class="sm-row ${t.feito?'ok':''}"><div class="sm-it"><input type="checkbox" aria-label="Concluir prioridade" ${t.feito?'checked':''} onchange="smPriCheck('${t.dia}',this.checked)"><span class="sm-tx">${esc(t.texto)} <span class="sm-tag" title="Vem da lista de prioridades (muda sozinho quando a lista muda)">prioridades</span></span></div></div>`;
   const ab=t.det&&SM.ab.has(t.id),tg=t.det?`<button class="sm-tg" onclick="smTg('${t.id}')" aria-expanded="${!!ab}" aria-label="Detalhes">${ab?'▾':'▸'}</button>`:'';
   return `<div class="sm-row ${t.feito?'ok':''} ${t.det?'tem-det':''} ${t.urg?'sm-urg t-'+smCorTipo(t.area):''}" data-tid="${t.id}"><div class="sm-it"><input type="checkbox" aria-label="Concluir tarefa" ${t.feito?'checked':''} onchange="smCheck('${t.id}',this.checked)">${tg}<span class="sm-tx">${smTexto(t)}${g.length>1?` <span class="sm-tag">${g.filter(x=>x.feito).length}/${g.length} dias</span>`:''}${q&&q.n?` <span class="sm-tag ${q.n>=m?'g':''}">banco ${q.n}/${m}</span>`:''}${t.auto?' <span class="sm-tag g">automático</span>':''}</span></div>
    <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${ab?`<div class="sm-det" role="textbox" aria-label="Detalhes da tarefa (clique para editar)" onclick="smDetIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smDetFim(this,'${t.id}')">${md(t.det)}</div>`:''}${ed?smEditor(t):''}`;
@@ -533,23 +486,23 @@ function smFracosCard(){
    ${SM.fr.length?`<p class="mut">Últimos 14 dias no banco (3+ respostas, menos de 70%).</p><div class="sm-fr">${SM.fr.map((x,i)=>`<div class="sm-frl"><span>${esc(x.t)}</span><span class="sm-q">${x.ok}/${x.n}</span><button class="b s" onclick="smTreinar(${i})">Treinar</button></div>`).join('')}</div>`:''}
    ${man.length?`<p class="mut">Que você marcou nas anotações:</p><ul class="sm-notas">${man.map(n=>`<li>${esc(n.texto)}</li>`).join('')}</ul>`:''}</div>`;
 }
+try{SM.aba=localStorage.getItem('sm_aba')==='calendario'?'calendario':'tarefas'}catch(e){SM.aba='tarefas'}
+function smAba(aba){SM.aba=aba==='calendario'?'calendario':'tarefas';try{localStorage.setItem('sm_aba',SM.aba)}catch(e){}smkIni();render()}
+function smTarefas(){
+  const hj=smHoje(),lista=SM.d.tarefas.slice();
+  const grupos=agruparTarefas(lista,hj);
+  if(!grupos.some(g=>g.dia===hj))grupos.unshift({dia:hj,titulo:'Hoje',l:[]});
+  if(!grupos.some(g=>g.dia==='sem'))grupos.push({dia:'sem',titulo:'Sem data',l:[]});
+  return `<button class="b s" onclick="qaAbre()">+ Nova tarefa</button>`+grupos.map(g=>`<div class="card ${g.dia===hj?'sm-hoje1':g.dia==='sem'?'sm-sd':''}" data-drop="${g.dia}"><span class="kick">${esc(g.titulo)}</span>${smGrupos(g.l)}${g.dia===hj||g.dia==='sem'?smAddLinha(g.dia):''}</div>`).join('');
+}
 function vSemana(){
   if(!SM.ok)return `<div class="card"><p class="mut">Carregando o calendário…</p></div>`;
   if(!SM.d)return `<div class="card"><p class="mut">Calendário ainda vazio.</p></div>`;
-  setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=SM.d.tarefas.filter(t=>t.dia!=='proxima'&&t.dia<hj&&t.dia>=smMais(hj,-7)&&!t.feito);
+  setTimeout(smAuto,0);
   return `<div class="sm">
    ${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}
-   ${smSemData()}
-   ${smCalendario()}
-   ${smHojeGrande()}
-   ${atr.length?`<div class="card"><span class="kick" style="color:var(--bad)">Ficou para trás (últimos 7 dias)</span>${atr.map(t=>`<div class="sm-frl"><span>${esc(t.texto)} <span class="sm-tag">${smRot(t.dia)}</span></span><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button></div>`).join('')}</div>`:''}
-   ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
-   ${smFracosCard()}
-   ${smPriCard()}
-   <div class="card"><span class="kick">Anotações</span><p class="mut">Temas que errou, ideias, o que travou. A revisão de domingo lê tudo.</p>
-    <div class="row"><input id="sm_nota" placeholder="Ex.: errei 4 de contraste iodado" value="${smVal('sm_nota')}" oninput="SM.dr[this.id]=this.value" onkeydown="if(event.key==='Enter')smNota()" style="flex:1;min-width:0"><button class="b s" onclick="smNota()">Anotar</button></div>
-    <label class="check"><input type="checkbox" id="sm_fraco"> marcar como tema fraco</label>
-    <ul class="sm-notas">${(SM.d.notas||[]).slice().sort((a,b)=>(b.em||'').localeCompare(a.em||'')).slice(0,20).map(n=>`<li><time>${smRot((n.em||'').slice(0,10)||hj)}</time><span style="flex:1;min-width:0">${esc(n.texto)}</span><button class="sm-tagb ${n.fraco?'on':''}" onclick="smNotaFraco('${n.id}')">tema fraco</button><button class="sm-edb" onclick="smNotaDel('${n.id}')" aria-label="Apagar">×</button></li>`).join('')}</ul></div>
+   <div class="sm-seg" role="group" aria-label="Semana"><button aria-pressed="${SM.aba==='tarefas'}" onclick="smAba('tarefas')">Tarefas</button><button aria-pressed="${SM.aba==='calendario'}" onclick="smAba('calendario')">Calendário</button></div>
+   ${SM.aba==='calendario'?smCalendario()+smHojeGrande():smTarefas()}
   </div>`;
 }
 // cartão na aba Hoje: itens de hoje com check, sem sair da tela
@@ -557,8 +510,8 @@ function smCardHoje(){
   if(!SM.d)return'';setTimeout(smAuto,0);const hj=smHoje(),todos=smItensDe(hj),its=smVisiveis(hj);if(!todos.length)return'';
   return `<div class="card sm-ch"><div class="row" style="justify-content:space-between"><span class="kick">Hoje no calendário · ${todos.filter(t=>t.feito).length}/${todos.length}</span>${smFeitasBotao(hj)}<button class="b s sm-ghost" onclick="go('semana')">Ver calendário</button></div>${smGrupos(its)}</div>`;
 }
-const smCarga=smPuxar();smPriPuxar();
-setInterval(()=>{if(document.visibilityState==='visible'){smPuxar();smPriPuxar()}},90000);
+const smCarga=smPuxar();
+setInterval(()=>{if(document.visibilityState==='visible')smPuxar()},90000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){smPuxar();smAuto()}});
 // anel da meta de hoje + dias até a prova + ritmo (estavam no cartão de hoje da aba Semana; agora no "Meta até a prova" da aba Hoje)
 function smMetaHoje(){
@@ -740,10 +693,11 @@ window.addEventListener('keydown',e=>{
 // (pedido do Artur, 24/10/2026). SMK.id = tarefa selecionada fora de Hoje/Tarefas (outros dias); SMK.cel = célula sem tarefa marcada.
 const SMK={on:false,i:-1,id:null,cel:'hoje'};
 function smkIni(){SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel='hoje'}
-const smkNh=()=>smAgrupa(smVisiveis(smHoje())).flatMap(g=>g.l).length;
+const smkItens=dia=>SM.aba==='tarefas'?smItensDe(dia):smVisiveis(dia);
+const smkNh=()=>smAgrupa(smkItens(smHoje())).flatMap(g=>g.l).length;
 function smkSelecionada(id){if(!SMK.on)return false;if(SMK.id)return SMK.id===id;const x=smkLista()[SMK.i];return !!x&&x.id===id}
 function smkSeleciona(id){const i=smkLista().findIndex(t=>t.id===id);SMK.on=true;SMK.cel=null;if(i>=0){SMK.i=i;SMK.id=null}else{SMK.i=-1;SMK.id=id}smkPinta()}
-function smkLista(){return [...smAgrupa(smVisiveis(smHoje())).flatMap(g=>g.l),...smAgrupa(smVisiveis('sem')).flatMap(g=>g.l)]}
+function smkLista(){return [...smAgrupa(smkItens(smHoje())).flatMap(g=>g.l),...smAgrupa(smkItens('sem')).flatMap(g=>g.l)]}
 function smkPinta(){if(tela!=='semana')return;const c=document.querySelector('#app .sm-hoje1'),d=document.querySelector('#app .sm-sd');if(!c)return;
   const rh=[...c.querySelectorAll('.sm-grp .sm-row')],rs=d?[...d.querySelectorAll('.sm-grp .sm-row')]:[],rows=[...rh,...rs];
   const naSd=SMK.i<0?SMK.cel==='sd':SMK.i>=rh.length,cel=SMK.on&&!SMK.id;
@@ -762,9 +716,9 @@ window.addEventListener('keydown',e=>{
     SMK.i=SMK.cel==='sd'&&de<0&&k==='ArrowDown'?Math.min(n-1,smkNh()):k==='ArrowDown'?Math.min(n-1,de+1):Math.max(0,de-1);SMK.id=null;SMK.cel=null;smkPinta();return}
   if(k==='Escape'){SMK.on=false;SMK.id=null;smkPinta();return}
   const x=SMK.id?smTar(SMK.id):L[SMK.i];if(!x)return;
-  if(keyIs(e,'smurg')){e.preventDefault();if(!x.pri){smUrgente(x.id);SMK.i=smkLista().findIndex(t=>t.id===x.id);smkPinta()}return}
-  if(k==='Enter'){e.preventDefault();if(x.pri)smPriCheck(x.dia,!x.feito);else smCheck(x.id,!x.feito);return}
-  if(keyIs(e,'smdel')){e.preventDefault();if(x.pri){toast('Esse item vem da lista de prioridades; não dá para apagar aqui.');return}
+  if(keyIs(e,'smurg')){e.preventDefault();smUrgente(x.id);SMK.i=smkLista().findIndex(t=>t.id===x.id);smkPinta();return}
+  if(k==='Enter'){e.preventDefault();smCheck(x.id,!x.feito);return}
+  if(keyIs(e,'smdel')){e.preventDefault();
     smMudar(d=>{d.tarefas=d.tarefas.filter(y=>y.id!==x.id)},'excluiu item');if(SMK.id){SMK.id=null;SMK.on=false;smkPinta()}else SMK.i=Math.min(SMK.i,n-2);toast('Item apagado')}
 });
 // clique fora do cartão de hoje e da célula "Sem data" solta a seleção do teclado
@@ -862,9 +816,11 @@ function smAtalhosInicia(){
     });
     return;
   }
-  if(r&&r.salvar)return;
-  go('semana');qaAbre();
-  if(acao==='voz'&&qaVozAPI())qaVoz();
+  SM.aba='tarefas';try{localStorage.setItem('sm_aba','tarefas')}catch(e){}
+  go('semana');
+  const abre=()=>{qaAbre();if(acao==='voz'&&qaVozAPI())qaVoz()};
+  if(r&&r.salvar){smCarga.then(()=>SM.fila).then(abre);return}
+  abre();
 }
 
 // ---- Ponte com o app Android (widgets e notificações; repo banco-cbr-android) ----
@@ -873,7 +829,7 @@ let smNatUlt='';
 function smNativoResumo(){
   if(!SM.d)return null;const hj=smHoje();
   const tp=t=>t.area==='estudo'||t.area==='ferramenta'?t.area:'tarefas';
-  const it=t=>({id:String(t.id),texto:t.texto||'',tipo:tp(t),feito:!!t.feito,urg:!!t.urg});
+  const it=t=>({id:String(t.id),texto:tituloTarefa(t.texto),tipo:tp(t),feito:!!t.feito,urg:!!t.urg});
   const lista=d=>smItensDe(d).map(it).sort((a,b)=>(b.urg-a.urg));
   const dias={};for(let i=-7;i<=35;i++){const d=smMais(hj,i),x=smDia(d),m=smMetaDe(d);
     dias[d]={noite:smNoite(d)||'',ev:smEvL(d).map(v=>v.t||''),agenda:x.agenda||'',meta:m||0,feito:smQ(d).n,tipoDia:smTipo(d)};}
@@ -889,7 +845,7 @@ if(window.BCBRNativo){setInterval(()=>smNativo(),20000);document.addEventListene
 
 // ---- Tarefas criadas pela tela nativa do app Android (sem abrir a WebView) — 1.17.0 ----
 // BCBRNativo.pendentes() -> JSON [{id, texto, criadoEm, voz, tipo?}] · cada texto passa por interpretarTarefa;
-// tipo 'ideia' (widget Ideia, APK 1.3) vira 1 tarefa Ferramenta sem data "💡 título" com o texto inteiro nos detalhes (1.19.0) · BCBRNativo.confirmar(JSON de ids).
+// tipo 'ideia' (widget Ideia, APK 1.3) entra pela caixa, como tarefa Ferramenta sem data com o texto inteiro nos detalhes · BCBRNativo.confirmar(JSON de ids).
 // Ids já importados ficam em localStorage (não duplica se o app nativo reenviar). Tolera a ponte sem esses métodos.
 const SM_NAT_IMP='bcbr_nat_importados';
 let smNatBusy=false;
@@ -909,7 +865,7 @@ function smNativoImporta(){
     SM.fila.then(()=>{smNatBusy=false;if(!SM.erro&&ids.length&&typeof B.confirmar==='function'){try{B.confirmar(JSON.stringify(ids))}catch(e){console.warn('confirmar',e)}}});
   }catch(e){smNatBusy=false;console.warn('ponte Android (pendentes)',e)}
 }
-// ---- Caixa de ideias (ideias/caixa.md do repo privado) -> tarefas "💡" em Ferramenta, sem data — 1.19.2 ----
+// ---- Caixa de ideias (ideias/caixa.md do repo privado) -> tarefas em Ferramenta, sem data ----
 // A caixa é a fonte (pedido do Artur, 24/10/2026): cada "- [ ] AAAA-MM-DD HH:MM — texto" vira 1 tarefa (campo ideia = data/hora, não duplica);
 // "- [x]" (o Claude no PC fez a ideia) marca a tarefa como concluída. Ideia do widget (APK) só é confirmada e entra pela caixa.
 let smIdeiaNova=false,smIdeiasUlt=0;
@@ -929,7 +885,7 @@ async function smIdeiasSync(forca){
       linhas.forEach(x=>{const t=d.tarefas.find(y=>y.ideia===x.chave);
         if(t){if(x.feita)t.feito=true;v.add(x.chave);return}
         if(v.has(x.chave))return;
-        v.add(x.chave);const n=smNovos(['sem'],'💡 '+tituloIdeia(x.texto),'ferramenta','',x.texto)[0];n.ideia=x.chave;n.feito=x.feita;d.tarefas.push(n)});
+        v.add(x.chave);const n=smNovos(['sem'],tituloTarefa(tituloIdeia(x.texto)),'ferramenta','',x.texto)[0];n.ideia=x.chave;n.feito=x.feita;d.tarefas.push(n)});
       d.ideiasVistas=[...v].slice(-1000)},'ideias do celular');
   }catch(e){if(e&&e.status!==404)console.warn('caixa de ideias',e)}
 }

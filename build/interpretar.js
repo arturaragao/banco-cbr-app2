@@ -123,4 +123,17 @@ function tituloIdeia(texto) {
     .replace(/\s+(e|de|do|da|que|o|a|os|as|em|no|na|pra|para|com|um|uma|ele|ela|se|mas|é)$/i, '');
   return c.charAt(0).toUpperCase() + c.slice(1);
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia };
+// Só remove o marcador inicial legado; não altera detalhes nem emojis no meio do título.
+function tituloTarefa(texto) { return String(texto ?? '').replace(/^💡\s+/, '') }
+// Todas as tarefas, inclusive concluídas; não modifica a lista nem os objetos recebidos.
+function agruparTarefas(tarefas, hoje) {
+  const datas = [...new Set(tarefas.map(t => t.dia).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+  const grupos = datas.map(dia => ({dia, titulo: dia === hoje ? 'Hoje' : (dia < hoje ? 'Dias anteriores · ' : 'Próximos dias · ') + dia,
+    l: tarefas.filter(t => t.dia === dia).slice().sort((a,b) => Number(!!b.urg)-Number(!!a.urg) || (a.ordem??0)-(b.ordem??0))}));
+  const sem = tarefas.filter(t => !datas.includes(t.dia) && t.dia !== 'proxima');
+  const proxima = tarefas.filter(t => t.dia === 'proxima');
+  if (sem.length) grupos.push({dia:'sem', titulo:'Sem data', l:sem});
+  if (proxima.length) grupos.push({dia:'proxima', titulo:'Semana seguinte · sem dia definido', l:proxima});
+  return grupos;
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia, tituloTarefa, agruparTarefas };
