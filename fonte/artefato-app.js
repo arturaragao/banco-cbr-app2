@@ -95,11 +95,14 @@ const posDe=q=>+q.id.slice(1); // posição da questão na página "Questões" d
 const etapaDe=q=>{const t=q.tags.map(norm);return t.includes('teorico-pratica')?'prática':t.includes('teorica')?'teórica':'?'};
 const anoDe=q=>(q.tags.find(t=>/^20\d\d$/.test(t))||'');
 
-// ===== dificuldade (acerto global estimado: fácil >=60, média 30-59, difícil <30) =====
+// ===== dificuldade (edição manual > PersonalRad com 15+ respostas > classificação existente) =====
 const DIF={f:{nome:'Fácil',meta:95,w:1.5},m:{nome:'Média',meta:75,w:1.2},d:{nome:'Difícil',meta:20,w:0.5}};
-const PARAM_DEF={facil_min:70,dificil_max:30,meta_facil:95,meta_media:75,meta_dificil:20,freq_ri:5,freq_rt:2,rev_pct:15,ia_estilo:''};
+const PARAM_DEF={facil_min:60,dificil_max:30,meta_facil:95,meta_media:75,meta_dificil:20,freq_ri:5,freq_rt:2,rev_pct:15,ia_estilo:''};
 let PARAM={...PARAM_DEF};
-const difDe=q=>q.dif&&DIF[q.dif]?q.dif:q.acerto==null?'m':q.acerto>=PARAM.facil_min?'f':q.acerto<=PARAM.dificil_max?'d':'m';
+const acertoPR=q=>typeof q.pr_stats?.acerto==='number'&&Number.isFinite(q.pr_stats.acerto)&&q.pr_stats.acerto>=0&&q.pr_stats.acerto<=100&&q.pr_stats.respostas>0?q.pr_stats.acerto:null;
+const acertoDe=q=>q._acertoManual?q.acerto:acertoPR(q)??q.acerto;
+const difAcerto=ac=>ac==null?'m':ac>=PARAM.facil_min?'f':ac<=PARAM.dificil_max?'d':'m';
+const difDe=q=>q._difManual&&DIF[q.dif]?q.dif:q._acertoManual?difAcerto(acertoDe(q)):q.pr_stats?.respostas>=15&&acertoPR(q)!=null?(DIF[q.dif_pr]?q.dif_pr:difAcerto(acertoDe(q))):q.dif&&DIF[q.dif]?q.dif:difAcerto(q.acerto);
 let metoU=0,metodo=window.METODO||'',metEdit=false;
 try{const _m=JSON.parse(localStorage.getItem('cbr_metodo'));if(_m&&_m.t){metodo=_m.t;metoU=_m.u||0}}catch(e){}
 function lerManual(txt){
@@ -147,6 +150,8 @@ function aplicaEd(q){
   if(!q._b)q._b=JSON.parse(JSON.stringify({enunciado:q.enunciado,alts:q.alts,gab:q.gab,coment:q.coment,tags:q.tags,acerto:q.acerto,imgs:q.imgs||[],imgsCom:q.imgsCom||[],cl:q.cl||[],dif:q.dif||null}));
   Object.assign(q,JSON.parse(JSON.stringify(q._b)));
   const e=pon['e:'+q.id]&&pon['e:'+q.id].e;if(e)Object.assign(q,JSON.parse(JSON.stringify(e)));
+  q._difManual=!!(e&&DIF[e.dif]);
+  q._acertoManual=!!(e&&e.acerto!=null&&(e.acertoManual??(e.acerto!==q._b.acerto)));
   refQ(q);
 }
 const aplicaEdTodas=()=>{Q.forEach(aplicaEd)};
@@ -446,7 +451,7 @@ function render(){
 const pct=(a,b)=>b?Math.round(a/b*100):0;
 const barra=(v,cls='',meta)=>`<div class="bar ${cls}"><i style="width:${Math.max(0,Math.min(100,v))}%"></i>${meta!=null?`<u style="left:${meta}%"></u>`:''}</div>`;
 const corAc=v=>v>=70?'g':v>=60?'w':'r';
-const difTag=q=>`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome}${q.acerto!=null?' · ~'+q.acerto+'%':''}</span>`;
+const difTag=q=>`<span class="dif ${q._d}"><i></i>${DIF[q._d].nome}${acertoPR(q)==null&&acertoDe(q)!=null?' · ~'+acertoDe(q)+'%':''}</span>`;
 const hoje0=()=>new Date().setHours(0,0,0,0);
 const idxHoje=()=>(new Date().getDay()+6)%7;
 const CK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
@@ -797,12 +802,12 @@ ${nvBloco()}
 }
 const DIFV={f:80,m:50,d:20};
 function setDif(id,d){edSet(id,{dif:d});render();toast('Dificuldade: '+DIF[d].nome)}
-function qEdita(id){const q=QID[id];sess.qEdit=id;sess.edTags=[...q.tags];sess.edImgs={a:[...(q.imgs||[])],c:[...(q.imgsCom||[])]};sess.tgEd=null;render()}
+function qEdita(id){const q=QID[id];sess.qEdit=id;sess.edAcertoManual=q._acertoManual;sess.edTags=[...q.tags];sess.edImgs={a:[...(q.imgs||[])],c:[...(q.imgsCom||[])]};sess.tgEd=null;render()}
 function qSalva(id){
   const q=QID[id],alts={},coment={};
   Object.keys(q.alts).forEach(l=>{alts[l]=$('#ed_a_'+l).value.trim();coment[l]=$('#ed_c_'+l).value.trim()});
   const ac=$('#ed_ac').value.trim();
-  edSet(id,{enunciado:$('#ed_en').value.trim(),alts,coment,gab:$('#ed_g').value,tags:[...sess.edTags],cl:clParse($('#ed_cl').value),imgs:[...sess.edImgs.a],imgsCom:[...sess.edImgs.c],acerto:ac===''?null:Math.max(0,Math.min(100,+ac||0))});
+  edSet(id,{enunciado:$('#ed_en').value.trim(),alts,coment,gab:$('#ed_g').value,tags:[...sess.edTags],cl:clParse($('#ed_cl').value),imgs:[...sess.edImgs.a],imgsCom:[...sess.edImgs.c],acerto:ac===''?null:Math.max(0,Math.min(100,+ac||0)),acertoManual:!!sess.edAcertoManual});
   sess.qEdit=null;sess.tgEd=null;render();toast('Questão salva')
 }
 // ---- tags editáveis: modo 'f' = rascunho no formulário de edição; modo 'q' = direto na questão (salva na hora) ----
@@ -858,7 +863,7 @@ function qEditForm(q){
   <div class="sk"><b>Imagens da questão</b> <span class="mut">(também dá para colar com Ctrl+V)</span><div id="edimg_a">${edImgHtml('a')}</div></div>
   ${ls.map(l=>`<div class="sk"><b>${l})</b><textarea id="ed_a_${l}" style="min-height:50px;font:inherit">${esc(q.alts[l])}</textarea><label style="display:block">Comentário ${l}<textarea id="ed_c_${l}" style="min-height:50px;font:inherit">${esc(q.coment[l]||'')}</textarea></label></div>`).join('')}
   <div class="row"><label>Gabarito <select id="ed_g">${ls.map(l=>`<option ${l===q.gab?'selected':''}>${l}</option>`).join('')}</select></label>
-  <label>Acerto global estimado (%) <input id="ed_ac" type="number" min="0" max="100" style="width:80px" value="${q.acerto??''}"></label></div>
+  <label>Acerto global estimado (%) <input id="ed_ac" type="number" min="0" max="100" style="width:80px" value="${q.acerto??''}" oninput="sess.edAcertoManual=true"></label></div>
   <div class="sk"><b>Imagens do comentário</b> <span class="mut">(aparecem depois de responder)</span><div id="edimg_c">${edImgHtml('c')}</div></div>
   <label style="display:block;margin-top:10px">Classificação <span class="mut">(Tema &gt; Subtema &gt; Assunto · a grande área é corrigida em “Corrigir área…”)</span><input id="ed_cl" list="cldl" value="${esc((q.cl||[]).join(' > '))}" style="width:100%;box-sizing:border-box"></label><datalist id="cldl">${[...new Set(Q.filter(x=>x._a===q._a&&x.cl&&x.cl.length).map(x=>x.cl.join(' > ')))].sort().map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
   <div style="margin-top:8px"><span class="mut">Tags (método e palavras-chave) · clique numa tag para editar, × para remover</span><div id="tgbox" class="tagstop">${tgHtml('f')}</div></div>
@@ -885,7 +890,7 @@ function vQuiz(){
    ${pontoBloco(q)}${iaBloco(q)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
   </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
-  ${fb?`<select title="Dificuldade desta questão (acerto global estimado ${q.acerto??'—'}%)" onchange="if(this.value)setDif('${q.id}',this.value)"><option value="">Dificuldade: ${DIF[q._d].nome}${q.acerto!=null?' ~'+q.acerto+'%':''}</option>${Object.entries(DIF).map(([k,v])=>`<option value="${k}">${v.nome}</option>`).join('')}</select>`:''}
+  ${fb?`<select title="Dificuldade desta questão" onchange="if(this.value)setDif('${q.id}',this.value)"><option value="">Dificuldade: ${DIF[q._d].nome}</option>${Object.entries(DIF).map(([k,v])=>`<option value="${k}">${v.nome}</option>`).join('')}</select>`:''}
   <button class="b s" onclick="qEdita('${q.id}')">✎ Editar questão</button></div></div>${painelNav()}</div>`;
 }
 function reclass(id,a){if(!a)return;over[id]=a;QID[id]._a=a;persist('_est');render()}
@@ -1237,7 +1242,7 @@ function vDificuldade(){
   log.forEach(l=>{const q=QID[l.q];if(!q)return;const x=D[q._d];x.n++;if(l.ok)x.ok++});
   const nb={f:0,m:0,d:0};Q.forEach(q=>nb[q._d]++);
   const alerta=D.f.n>=5&&pct(D.f.ok,D.f.n)<90?`<p class="ponto">Você está acertando ${pct(D.f.ok,D.f.n)}% das fáceis (meta ${DIF.f.meta}%). Errar fácil custa mais caro: priorize rever essas.</p>`:'';
-  return `<div class="card"><h2>Desempenho por dificuldade</h2><p class="mut">A dificuldade é o acerto global estimado de cada questão. A linha marca a sua meta.</p>
+  return `<div class="card"><h2>Desempenho por dificuldade</h2><p class="mut">A linha marca a sua meta para cada dificuldade.</p>
   <div class="tw"><table><tr><th>Nível</th><th>Banco</th><th>Resp.</th><th>Seu acerto</th><th>Meta</th></tr>${Object.entries(DIF).map(([k,v])=>{const x=D[k],a=pct(x.ok,x.n);
    return `<tr><td><span class="dif ${k}"><i></i>${v.nome}</span></td><td>${nb[k]}</td><td>${x.n}</td><td style="min-width:130px">${x.n?`${a}%${barra(a,a>=v.meta?'g':a>=v.meta-15?'w':'r',v.meta)}`:'—'}</td><td>${v.meta}%</td></tr>`}).join('')}</table></div>${alerta}</div>`;
 }

@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.22.0"
+VERSAO = "1.22.1"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -26,6 +26,7 @@ troca("Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}", "Notion
 troca("${fb&&q.coment[l]?`<div class=\"mut md cm\" style=\"margin-top:6px\">${md(q.coment[l])}</div>`:''}", "${fb?comentAlt(q,l):''}")
 # ponto de ensino do curso antes do CCQ do Claude
 troca("${pontoBloco(q)}${iaBloco(q)}", "${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}")
+troca("<span class=\"mut\">(${r.conf})</span>", "<span class=\"mut\">(${r.conf})</span>${prAcertoBloco(q)}")
 # IA = Gemini
 troca("'CCQ e resumo rápido com o Claude ('+keyLab('ia')+')'", "'CCQ e resumo rápido com IA ('+keyLab('ia')+')'")
 troca("toast('O Claude não está disponível nesta janela.')", "toast('Cole a chave do Gemini em Banco › Chaves deste aparelho.')")
