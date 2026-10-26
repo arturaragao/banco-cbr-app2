@@ -1,5 +1,6 @@
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
-// Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
+// interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
+// Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
 //  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
 //  hora: 'HH:MM' | null · urg: boolean · area: 'estudo' | 'ferramenta' | 'tarefas' | null (null = padrão de quem chama)
 //  hoje: 'AAAA-MM-DD' (padrão: hoje no aparelho). Um ditado pode ter várias tarefas: "próxima tarefa", "nova tarefa", "outra tarefa" ou ";".
@@ -38,7 +39,7 @@ function itpPartes(s) {
 
 function itpUma(seg, hoje) {
   let o = seg, n = itpSem(seg.toLowerCase());
-  const R = { texto: '', dia: null, hora: null, urg: false, area: null };
+  const R = { texto: '', dia: null, hora: null, urg: false, area: null, prioridade: null, etiquetas: [], repetir: null };
   // acha a 1ª ocorrência em que fn(m) não devolve false e apaga o trecho (o e n ficam alinhados, com espaços no lugar)
   const tira = (re, fn) => {
     const g = new RegExp(re.source, 'g'); let m;
@@ -53,17 +54,31 @@ function itpUma(seg, hoje) {
   };
   tira(/\bsem\s+data(?:\s+definida)?\b/, () => { R.dia = 'sem' });
   tira(/\burgente\b/, () => { R.urg = true });
+  tira(/!+(alta|media|baixa)\b|!!/, m => { R.prioridade = m[1] || 'alta' });
+  while (tira(/#([a-z0-9_-]+)/, m => { if (!R.etiquetas.includes(m[1])) R.etiquetas.push(m[1]) })) {}
+  tira(/\b(?:todo dia|todos os dias|diariamente)\b/, () => { R.repetir = {tipo:'diaria'} }) ||
+  tira(/\b(?:dias uteis|todo dia util)\b/, () => { R.repetir = {tipo:'uteis'} }) ||
+  tira(/\b(?:toda semana|todas as semanas|semanalmente)\b/, () => { R.repetir = {tipo:'semanal', dias:[]} }) ||
+  tira(/\b(?:todo mes|todos os meses|mensalmente)\b/, () => { R.repetir = {tipo:'mensal'} });
+  const nomesDias = [...ITP_DIAS, 'dom','seg','ter','qua','qui','sex','sab'];
+  if (R.repetir?.tipo === 'semanal') {
+    while (tira(new RegExp('(?:\\b(?:na|no|nas|nos|e)\\s+)?\\b(' + nomesDias.join('|') + ')(?:-feira)?\\b'), m => {
+      const dia = nomesDias.indexOf(m[1]) % 7;
+      if (!R.repetir.dias.includes(dia)) R.repetir.dias.push(dia);
+    })) {}
+  }
   // ---- data ----
   const pre = '(?:\\b(?:para|pra|ate|em)\\s+)?';
   if (!R.dia) {
+    tira(/\bdaqui\s+a\s+(\d+)\s+dias?\b/, m => { if (+m[1] > 36500) return false; R.dia = itpMais(hoje, +m[1]) }) ||
     tira(new RegExp(pre + '\\bdepois\\s+de\\s+amanha\\b'), () => { R.dia = itpMais(hoje, 2) }) ||
     tira(new RegExp(pre + '\\bamanha\\b'), () => { R.dia = itpMais(hoje, 1) }) ||
     tira(new RegExp(pre + '\\bhoje\\b'), () => { R.dia = hoje }) ||
     tira(/(?:\bdia\s+)?\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?(?!\d)/, m => { const iso = itpDataNum(+m[1], +m[2], m[3] != null ? +m[3] : null, hoje); if (!iso) return false; R.dia = iso }) ||
     tira(new RegExp('(?:\\bdia\\s+)?\\b(\\d{1,2})\\s+de\\s+(' + ITP_MESES.join('|') + ')(?:\\s+de\\s+(\\d{4}))?\\b'), m => { const iso = itpDataNum(+m[1], ITP_MESES.indexOf(m[2]) + 1, m[3] != null ? +m[3] : null, hoje); if (!iso) return false; R.dia = iso }) ||
     tira(/\bdia\s+(\d{1,2})\b/, m => { const iso = itpDiaDoMes(+m[1], hoje); if (!iso) return false; R.dia = iso }) ||
-    tira(new RegExp('(?:\\b(?:na|no|nesta|neste|esta|este|proxima|proximo|pra|para)\\s+)?\\b(' + ITP_DIAS.join('|') + ')(?:-feira)?\\b'), m => {
-      const alvo = ITP_DIAS.indexOf(m[1]), delta = ((alvo - itpDow(hoje)) % 7 + 7) % 7 || 7; R.dia = itpMais(hoje, delta);
+    tira(new RegExp('(?:\\b(?:na|no|nesta|neste|esta|este|proxima|proximo|pra|para)\\s+)?\\b(' + nomesDias.join('|') + ')(?:-feira)?\\b'), m => {
+      const alvo = nomesDias.indexOf(m[1]) % 7, delta = ((alvo - itpDow(hoje)) % 7 + 7) % 7 || 7; R.dia = itpMais(hoje, delta);
     });
   }
   // ---- hora ----
@@ -89,6 +104,11 @@ function itpUma(seg, hoje) {
     const m = ini || fim; if (!m) break;
     if (!R.area) R.area = tipoDe(m[1]);
     tira2(m);
+  }
+  if (R.repetir) {
+    if (R.repetir.tipo === 'semanal' && !R.repetir.dias.length) R.repetir.dias = [itpDow(R.dia && R.dia !== 'sem' ? R.dia : hoje)];
+    if (!R.dia) R.dia = R.repetir.tipo === 'mensal' ? hoje : proximaData(itpMais(hoje,-1), R.repetir);
+    if (R.repetir.tipo === 'mensal' && R.dia !== 'sem') R.repetir.diaMes = +(R.dia || hoje).slice(8);
   }
   // ---- limpeza: espaços, pontuação solta e preposições que sobraram nas pontas ----
   let t = o.replace(/\s+/g, ' ').trim();
@@ -129,11 +149,80 @@ function tituloTarefa(texto) { return String(texto ?? '').replace(/^💡\s+/, ''
 function agruparTarefas(tarefas, hoje) {
   const datas = [...new Set(tarefas.map(t => t.dia).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
   const grupos = datas.map(dia => ({dia, titulo: dia === hoje ? 'Hoje' : (dia < hoje ? 'Dias anteriores · ' : 'Próximos dias · ') + dia,
-    l: tarefas.filter(t => t.dia === dia).slice().sort((a,b) => Number(!!b.urg)-Number(!!a.urg) || (a.ordem??0)-(b.ordem??0))}));
+    l: ordenarTarefas(tarefas.filter(t => t.dia === dia))}));
   const sem = tarefas.filter(t => !datas.includes(t.dia) && t.dia !== 'proxima');
   const proxima = tarefas.filter(t => t.dia === 'proxima');
   if (sem.length) grupos.push({dia:'sem', titulo:'Sem data', l:sem});
   if (proxima.length) grupos.push({dia:'proxima', titulo:'Semana seguinte · sem dia definido', l:proxima});
   return grupos;
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia, tituloTarefa, agruparTarefas };
+// Regras puras compartilhadas pela tela e pela ponte Android. Campos novos são opcionais.
+function dataTarefaValida(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return false;
+  const [y,m,dia] = d.split('-').map(Number); return itpValida(y,m,dia);
+}
+function prioridadeTarefa(t) { return t.urg || t.prioridade === 'u' ? 'u' : ['alta','media','baixa'].includes(t.prioridade) ? t.prioridade : null }
+function ordenarTarefas(tarefas) {
+  const pesos = {u:0, alta:1, media:2, baixa:3};
+  return tarefas.slice().sort((a,b) => (pesos[prioridadeTarefa(a)] ?? 4) - (pesos[prioridadeTarefa(b)] ?? 4) || (a.ordem ?? 0) - (b.ordem ?? 0));
+}
+function tarefasAtrasadas(tarefas, hoje) { return ordenarTarefas(tarefas.filter(t => !t.feito && dataTarefaValida(t.dia) && t.dia < hoje)) }
+// Próxima data estritamente após base; mensal conserva o dia original mesmo após fevereiro.
+function proximaData(base, repetir) {
+  if (!dataTarefaValida(base) || !repetir) return null;
+  const tipo = repetir.tipo;
+  if (tipo === 'mensal') {
+    const [y,m,d] = base.split('-').map(Number), alvo = Math.min(31,Math.max(1,Number(repetir.diaMes)||d));
+    for (let i=0;i<2;i++) {
+      const x=new Date(y,m-1+i,1,12), yy=x.getFullYear(), mm=x.getMonth()+1;
+      const data=itpIso(yy,mm,Math.min(alvo,new Date(yy,mm,0,12).getDate()));
+      if (data>base) return data;
+    }
+  }
+  if (!['diaria','uteis','semanal'].includes(tipo)) return null;
+  const dias = Array.isArray(repetir.dias) && repetir.dias.length ? repetir.dias : [itpDow(base)];
+  for(let i=1;i<=7;i++) { const x=itpMais(base,i),w=itpDow(x); if(tipo==='diaria'||(tipo==='uteis'&&w>0&&w<6)||(tipo==='semanal'&&dias.includes(w))) return x }
+  return null;
+}
+function concluirTarefa(tarefas,id,feitoEm,hoje) {
+  const t=tarefas.find(x=>x.id===id); if(!t||t.feito) return tarefas;
+  const repetir=t.repetir ? {...t.repetir, ...(t.repetir.tipo==='mensal'?{diaMes:t.repetir.diaMes||+String(t.dia).slice(8)}:{})} : null;
+  const base=dataTarefaValida(t.dia)?(t.dia>hoje?t.dia:hoje):hoje;
+  let dia=proximaData(base,repetir);
+  while(dia&&t.grupo&&tarefas.some(x=>x.grupo===t.grupo&&x.dia===dia))dia=proximaData(dia,repetir);
+  const lista=tarefas.map(x=>x.id===id?{...x,feito:true,feitoEm}:x);
+  if(dia) {
+    const serie=t.serie||t.id, novoId=serie+'~'+dia;
+    if(!lista.some(x=>x.id===novoId||(x.serie===serie&&x.dia===dia))) {
+      const novo={...t,id:novoId,serie,dia,repetir,feito:false,subtarefas:(t.subtarefas||[]).map(s=>({...s,feito:false}))};
+      delete novo.feitoEm; delete novo.auto; delete novo.grupo; delete novo.adiado; delete novo.ideia;
+      lista.push(novo);
+    }
+  }
+  return lista;
+}
+function normalizarAgenda(agenda) {
+  if (Array.isArray(agenda)) return {eventos:agenda,avisos:[],atualizado:null};
+  if (!agenda || !Array.isArray(agenda.eventos)) return {eventos:[],avisos:[],atualizado:null};
+  return {eventos:agenda.eventos,avisos:Array.isArray(agenda.avisos)?agenda.avisos.filter(a=>typeof a==='string'&&a.trim()):[],atualizado:agenda.atualizado||null};
+}
+function dedupeAgenda(agenda, manuais, dia) {
+  const chave=s=>String(s||'').normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('pt-BR');
+  const vistos=new Set(manuais.map(e=>chave(e.t||e.titulo)));
+  return normalizarAgenda(agenda).eventos.filter(e=>{
+    if(!e||!e.titulo||!dataTarefaValida(String(e.inicio).slice(0,10))) return false;
+    const inicio=String(e.inicio), fim=String(e.fim||e.inicio), ultimo=fim.slice(0,10);
+    if(dia<inicio.slice(0,10)||dia>ultimo||(dia===ultimo&&ultimo>inicio.slice(0,10)&&(e.diaInteiro||/T00:00(?::00(?:\.000)?)?$/.test(fim)))) return false;
+    const k=chave(e.titulo); if(vistos.has(k)) return false; vistos.add(k); return true;
+  });
+}
+function lembreteTarefa(t) {
+  if(!dataTarefaValida(t.dia)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t.hora||'')||t.lembrete==null||t.lembrete===''||!Number.isFinite(+t.lembrete)||+t.lembrete<0) return null;
+  const [y,m,d]=t.dia.split('-').map(Number),[h,mi]=t.hora.split(':').map(Number),x=new Date(y,m-1,d,h,mi-Number(t.lembrete));
+  return itpIso(x.getFullYear(),x.getMonth()+1,x.getDate())+'T'+itpP(x.getHours())+':'+itpP(x.getMinutes());
+}
+function tarefasNativas(tarefas,hoje) {
+  const fim=itpMais(hoje,14);
+  return ordenarTarefas(tarefas.filter(t=>dataTarefaValida(t.dia)&&t.dia>=hoje&&t.dia<=fim)).map(t=>({id:String(t.id),titulo:tituloTarefa(t.texto),data:t.dia,hora:t.hora||null,lembrete:lembreteTarefa(t),feita:!!t.feito,prioridade:prioridadeTarefa(t)}));
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia, tituloTarefa, agruparTarefas, dataTarefaValida, ordenarTarefas, prioridadeTarefa, tarefasAtrasadas, proximaData, concluirTarefa, normalizarAgenda, dedupeAgenda, lembreteTarefa, tarefasNativas };

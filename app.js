@@ -1,6 +1,7 @@
-// Banco CBR app 1.20.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.21.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
-// Função pura: interpretarTarefa(texto, hoje) -> [{texto, dia, hora, urg, area}]
+// interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
+// Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
 //  dia: 'AAAA-MM-DD' | 'sem' (disse "sem data") | null (o texto não diz; quem chama usa o padrão/opção escolhida)
 //  hora: 'HH:MM' | null · urg: boolean · area: 'estudo' | 'ferramenta' | 'tarefas' | null (null = padrão de quem chama)
 //  hoje: 'AAAA-MM-DD' (padrão: hoje no aparelho). Um ditado pode ter várias tarefas: "próxima tarefa", "nova tarefa", "outra tarefa" ou ";".
@@ -39,7 +40,7 @@ function itpPartes(s) {
 
 function itpUma(seg, hoje) {
   let o = seg, n = itpSem(seg.toLowerCase());
-  const R = { texto: '', dia: null, hora: null, urg: false, area: null };
+  const R = { texto: '', dia: null, hora: null, urg: false, area: null, prioridade: null, etiquetas: [], repetir: null };
   // acha a 1ª ocorrência em que fn(m) não devolve false e apaga o trecho (o e n ficam alinhados, com espaços no lugar)
   const tira = (re, fn) => {
     const g = new RegExp(re.source, 'g'); let m;
@@ -54,17 +55,31 @@ function itpUma(seg, hoje) {
   };
   tira(/\bsem\s+data(?:\s+definida)?\b/, () => { R.dia = 'sem' });
   tira(/\burgente\b/, () => { R.urg = true });
+  tira(/!+(alta|media|baixa)\b|!!/, m => { R.prioridade = m[1] || 'alta' });
+  while (tira(/#([a-z0-9_-]+)/, m => { if (!R.etiquetas.includes(m[1])) R.etiquetas.push(m[1]) })) {}
+  tira(/\b(?:todo dia|todos os dias|diariamente)\b/, () => { R.repetir = {tipo:'diaria'} }) ||
+  tira(/\b(?:dias uteis|todo dia util)\b/, () => { R.repetir = {tipo:'uteis'} }) ||
+  tira(/\b(?:toda semana|todas as semanas|semanalmente)\b/, () => { R.repetir = {tipo:'semanal', dias:[]} }) ||
+  tira(/\b(?:todo mes|todos os meses|mensalmente)\b/, () => { R.repetir = {tipo:'mensal'} });
+  const nomesDias = [...ITP_DIAS, 'dom','seg','ter','qua','qui','sex','sab'];
+  if (R.repetir?.tipo === 'semanal') {
+    while (tira(new RegExp('(?:\\b(?:na|no|nas|nos|e)\\s+)?\\b(' + nomesDias.join('|') + ')(?:-feira)?\\b'), m => {
+      const dia = nomesDias.indexOf(m[1]) % 7;
+      if (!R.repetir.dias.includes(dia)) R.repetir.dias.push(dia);
+    })) {}
+  }
   // ---- data ----
   const pre = '(?:\\b(?:para|pra|ate|em)\\s+)?';
   if (!R.dia) {
+    tira(/\bdaqui\s+a\s+(\d+)\s+dias?\b/, m => { if (+m[1] > 36500) return false; R.dia = itpMais(hoje, +m[1]) }) ||
     tira(new RegExp(pre + '\\bdepois\\s+de\\s+amanha\\b'), () => { R.dia = itpMais(hoje, 2) }) ||
     tira(new RegExp(pre + '\\bamanha\\b'), () => { R.dia = itpMais(hoje, 1) }) ||
     tira(new RegExp(pre + '\\bhoje\\b'), () => { R.dia = hoje }) ||
     tira(/(?:\bdia\s+)?\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?(?!\d)/, m => { const iso = itpDataNum(+m[1], +m[2], m[3] != null ? +m[3] : null, hoje); if (!iso) return false; R.dia = iso }) ||
     tira(new RegExp('(?:\\bdia\\s+)?\\b(\\d{1,2})\\s+de\\s+(' + ITP_MESES.join('|') + ')(?:\\s+de\\s+(\\d{4}))?\\b'), m => { const iso = itpDataNum(+m[1], ITP_MESES.indexOf(m[2]) + 1, m[3] != null ? +m[3] : null, hoje); if (!iso) return false; R.dia = iso }) ||
     tira(/\bdia\s+(\d{1,2})\b/, m => { const iso = itpDiaDoMes(+m[1], hoje); if (!iso) return false; R.dia = iso }) ||
-    tira(new RegExp('(?:\\b(?:na|no|nesta|neste|esta|este|proxima|proximo|pra|para)\\s+)?\\b(' + ITP_DIAS.join('|') + ')(?:-feira)?\\b'), m => {
-      const alvo = ITP_DIAS.indexOf(m[1]), delta = ((alvo - itpDow(hoje)) % 7 + 7) % 7 || 7; R.dia = itpMais(hoje, delta);
+    tira(new RegExp('(?:\\b(?:na|no|nesta|neste|esta|este|proxima|proximo|pra|para)\\s+)?\\b(' + nomesDias.join('|') + ')(?:-feira)?\\b'), m => {
+      const alvo = nomesDias.indexOf(m[1]) % 7, delta = ((alvo - itpDow(hoje)) % 7 + 7) % 7 || 7; R.dia = itpMais(hoje, delta);
     });
   }
   // ---- hora ----
@@ -90,6 +105,11 @@ function itpUma(seg, hoje) {
     const m = ini || fim; if (!m) break;
     if (!R.area) R.area = tipoDe(m[1]);
     tira2(m);
+  }
+  if (R.repetir) {
+    if (R.repetir.tipo === 'semanal' && !R.repetir.dias.length) R.repetir.dias = [itpDow(R.dia && R.dia !== 'sem' ? R.dia : hoje)];
+    if (!R.dia) R.dia = R.repetir.tipo === 'mensal' ? hoje : proximaData(itpMais(hoje,-1), R.repetir);
+    if (R.repetir.tipo === 'mensal' && R.dia !== 'sem') R.repetir.diaMes = +(R.dia || hoje).slice(8);
   }
   // ---- limpeza: espaços, pontuação solta e preposições que sobraram nas pontas ----
   let t = o.replace(/\s+/g, ' ').trim();
@@ -130,14 +150,83 @@ function tituloTarefa(texto) { return String(texto ?? '').replace(/^💡\s+/, ''
 function agruparTarefas(tarefas, hoje) {
   const datas = [...new Set(tarefas.map(t => t.dia).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
   const grupos = datas.map(dia => ({dia, titulo: dia === hoje ? 'Hoje' : (dia < hoje ? 'Dias anteriores · ' : 'Próximos dias · ') + dia,
-    l: tarefas.filter(t => t.dia === dia).slice().sort((a,b) => Number(!!b.urg)-Number(!!a.urg) || (a.ordem??0)-(b.ordem??0))}));
+    l: ordenarTarefas(tarefas.filter(t => t.dia === dia))}));
   const sem = tarefas.filter(t => !datas.includes(t.dia) && t.dia !== 'proxima');
   const proxima = tarefas.filter(t => t.dia === 'proxima');
   if (sem.length) grupos.push({dia:'sem', titulo:'Sem data', l:sem});
   if (proxima.length) grupos.push({dia:'proxima', titulo:'Semana seguinte · sem dia definido', l:proxima});
   return grupos;
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia, tituloTarefa, agruparTarefas };
+// Regras puras compartilhadas pela tela e pela ponte Android. Campos novos são opcionais.
+function dataTarefaValida(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return false;
+  const [y,m,dia] = d.split('-').map(Number); return itpValida(y,m,dia);
+}
+function prioridadeTarefa(t) { return t.urg || t.prioridade === 'u' ? 'u' : ['alta','media','baixa'].includes(t.prioridade) ? t.prioridade : null }
+function ordenarTarefas(tarefas) {
+  const pesos = {u:0, alta:1, media:2, baixa:3};
+  return tarefas.slice().sort((a,b) => (pesos[prioridadeTarefa(a)] ?? 4) - (pesos[prioridadeTarefa(b)] ?? 4) || (a.ordem ?? 0) - (b.ordem ?? 0));
+}
+function tarefasAtrasadas(tarefas, hoje) { return ordenarTarefas(tarefas.filter(t => !t.feito && dataTarefaValida(t.dia) && t.dia < hoje)) }
+// Próxima data estritamente após base; mensal conserva o dia original mesmo após fevereiro.
+function proximaData(base, repetir) {
+  if (!dataTarefaValida(base) || !repetir) return null;
+  const tipo = repetir.tipo;
+  if (tipo === 'mensal') {
+    const [y,m,d] = base.split('-').map(Number), alvo = Math.min(31,Math.max(1,Number(repetir.diaMes)||d));
+    for (let i=0;i<2;i++) {
+      const x=new Date(y,m-1+i,1,12), yy=x.getFullYear(), mm=x.getMonth()+1;
+      const data=itpIso(yy,mm,Math.min(alvo,new Date(yy,mm,0,12).getDate()));
+      if (data>base) return data;
+    }
+  }
+  if (!['diaria','uteis','semanal'].includes(tipo)) return null;
+  const dias = Array.isArray(repetir.dias) && repetir.dias.length ? repetir.dias : [itpDow(base)];
+  for(let i=1;i<=7;i++) { const x=itpMais(base,i),w=itpDow(x); if(tipo==='diaria'||(tipo==='uteis'&&w>0&&w<6)||(tipo==='semanal'&&dias.includes(w))) return x }
+  return null;
+}
+function concluirTarefa(tarefas,id,feitoEm,hoje) {
+  const t=tarefas.find(x=>x.id===id); if(!t||t.feito) return tarefas;
+  const repetir=t.repetir ? {...t.repetir, ...(t.repetir.tipo==='mensal'?{diaMes:t.repetir.diaMes||+String(t.dia).slice(8)}:{})} : null;
+  const base=dataTarefaValida(t.dia)?(t.dia>hoje?t.dia:hoje):hoje;
+  let dia=proximaData(base,repetir);
+  while(dia&&t.grupo&&tarefas.some(x=>x.grupo===t.grupo&&x.dia===dia))dia=proximaData(dia,repetir);
+  const lista=tarefas.map(x=>x.id===id?{...x,feito:true,feitoEm}:x);
+  if(dia) {
+    const serie=t.serie||t.id, novoId=serie+'~'+dia;
+    if(!lista.some(x=>x.id===novoId||(x.serie===serie&&x.dia===dia))) {
+      const novo={...t,id:novoId,serie,dia,repetir,feito:false,subtarefas:(t.subtarefas||[]).map(s=>({...s,feito:false}))};
+      delete novo.feitoEm; delete novo.auto; delete novo.grupo; delete novo.adiado; delete novo.ideia;
+      lista.push(novo);
+    }
+  }
+  return lista;
+}
+function normalizarAgenda(agenda) {
+  if (Array.isArray(agenda)) return {eventos:agenda,avisos:[],atualizado:null};
+  if (!agenda || !Array.isArray(agenda.eventos)) return {eventos:[],avisos:[],atualizado:null};
+  return {eventos:agenda.eventos,avisos:Array.isArray(agenda.avisos)?agenda.avisos.filter(a=>typeof a==='string'&&a.trim()):[],atualizado:agenda.atualizado||null};
+}
+function dedupeAgenda(agenda, manuais, dia) {
+  const chave=s=>String(s||'').normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('pt-BR');
+  const vistos=new Set(manuais.map(e=>chave(e.t||e.titulo)));
+  return normalizarAgenda(agenda).eventos.filter(e=>{
+    if(!e||!e.titulo||!dataTarefaValida(String(e.inicio).slice(0,10))) return false;
+    const inicio=String(e.inicio), fim=String(e.fim||e.inicio), ultimo=fim.slice(0,10);
+    if(dia<inicio.slice(0,10)||dia>ultimo||(dia===ultimo&&ultimo>inicio.slice(0,10)&&(e.diaInteiro||/T00:00(?::00(?:\.000)?)?$/.test(fim)))) return false;
+    const k=chave(e.titulo); if(vistos.has(k)) return false; vistos.add(k); return true;
+  });
+}
+function lembreteTarefa(t) {
+  if(!dataTarefaValida(t.dia)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t.hora||'')||t.lembrete==null||t.lembrete===''||!Number.isFinite(+t.lembrete)||+t.lembrete<0) return null;
+  const [y,m,d]=t.dia.split('-').map(Number),[h,mi]=t.hora.split(':').map(Number),x=new Date(y,m-1,d,h,mi-Number(t.lembrete));
+  return itpIso(x.getFullYear(),x.getMonth()+1,x.getDate())+'T'+itpP(x.getHours())+':'+itpP(x.getMinutes());
+}
+function tarefasNativas(tarefas,hoje) {
+  const fim=itpMais(hoje,14);
+  return ordenarTarefas(tarefas.filter(t=>dataTarefaValida(t.dia)&&t.dia>=hoje&&t.dia<=fim)).map(t=>({id:String(t.id),titulo:tituloTarefa(t.texto),data:t.dia,hora:t.hora||null,lembrete:lembreteTarefa(t),feita:!!t.feito,prioridade:prioridadeTarefa(t)}));
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { interpretarTarefa, tituloIdeia, tituloTarefa, agruparTarefas, dataTarefaValida, ordenarTarefas, prioridadeTarefa, tarefasAtrasadas, proximaData, concluirTarefa, normalizarAgenda, dedupeAgenda, lembreteTarefa, tarefasNativas };
 
 
 // ===== ABA SEMANA = CALENDÁRIO DO MÊS (pedido do Artur, 21/10/2026) =====
@@ -161,9 +250,9 @@ const smDt=iso=>{const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d
 const smMais=(iso,n)=>{const x=smDt(iso);x.setDate(x.getDate()+n);return dKey(+x)};
 const smRot=iso=>{if(iso==='proxima')return'Sem dia';if(iso==='sem')return'Sem data';const x=smDt(iso);return smDOW[x.getDay()]+' '+x.getDate()};
 const smRotL=iso=>{const x=smDt(iso);return smDOW[x.getDay()]+' '+x.getDate()+'/'+String(x.getMonth()+1).padStart(2,'0')};
-const smSeg=iso=>smMais(iso,-smDt(iso).getDay());        // início da semana = DOMINGO (1.17.0)
+const smSeg=iso=>smMais(iso,-((smDt(iso).getDay()+6)%7)); // segunda a domingo
 const smSemana=iso=>{const s=smSeg(iso);return Array.from({length:7},(_,i)=>smMais(s,i))};
-const smNumSem=iso=>{const x=smDt(smMais(smSeg(iso),4)),a=new Date(x.getFullYear(),0,1,12);return 1+Math.floor(Math.round((x-a)/DAY)/7)};   // semana ISO (pela quinta-feira)
+const smNumSem=iso=>{const x=smDt(smMais(smSeg(iso),3)),a=new Date(x.getFullYear(),0,1,12);return Math.ceil((Math.round((x-a)/DAY)+1)/7)}; // semana ISO pela quinta-feira
 function smGuardaCache(){try{localStorage.setItem('sm_cache2',JSON.stringify({sha:SM.sha,d:SM.d}))}catch(e){}}
 
 // ---------- leitura / gravação ----------
@@ -172,10 +261,11 @@ function smConverte(v){   // semana/atual.json (v1) -> plano v2
   return {v:2,regras:v.regras||'',subtitulo:v.subtitulo||'',dias,tarefas:v.tarefas||[],notas:v.notas||[]};
 }
 async function smPuxar(){
+  smAgendaPuxar();
   try{
     const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/${SM_ARQ}`);
     SM.ok=true;SM.erro='';
-    if(f.sha!==SM.sha){SM.d=JSON.parse(smDec(f.content));SM.sha=f.sha;smGuardaCache();smAuto();smRender()}
+    if(f.sha!==SM.sha){SM.d=JSON.parse(smDec(f.content));SM.sha=f.sha;smGuardaCache();smAuto();smRender();smNativoTarefas()}
   }catch(e){
     SM.ok=true;
     if(e.status===404){
@@ -188,21 +278,23 @@ async function smPuxar(){
 function smRender(){if(tela==='semana'||tela==='hoje')render()}
 // toda mudança é uma função idempotente: aplica na hora e de novo na gravação (se outro aparelho mudou o arquivo, relê e reaplica)
 function smMudar(fn,msg){
-  if(!SM.d)return;fn(SM.d);smGuardaCache();render();
+  if(SM.ed)smRascEdSalva(SM.ed.id);
+  if(!SM.d)return Promise.resolve(false);fn(SM.d);smGuardaCache();render();smNativoTarefas();
   const tarefa=async()=>{
     for(let t=0;t<6;t++){
       try{
         fn(SM.d);
         const body={message:'semana: '+(msg||'atualização'),content:BCBR.b64(JSON.stringify(SM.d,null,1)),branch:'main'};if(SM.sha)body.sha=SM.sha;
         const r=await BCBR.api(`/repos/${BCBR.REPO}/contents/${SM_ARQ}`,{method:'PUT',body:JSON.stringify(body)});
-        SM.sha=r.content.sha;SM.erro='';smGuardaCache();return;
+        SM.sha=r.content.sha;SM.erro='';smGuardaCache();smNativoTarefas();return true;
       }catch(e){
         if(e.status===409||e.status===422){try{const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/${SM_ARQ}`);SM.d=JSON.parse(smDec(f.content));SM.sha=f.sha}catch(e2){}continue}
-        SM.erro='Não salvou no GitHub ('+e.message+'). Confira a internet; a mudança fica neste aparelho.';smRender();return;
+        SM.erro='Não salvou no GitHub ('+e.message+'). Confira a internet; a mudança fica neste aparelho.';smRender();return false;
       }
     }
+    SM.erro='Não salvou após conflitos no GitHub. Tente novamente.';smRender();return false;
   };
-  SM.fila=SM.fila.then(tarefa);
+  SM.fila=SM.fila.then(tarefa);return SM.fila;
 }
 
 // ---------- tipo do dia, meta e questões ----------
@@ -231,19 +323,18 @@ function smMetaDe(iso){
 }
 function smQ(dia){let n=0,ok=0;log.forEach(l=>{if(dKey(l.t)===dia){n++;if(l.ok)ok++}});return{n,ok}}
 const smMeta=t=>{if((t.area||'estudo')!=='estudo'||t.dia==='sem')return 0;const s=String(t.texto),m=s.match(/(\d+)\s*quest/i);return m?+m[1]:/quest/i.test(s)&&t.dia!=='proxima'?smMetaDe(t.dia):0};
-// Tarefas não concluídas de dias que já passaram vão sozinhas para hoje (pedido do Artur, 24/10/2026). Não mexe nas "N questões"
-// (meta do dia) nem em "sem data". Tarefa de vários dias: se a mesma já está em hoje, a atrasada sai (não duplica).
+// Atrasadas só mudam de data pela ação explícita da faixa.
 function smRolaAplica(d,hj){let n=0;const hoje=new Set(d.tarefas.filter(t=>t.dia===hj&&t.grupo).map(t=>t.grupo)),sai=new Set();
-  d.tarefas.forEach(t=>{if(!/^\d{4}-\d\d-\d\d$/.test(t.dia)||t.dia>=hj||t.feito||smMeta(t))return;n++;
+  d.tarefas.forEach(t=>{if(!dataTarefaValida(t.dia)||t.dia>=hj||t.feito)return;n++;
     if(t.grupo&&hoje.has(t.grupo)){sai.add(t.id);return}if(t.grupo)hoje.add(t.grupo);t.dia=hj;t.ordem=200+n});
   if(sai.size)d.tarefas=d.tarefas.filter(t=>!sai.has(t.id));return n}
 function smRola(){if(!SM.d)return;const hj=smHoje(),n=smRolaAplica(JSON.parse(JSON.stringify(SM.d)),hj);if(!n)return;
   smMudar(d=>smRolaAplica(d,hj),'pendentes passaram para hoje');toast(n===1?'1 tarefa pendente passou para hoje':n+' tarefas pendentes passaram para hoje')}
 function smAuto(){   // marca sozinho "N questões" quando o banco chega à meta do dia; grava a meta de hoje 1x
-  if(!SM.d)return;smRola();const hj=smHoje(),marcar=[];
+  if(!SM.d)return;const hj=smHoje(),marcar=[];
   SM.d.tarefas.forEach(t=>{const m=smMeta(t);if(!m||t.feito||t.dia>hj||SM.auto.has(t.id))return;if(smQ(t.dia).n>=m){SM.auto.add(t.id);marcar.push(t.id)}});
   const feitoEm=new Date().toISOString();
-  if(marcar.length)smMudar(d=>d.tarefas.forEach(t=>{if(marcar.includes(t.id)&&!t.feito){t.feito=true;t.auto=true;t.feitoEm=feitoEm}}),'questões do dia (automático)');
+  if(marcar.length)smMudar(d=>marcar.forEach(id=>{d.tarefas=concluirTarefa(d.tarefas,id,feitoEm,hj);const t=d.tarefas.find(t=>t.id===id);if(t)t.auto=true}),'questões do dia (automático)');
   if(smTipo(hj)==='estudo'&&!SM.auto.has('meta'+hj)){const m=metaHoje();if(m){SM.auto.add('meta'+hj);if(smDia(hj).meta!==m)smMudar(d=>{d.dias[hj]=d.dias[hj]||{};d.dias[hj].meta=m},'meta do dia')}}
 }
 function smCor(iso){
@@ -295,7 +386,7 @@ function smAgrupa(its){
 // ---------- ações ----------
 const smTar=id=>SM.d&&SM.d.tarefas.find(t=>t.id===id);
 const smGrupo=t=>t.grupo?SM.d.tarefas.filter(x=>x.grupo===t.grupo):[t];
-const smItensDe=dia=>SM.d.tarefas.filter(t=>t.dia===dia).sort((a,b)=>(a.ordem??0)-(b.ordem??0));
+const smItensDe=dia=>ordenarTarefas(SM.d.tarefas.filter(t=>t.dia===dia));
 function smSel(iso){SM.sel=SM.sel===iso?null:iso;SM.ed=null;render()}
 function smSem(seg){SM.sem=SM.sem===seg?null:seg;SM.semAdd=null;SM.conf=null;render()}
 function smMesVai(k){const[y,m]=(SM.mes||smHoje().slice(0,7)).split('-').map(Number),x=new Date(y,m-1+k,1,12);SM.mes=dKey(+x).slice(0,7);render()}
@@ -313,7 +404,21 @@ function smVisiveis(dia){
 }
 function smFeitasBotao(dia){const n=smItensDe(dia).filter(smFeitaHoje).length;return `<button class="sm-tagb" aria-label="Mostrar ou esconder concluídas hoje" aria-pressed="${!!SM_FEITAS[dia]}" onclick="smFeitasAlterna('${dia}')">✓ ${n}</button>`}
 function smFeitasAlterna(dia){SM_FEITAS[dia]=!SM_FEITAS[dia];try{localStorage.setItem('sm_feitas',JSON.stringify(SM_FEITAS))}catch(e){}render()}
-function smCheck(id,v){const feitoEm=v?new Date().toISOString():null;smMudar(d=>{const t=d.tarefas.find(x=>x.id===id);if(t){t.feito=v;t.feitoEm=feitoEm;if(!v)delete t.auto}},v?'feito':'desmarcado');if(!v)SM.auto.add(id)}
+function smCheck(id,v,forcar=false){
+  const original=smTar(id);if(!original)return Promise.resolve(false);if(!!original.feito===v&&!forcar)return Promise.resolve(true);
+  const antes={feito:original.feito,feitoEm:original.feitoEm,auto:original.auto},feitoEm=v?new Date().toISOString():null,hj=smHoje();
+  let documento;const novas=new Set();
+  const salvo=smMudar(d=>{if(v){
+    if(documento!==d){documento=d;novas.clear()}
+    const ids=new Set(d.tarefas.map(t=>t.id));d.tarefas=concluirTarefa(d.tarefas,id,feitoEm,hj);
+    d.tarefas.forEach(t=>{if(!ids.has(t.id))novas.add(t.id)});
+  }else{const t=d.tarefas.find(x=>x.id===id);if(t){t.feito=false;t.feitoEm=null;delete t.auto}}},v?'feito':'desmarcado');
+  if(!v)SM.auto.add(id);
+  if(v)smDesfazToast('Concluída ·',()=>{SM.auto.add(id);smMudar(d=>{
+    const t=d.tarefas.find(x=>x.id===id);if(t&&t.feitoEm===feitoEm){Object.assign(t,antes);d.tarefas=d.tarefas.filter(x=>!novas.has(x.id))}
+  },'desfez conclusão')});
+  return salvo;
+}
 function smUrgente(id){const t=smTar(id);if(!t)return;const urg=!t.urg;smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x){if(urg)x.urg=true;else delete x.urg}},'urgência do item')}
 function smEdita(id){
   if(SM.ed&&SM.ed.id===id){smEdFecha();return}
@@ -329,15 +434,18 @@ function smSalvar(id,textoDireto){
   const t=smTar(SM.ed&&SM.ed.id);if(!t)return;
   const texto=document.getElementById('sm_ed_txt').value.trim(),{area,sub}=smParseTS(document.getElementById('sm_ed_area').value);if(!texto)return;
   const urg=document.getElementById('sm_ed_urg').getAttribute('aria-pressed')==='true';
+  const extras=smExtrasLer();
+  if(extras.repetir?.tipo==='semanal'&&!extras.repetir.dias.length){toast('Escolha pelo menos um dia para repetir.');return}
   const dtEl=document.getElementById('sm_ed_det'),det=dtEl?dtEl.value.trim():(t.det||'');const dEl=document.getElementById('sm_ed_dia'),nd=dEl?(dEl.value||(/^\d{4}-/.test(t.dia)?'sem':t.dia)):t.dia,mudouDia=!!dEl&&nd!==t.dia;
   const g=smGrupo(t),ligado=g.length>1;
-  const aplica=(x,sd)=>{x.texto=texto;x.area=area;if(urg)x.urg=true;else delete x.urg;if(det)x.det=det;else delete x.det;if(sub)x.sub=sub;else delete x.sub;if(sd){x.dia=nd;delete x.grupo;x.ordem=100+SM.d.tarefas.filter(y=>y.dia===nd).length}};
+  const aplica=(x,sd)=>{const diaMes=x.repetir?.tipo==='mensal'?x.repetir.diaMes:null;Object.assign(x,extras);x.texto=texto;x.area=area;if(urg)x.urg=true;else delete x.urg;if(det)x.det=det;else delete x.det;if(sub)x.sub=sub;else delete x.sub;if(sd){x.dia=nd;delete x.grupo;x.ordem=100+SM.d.tarefas.filter(y=>y.dia===nd).length}if(x.repetir?.tipo==='mensal'&&dataTarefaValida(x.dia))x.repetir={...x.repetir,diaMes:!sd&&diaMes?diaMes:+x.dia.slice(8)}};
   if((ligado&&SM.ed.esc==='este')||t.dia==='sem'||(!ligado&&mudouDia)){const id=t.id,sd=mudouDia;smRascEdLimpa();SM.ed=null;smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(x)aplica(x,sd)},'editou item');return}
   const semana=new Set(smSemana(t.dia==='proxima'?smHoje():t.dia)),dias=[...SM.ed.dias].filter(x=>semana.has(x));
   if(!dias.length&&t.dia!=='proxima'&&g.every(x=>semana.has(x.dia))){toast('Escolha pelo menos um dia (ou use Excluir).');return}
   const gid=t.grupo||(dias.length>1?'g'+smId():null),tem=new Set(g.map(x=>x.dia)),ids=g.map(x=>x.id);
   const fora=g.filter(x=>semana.has(x.dia)&&!SM.ed.dias.has(x.dia)).map(x=>x.id);   // só mexe nos dias desta semana
   const novos=dias.filter(dia=>!tem.has(dia)).map(dia=>({id:smId(),dia,texto,area,...(urg?{urg:true}:{}),...(sub?{sub}:{}),...(det?{det}:{}),feito:false,ordem:100+smItensDe(dia).length,...(gid?{grupo:gid}:{})}));
+  novos.forEach(n=>Object.assign(n,extras));
   smRascEdLimpa();SM.ed=null;
   smMudar(d=>{d.tarefas=d.tarefas.filter(x=>!fora.includes(x.id));d.tarefas.forEach(x=>{if(ids.includes(x.id)){aplica(x,false);if(gid)x.grupo=gid}});
     novos.forEach(n=>{if(!d.tarefas.some(x=>x.id===n.id))d.tarefas.push({...n})})},'editou item');
@@ -361,7 +469,7 @@ function smAddChip(dia,id){SM.add[dia]&&smChip(SM.add[dia],id,smSemana(dia))}
 function smAdd(dia){
   const inp=document.getElementById('sm_add_'+dia),v=(inp&&inp.value||'').trim();if(!v)return;
   const ts=smParseTS(document.getElementById('sm_area_'+dia).value),alvo=SM.add[dia]&&SM.add[dia].size?[...SM.add[dia]]:[dia];
-  const dt=document.getElementById('sm_det_'+dia),det=dt?dt.value:'';delete SM.add[dia];delete SM.dr['sm_add_'+dia];delete SM.dr['sm_det_'+dia];if(SM.addDet)delete SM.addDet[dia];smPoe(smNovos(alvo,v,ts.area,ts.sub,det),'novo item');
+  const dt=document.getElementById('sm_det_'+dia),det=dt?dt.value:'';delete SM.add[dia];delete SM.dr['sm_add_'+dia];delete SM.dr['sm_det_'+dia];if(SM.addDet)delete SM.addDet[dia];smCriaDeTexto(v,{dias:alvo,area:ts.area+(ts.sub?'|'+ts.sub:''),det});
 }
 function smAgenda(iso,v){v=String(v||'').trim();smMudar(d=>{d.dias[iso]=d.dias[iso]||{};d.dias[iso].agenda=v},'agenda do dia')}
 function smTipoMuda(iso,v){smMudar(d=>{d.dias[iso]=d.dias[iso]||{};if(v==='auto')delete d.dias[iso].tipo;else d.dias[iso].tipo=v;delete d.dias[iso].meta},'tipo do dia')}
@@ -421,7 +529,7 @@ const SM_RASC_ED='bcbr_rasc_edicao';
 const smRascEd=id=>{try{const r=JSON.parse(localStorage.getItem(SM_RASC_ED)||'null');return r&&r.id===id?r:null}catch(e){return null}};
 function smRascEdSalva(id){
   const g=k=>document.getElementById(k),a=g('sm_ed_txt');if(!a)return;
-  try{localStorage.setItem(SM_RASC_ED,JSON.stringify({id,texto:a.value,det:g('sm_ed_det')?g('sm_ed_det').value:undefined,area:g('sm_ed_area').value,urg:g('sm_ed_urg').getAttribute('aria-pressed')==='true',dia:g('sm_ed_dia')?g('sm_ed_dia').value:undefined}))}catch(e){}
+  try{localStorage.setItem(SM_RASC_ED,JSON.stringify({id,texto:a.value,det:g('sm_ed_det')?g('sm_ed_det').value:undefined,area:g('sm_ed_area').value,urg:g('sm_ed_urg').getAttribute('aria-pressed')==='true',dia:g('sm_ed_dia')?g('sm_ed_dia').value:undefined,...smExtrasLer()}))}catch(e){}
 }
 const smRascEdLimpa=()=>{try{localStorage.removeItem(SM_RASC_ED)}catch(e){}};
 function smEdFecha(){smRascEdLimpa();SM.ed=null;render()}
@@ -431,7 +539,8 @@ function smEditor(t){
   return `<div class="sm-ed">
    <div class="row"><input id="sm_ed_txt" value="${esc(tituloTarefa(rd.texto??t.texto))}" style="flex:1 1 200px;min-width:0" oninput="smRascEdSalva('${t.id}')" onkeydown="if(event.key==='Enter')smSalvar();if(event.key==='Escape')smEdFecha()" aria-label="Texto">
      <select id="sm_ed_area" aria-label="Tipo" onchange="smRascEdSalva('${t.id}')">${smOpcoes(rd.area??(t.sub?(t.area||'estudo')+'|'+t.sub:(t.area||'estudo')))}</select><button type="button" id="sm_ed_urg" class="sm-tagb" aria-label="Urgente" aria-pressed="${rd.urg??!!t.urg}" onclick="this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')!=='true');smRascEdSalva('${t.id}')">! urgente</button></div>
-   <textarea id="sm_ed_det" class="sm-detin" rows="3" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa (▸)" aria-label="Detalhes" oninput="smRascEdSalva('${t.id}')">${esc(rd.det??t.det??'')}</textarea>
+   <label>Nota<textarea id="sm_ed_det" class="sm-detin" rows="3" placeholder="Nota livre (opcional)" aria-label="Nota" oninput="smRascEdSalva('${t.id}')">${esc(rd.det??t.det??'')}</textarea></label>
+   ${smExtrasHtml(t,rd)}
    ${!lig||SM.ed.esc==='este'?`<div class="row"><span class="sm-lbl">Data</span><input type="date" id="sm_ed_dia" class="sm-date" value="${rd.dia!=null?rd.dia:/^\d{4}-/.test(t.dia)?t.dia:''}" aria-label="Data" onchange="smRascEdSalva('${t.id}')"><button type="button" class="sm-tagb" onclick="document.getElementById('sm_ed_dia').value='';smRascEdSalva('${t.id}')">sem data</button>${t.dia==='proxima'?'<span class="mut">(hoje: sem dia, semana nova)</span>':''}</div>`:''}
    ${lig?`<div class="row"><span class="sm-lbl">Aplicar em</span><div class="sm-seg"><button type="button" aria-pressed="${SM.ed.esc==='este'}" onclick="smEdEsc('este')">Só neste dia</button><button type="button" aria-pressed="${SM.ed.esc==='todos'}" onclick="smEdEsc('todos')">Todos os ${g.length} dias</button></div></div>`:''}
    ${todos&&!prox?`<span class="sm-lbl">Dias desta semana${outras?` <span class="mut">(+${outras} em outras semanas, ficam como estão)</span>`:''}</span>${smChips(SM.ed.dias,x=>`smEdChip('${x}')`,sem)}`:''}
@@ -471,21 +580,22 @@ function smDetFim(el,id){
 function smTexto(t){return `<span class="sm-texto" role="textbox" aria-label="Texto da tarefa (clique para editar)" spellcheck="true" onclick="smTxtIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smTxtFim(this,'${t.id}')">${esc(tituloTarefa(t.texto))}</span>`}
 function smItem(t){
   const g=t.grupo?SM.d.tarefas.filter(x=>x.grupo===t.grupo):[t],ed=SM.ed&&SM.ed.id===t.id,m=smMeta(t),q=m&&t.dia!=='proxima'&&t.dia!=='sem'?smQ(t.dia):null;
-  const ab=t.det&&SM.ab.has(t.id),tg=t.det?`<button class="sm-tg" onclick="smTg('${t.id}')" aria-expanded="${!!ab}" aria-label="Detalhes">${ab?'▾':'▸'}</button>`:'';
+  const ab=SM.ab.has(t.id),tg=`<button class="sm-tg" onclick="smTg('${t.id}')" aria-expanded="${!!ab}" aria-label="Nota, subtarefas e anexos">${ab?'▾':'▸'}</button>`;
   return `<div class="sm-row ${t.feito?'ok':''} ${t.det?'tem-det':''} ${t.urg?'sm-urg t-'+smCorTipo(t.area):''}" data-tid="${t.id}"><div class="sm-it"><input type="checkbox" aria-label="Concluir tarefa" ${t.feito?'checked':''} onchange="smCheck('${t.id}',this.checked)">${tg}<span class="sm-tx">${smTexto(t)}${g.length>1?` <span class="sm-tag">${g.filter(x=>x.feito).length}/${g.length} dias</span>`:''}${q&&q.n?` <span class="sm-tag ${q.n>=m?'g':''}">banco ${q.n}/${m}</span>`:''}${t.auto?' <span class="sm-tag g">automático</span>':''}</span></div>
-   <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${ab?`<div class="sm-det" role="textbox" aria-label="Detalhes da tarefa (clique para editar)" onclick="smDetIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smDetFim(this,'${t.id}')">${md(t.det)}</div>`:''}${ed?smEditor(t):''}`;
+   <button class="sm-edb" onclick="smEdita('${t.id}')" aria-label="Editar" aria-expanded="${!!ed}">✎</button></div>${smMetadados(t)}${ab?`<div class="sm-conteudo"><div class="sm-det" role="textbox" aria-label="Nota da tarefa (clique para editar)" onclick="smDetIni(event,this,'${t.id}')" onkeydown="smTextoTecla(event,this)" onblur="smDetFim(this,'${t.id}')">${esc(t.det||'')}</div>${smSubHtml(t)}${smAnexosHtml(t)}</div>`:''}`;
 }
 function smGrupos(its){
-  const g=smAgrupa(its);if(!g.length)return'';
-  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}"><span class="sm-lbl">${esc(smTipoDe(x.a).nome)}${x.sub?` <i>› ${esc(x.sub)}</i>`:''}</span>${x.l.map(smItem).join('')}</div>`).join('')}</div>`;
+  if(!its.length)return'';
+  return `<div class="sm-gs"><div class="sm-grp">${ordenarTarefas(its).map(smItem).join('')}</div></div>`;
 }
 function smAddDet(dia){SM.addDet=SM.addDet||{};SM.addDet[dia]=!SM.addDet[dia];render();const i=document.getElementById(SM.addDet[dia]?'sm_det_'+dia:'sm_add_'+dia);i&&i.focus()}
 function smTg(id){SM.ab.has(id)?SM.ab.delete(id):SM.ab.add(id);render()}
 function smAddLinha(dia){
   const add=SM.add[dia],dt=SM.addDet&&SM.addDet[dia];
-  return `<div class="sm-add sm-c1"><div class="row"><input id="sm_add_${dia}" placeholder="Adicionar item" value="${smVal('sm_add_'+dia)}" oninput="SM.dr[this.id]=this.value" onkeydown="if(event.key==='Enter')smAdd('${dia}')" style="flex:1;min-width:0">
+  return `<div class="sm-add sm-c1"><div class="row"><input id="sm_add_${dia}" placeholder="Adicionar item" value="${smVal('sm_add_'+dia)}" oninput="SM.dr[this.id]=this.value;smPrevLinha('${dia}',this.value)" onkeydown="if(event.key==='Enter')smAdd('${dia}')" style="flex:1;min-width:0">
      <select id="sm_area_${dia}" aria-label="Tipo">${smOpcoes(dia==='sem'?'tarefas':undefined)}</select>
      <button class="b s sm-ghost" aria-pressed="${!!dt}" onclick="smAddDet('${dia}')" title="Detalhes (texto que aparece ao abrir a tarefa)">≡</button>${dia==='sem'?'':`<button class="b s sm-ghost" aria-pressed="${!!add}" onclick="smAddDias('${dia}')">+ dias</button>`}<button class="b s" onclick="smAdd('${dia}')">+</button></div>
+     <div class="qa-prev" id="sm_prev_${dia}" aria-live="polite">${esc(smPreviaTexto(SM.dr['sm_add_'+dia]||'',{dias:add?[...add]:[dia]}))}</div>
      ${dt?`<textarea id="sm_det_${dia}" class="sm-detin" rows="3" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa (▸)" oninput="SM.dr[this.id]=this.value">${smVal('sm_det_'+dia)}</textarea>`:''}
      ${add?smChips(add,x=>`smAddChip('${dia}','${x}')`,smSemana(dia)):''}</div>`;
 }
@@ -571,7 +681,7 @@ function smSelo(x,longo){   // questões feitas/meta: só a letra colorida
 const smCorTipo=a=>(a||'estudo')==='estudo'?'e':a==='ferramenta'?'f':'t';   // bolinha: azul estudo, amarelo ferramenta, verde tarefas (e outros tipos)
 const smDots=x=>{const its=smItensDe(x),hj=smHoje();return its.length?`<span class="dots">${its.map(i=>`<i class="t-${smCorTipo(i.area)} ${i.feito?'ok':x<hj?'late':''}"></i>`).join('')}</span>`:''};
 function smCalCab(mes,y,m){
-  const hj=smHoje(),est=smEstagio(mes),vis=SM.vis||'mes',sem=vis==='semana',seg=SM.semana||smSeg(hj);
+  const hj=smHoje(),est=smEstagio(mes),vis=SM.vis||'semana',sem=vis==='semana',seg=SM.semana||smSeg(hj);
   const titulo=sem?`${smRotL(seg)} – ${smRotL(smMais(seg,6))}`:`${smMES[m-1][0].toUpperCase()+smMES[m-1].slice(1)} ${y}`;
   return `<div class="sm-calh"><button class="b s sm-ghost" onclick="smCalVai(-1)" aria-label="${sem?'Semana anterior':'Mês anterior'}">‹</button><h3>${titulo}</h3><button class="sm-est ${est?'':'vazio'}" onclick="smEstagioEdita('${mes}')" title="Estágio do mês (toque para mudar)">${est?esc(est):'+ estágio'}</button><button class="b s sm-ghost" onclick="smCalVai(1)" aria-label="${sem?'Próxima semana':'Próximo mês'}">›</button>${(sem?seg!==smSeg(hj):mes!==hj.slice(0,7))?`<button class="b s sm-ghost" onclick="SM.mes=null;SM.semana=null;render()">Hoje</button>`:''}<span style="flex:1"></span>
    <div class="sm-seg"><button type="button" aria-pressed="${vis==='mes'}" onclick="smVis('mes')">Mês</button><button type="button" aria-pressed="${sem}" onclick="smVis('semana')">Semana</button><button type="button" aria-pressed="${vis==='lista'}" onclick="smVis('lista')">Lista</button></div>
@@ -580,13 +690,23 @@ function smCalCab(mes,y,m){
 }
 function smVis(v){SM.vis=v;try{localStorage.setItem('sm_vis',v)}catch(e){}render()}
 function smCalVai(k){if(SM.vis!=='semana'){smMesVai(k);return}SM.semana=smMais(SM.semana||smSeg(smHoje()),k*7);render()}
-try{SM.vis=localStorage.getItem('sm_vis')||'mes'}catch(e){SM.vis='mes'}
+SM.vis='semana';
 function smCalendario(){
   const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smSeg(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smSeg(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
-  const corpo=SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
+  const corpo=sem?smQuadroSemana(seg):SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${SM.plan?smPainelMes():''}${corpo}
    <p class="mut sm-dica">Toque num dia para editar (tema, foco, noite, feriado, itens) · <button class="sm-tagb" onclick="smSem('${sem?seg:smSeg(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar. Plantões e sobreavisos vêm do Google Agenda na revisão de domingo.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
 }
+function smQuadroSemana(seg){
+  const velho=document.getElementById('sm_quadro');
+  SM.scrollSem=SM.scrollSem||{};if(velho)SM.scrollSem[velho.dataset.semana]=velho.scrollLeft;
+  setTimeout(()=>{const el=document.getElementById('sm_quadro');if(!el||el.dataset.semana!==seg)return;
+    const hj=el.querySelector('.sm-dia.hoje');el.scrollLeft=SM.scrollSem[seg]??(hj?hj.offsetLeft-el.firstElementChild.offsetLeft:0);
+  },0);
+  const dias=smSemana(seg),hj=smHoje();
+  return `<div id="sm_quadro" class="sm-quadro" data-semana="${seg}" role="region" aria-label="Semana de segunda a domingo" tabindex="0"><div class="sm-colunas">${dias.map(d=>`<section class="sm-dia ${d===hj?'hoje sm-hoje1':''}" data-drop="${d}"><header><button class="sm-tagb" onclick="smSel('${d}')">${smRotL(d)}${d===hj?' · hoje':''}</button>${smFeitasBotao(d)}</header><div class="sm-eventos">${smEvs(d)}${smDia(d).agenda?`<span class="sm-agenda-texto">${esc(smDia(d).agenda)}</span>`:''}${smFeriado(d)?`<small>${esc(smFeriado(d))}</small>`:''}</div><div class="sm-dia-tarefas">${smGrupos(smVisiveis(d))||'<p class="mut">Sem tarefas</p>'}</div><footer>${smSelo(d,true)}<button class="sm-tagb" onclick="qaAbreDia('${d}')">+ tarefa</button></footer></section>`).join('')}</div></div>${SM.sem===seg?smPainelSemana(seg):''}${dias.includes(SM.sel)?smPainelDia(SM.sel):''}`;
+}
+function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
   const hj=smHoje();let h='';
   for(let s=ini;s<=fim;s=smMais(s,7)){
@@ -601,7 +721,7 @@ function smGrade(mes,ini,fim,p,r,sem=false){
     if(SM.sem===s)h+=smPainelSemana(s);
     if(SM.sel&&ds.includes(SM.sel))h+=smPainelDia(SM.sel);
   }
-  return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
+  return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
 }
 function smLista(mes,ini,fim,p,r){
   const hj=smHoje(),esta=smSeg(hj);let h='';
@@ -631,20 +751,22 @@ function smFracosCard(){
 function vSemana(){
   if(!SM.ok)return `<div class="card"><p class="mut">Carregando o calendário…</p></div>`;
   if(!SM.d)return `<div class="card"><p class="mut">Calendário ainda vazio.</p></div>`;
-  setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=SM.d.tarefas.filter(t=>t.dia!=='proxima'&&t.dia<hj&&t.dia>=smMais(hj,-7)&&!t.feito);
+  setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=tarefasAtrasadas(SM.d.tarefas,hj);
   return `<div class="sm">
    ${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}
-   ${smSemData()}
+   ${atr.length?`<div class="card sm-atrasadas"><div class="row"><span class="kick">Atrasadas · ${atr.length}</span><button class="b s sm-ghost" onclick="smRola()">Passar tudo para hoje</button></div>${atr.map(t=>`<div><small>${smRotL(t.dia)}</small>${smItem(t)}</div>`).join('')}</div>`:''}
+   ${SM.avisosAgenda?.length?`<details class="sm-avisos"><summary>Avisos da escala · ${SM.avisosAgenda.length}</summary>${SM.avisosAgenda.map(a=>`<p>${esc(a)}</p>`).join('')}</details>`:''}
    ${smCalendario()}
-   ${smHojeGrande()}
-   ${atr.length?`<div class="card"><span class="kick" style="color:var(--bad)">Ficou para trás (últimos 7 dias)</span>${atr.map(t=>`<div class="sm-frl"><span>${esc(tituloTarefa(t.texto))} <span class="sm-tag">${smRot(t.dia)}</span></span><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button></div>`).join('')}</div>`:''}
+   ${SM.vis!=='semana'?smHojeGrande():''}
+   ${smSemData()}
    ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
+   ${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}
   </div>`;
 }
 // cartão na aba Hoje: itens de hoje com check, sem sair da tela
 function smCardHoje(){
   if(!SM.d)return'';setTimeout(smAuto,0);const hj=smHoje(),todos=smItensDe(hj),its=smVisiveis(hj);if(!todos.length)return'';
-  return `<div class="card sm-ch"><div class="row" style="justify-content:space-between"><span class="kick">Hoje no calendário · ${todos.filter(t=>t.feito).length}/${todos.length}</span>${smFeitasBotao(hj)}<button class="b s sm-ghost" onclick="go('semana')">Ver calendário</button></div>${smGrupos(its)}</div>`;
+  return `<div class="card sm-ch"><div class="row" style="justify-content:space-between"><span class="kick">Hoje no calendário · ${todos.filter(t=>t.feito).length}/${todos.length}</span>${smFeitasBotao(hj)}<button class="b s sm-ghost" onclick="go('semana')">Ver calendário</button></div>${smGrupos(its)}${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}</div>`;
 }
 const smCarga=smPuxar();
 setInterval(()=>{if(document.visibilityState==='visible')smPuxar()},90000);
@@ -663,22 +785,22 @@ function smMetaHoje(){
 // (interpretarTarefa, build/interpretar.js). Quando / tipo / urgente / detalhes são botões opcionais. O que estiver digitado fica em
 // localStorage (QA_RASC) a cada tecla e volta ao reabrir, mesmo depois de recarregar o app; só some ao salvar ou em "Limpar".
 const QA_RASC='bcbr_rasc_tarefa';
-const QA={on:false,texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,ouvindo:false,rec:null,detAberto:false,diasAberto:false};
+const QA={on:false,texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,prioridade:'',hora:'',lembrete:'',repetir:null,etiquetas:[],ouvindo:false,rec:null,detAberto:false,diasAberto:false};
 const qaRascLer=()=>{try{return JSON.parse(localStorage.getItem(QA_RASC)||'null')}catch(e){return null}};
 function qaRascSalva(extra){
-  try{const r={texto:QA.texto,det:QA.det,area:QA.area,quando:QA.quando,dias:QA.dias,urg:!!QA.urg,aberto:QA.on,...(extra||{})};
-    if(!r.texto.trim()&&!r.det.trim()&&r.area==='tarefas'&&!r.quando&&!(r.dias||[]).length&&!r.urg&&!r.salvar)localStorage.removeItem(QA_RASC);else localStorage.setItem(QA_RASC,JSON.stringify(r))}catch(e){}
+  try{const r={texto:QA.texto,det:QA.det,area:QA.area,quando:QA.quando,dias:QA.dias,urg:!!QA.urg,prioridade:QA.prioridade,hora:QA.hora,lembrete:QA.lembrete,repetir:QA.repetir,etiquetas:QA.etiquetas,aberto:QA.on,...(extra||{})};
+    if(!r.texto.trim()&&!r.det.trim()&&r.area==='tarefas'&&!r.quando&&!(r.dias||[]).length&&!r.urg&&!r.salvar&&!r.prioridade&&!r.hora&&r.lembrete===''&&!r.repetir&&!r.etiquetas.length)localStorage.removeItem(QA_RASC);else localStorage.setItem(QA_RASC,JSON.stringify(r))}catch(e){}
 }
 const qaRascLimpa=()=>{try{localStorage.removeItem(QA_RASC)}catch(e){}};
 // No app Android (WebView) a voz do navegador não funciona: o 🎤 abre o reconhecedor nativo (BCBRNativo.falar), que grava na fila de pendentes;
 // o app importa ao voltar (MainActivity.onResume chama smNativoImporta). APK antigo sem falar(): sem 🎤 (pedido do Artur, 24/10/2026).
 const qaVozNativa=()=>!!(window.BCBRNativo&&typeof window.BCBRNativo.falar==='function');
 const qaVozAPI=()=>window.BCBRNativo?qaVozNativa():(window.SpeechRecognition||window.webkitSpeechRecognition);
-function qaZera(){Object.assign(QA,{texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,detAberto:false,diasAberto:false})}
+function qaZera(){Object.assign(QA,{texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,prioridade:'',hora:'',lembrete:'',repetir:null,etiquetas:[],detAberto:false,diasAberto:false})}
 function qaAbre(){
   if(QA.on){const i=document.getElementById('qa_in');i&&i.focus();return}
   const r=qaRascLer()||{};
-  Object.assign(QA,{on:true,texto:r.texto||'',det:r.det||'',area:r.area||'tarefas',quando:r.quando||'',dias:Array.isArray(r.dias)?r.dias:[],urg:!!r.urg,ouvindo:false,rec:null,detAberto:!!r.det,diasAberto:Array.isArray(r.dias)&&r.dias.length>0});
+  Object.assign(QA,{on:true,texto:r.texto||'',det:r.det||'',area:r.area||'tarefas',quando:r.quando||'',dias:Array.isArray(r.dias)?r.dias:[],urg:!!r.urg,prioridade:r.prioridade||'',hora:r.hora||'',lembrete:r.lembrete??'',repetir:r.repetir||null,etiquetas:r.etiquetas||[],ouvindo:false,rec:null,detAberto:!!r.det,diasAberto:Array.isArray(r.dias)&&r.dias.length>0});
   qaRascSalva();qaDesenha();
 }
 function qaFechaEl(){if(QA.rec){try{QA.rec.abort()}catch(e){}QA.rec=null}QA.ouvindo=false;QA.on=false;const el=document.getElementById('qa');if(el)el.remove()}
@@ -703,9 +825,20 @@ function qaTipoCria(){
 function qaUrgente(){QA.urg=!QA.urg;qaRascSalva();qaPinta()}
 function qaDetAlterna(){QA.detAberto=!QA.detAberto;const d=document.getElementById('qa_det');if(d){d.hidden=!QA.detAberto;if(QA.detAberto)d.focus()}qaPinta()}
 const qaDM=iso=>iso.slice(8)+'/'+iso.slice(5,7);
-function qaPrevTxt(){
-  const hj=smHoje(),L=interpretarTarefa(QA.texto,hj);if(!L.length)return'';
-  const parte=r=>{const p=[];if(r.dia)p.push(r.dia==='sem'?'♾️ sem data':'📅 '+qaDM(r.dia));if(r.hora)p.push(r.hora);if(r.urg)p.push('! urgente');if(r.area&&r.area!=='tarefas')p.push(smTipoIco(r.area)+' '+smTipoDe(r.area).nome);return p.join(' · ')};
+function qaPrevTxt(){return smPreviaTexto(QA.texto,QA)}
+function smTextoOpcoes(texto,hoje,pad={}){
+  return interpretarTarefa(texto,hoje).map(r=>{
+    const repetir=r.repetir||pad.repetir||null;
+    let dias=r.dia?[r.dia]:pad.dias?.length?[...pad.dias].sort():[pad.quando==='hoje'?hoje:pad.quando||'sem'];
+    if(repetir&&!r.dia&&!pad.dias?.length&&!pad.quando)dias=[repetir.tipo==='mensal'?hoje:proximaData(smMais(hoje,-1),repetir)||hoje];
+    return {...r,dias,hora:r.hora||pad.hora||null,prioridade:r.prioridade||pad.prioridade||null,urg:r.urg||!!pad.urg,repetir,
+      lembrete:pad.lembrete==null||pad.lembrete===''?null:+pad.lembrete,etiquetas:[...new Set([...r.etiquetas,...(pad.etiquetas||[])])]};
+  });
+}
+function smPrevLinha(dia,texto){const el=document.getElementById('sm_prev_'+dia);if(el)el.textContent=smPreviaTexto(texto,{dias:SM.add[dia]?[...SM.add[dia]]:[dia]})}
+function smPreviaTexto(texto,pad={}){
+  const hj=smHoje(),L=smTextoOpcoes(texto,hj,pad);if(!L.length)return'';
+  const parte=r=>{const p=[r.dias.map(d=>d==='sem'?'sem data':qaDM(d)).join(', '),r.hora||'sem hora',r.urg?'U urgente':({alta:'alta',media:'média',baixa:'baixa'})[r.prioridade]||'sem prioridade'];if(r.repetir)p.push(({diaria:'todo dia',uteis:'dias úteis',semanal:'toda semana',mensal:'todo mês'})[r.repetir.tipo]);if(r.etiquetas.length)p.push(r.etiquetas.map(t=>'#'+t).join(' '));return p.join(' · ')};
   if(L.length===1)return parte(L[0]);
   return L.length+' tarefas: '+L.map(r=>r.texto+(parte(r)?' ('+parte(r)+')':'')).join(' | ');
 }
@@ -723,11 +856,11 @@ function qaPinta(){   // atualiza só o que mudou (não refaz o campo: não perd
 // cria a(s) tarefa(s) a partir de um texto livre; pad = escolhas dos botões {quando,area,urg,det}. Devolve as tarefas criadas.
 function smCriaDeTexto(bruto,pad){
   pad=pad||{};const hj=smHoje(),novos=[];
-  interpretarTarefa(bruto,hj).forEach(r=>{
-    const dias=r.dia?[r.dia]:pad.dias&&pad.dias.length?[...pad.dias].sort():[pad.quando==='hoje'?hj:pad.quando||'sem'],ts=r.area?{area:r.area,sub:''}:smParseTS(pad.area||'tarefas');
-    const texto=r.hora?r.hora+' '+r.texto:r.texto,urg=r.urg||!!pad.urg;
-    smNovos(dias,texto,ts.area,ts.sub,pad.det).forEach(x=>novos.push(urg?{...x,urg:true}:x));
+  smTextoOpcoes(bruto,hj,pad).forEach(r=>{
+    const ts=r.area?{area:r.area,sub:''}:smParseTS(pad.area||'tarefas');
+    smNovos(r.dias,r.texto,ts.area,ts.sub,pad.det).forEach(x=>novos.push({...x,urg:r.urg,hora:r.hora,lembrete:r.lembrete,prioridade:r.prioridade,etiquetas:r.etiquetas,repetir:r.repetir?{...r.repetir,...(r.repetir.tipo==='mensal'&&dataTarefaValida(x.dia)?{diaMes:+x.dia.slice(8)}:{})}:null}));
   });
+  if(pad.nativoId){const prefixo='nat_'+Array.from(String(pad.nativoId),c=>c.codePointAt(0).toString(16)).join('_'),grupos=new Map();novos.forEach((x,i)=>{x.id=prefixo+'_'+i;if(x.grupo){if(!grupos.has(x.grupo))grupos.set(x.grupo,prefixo+'_g'+i);x.grupo=grupos.get(x.grupo)}})}
   if(novos.length)smPoe(novos,'novo item');
   return novos;
 }
@@ -737,11 +870,12 @@ function smDesfazToast(msg,fn){
   let el=document.getElementById('sm_dz');if(el)el.remove();
   el=document.createElement('div');el.id='sm_dz';el.className='sm-dz';
   const sp=document.createElement('span');sp.textContent=msg;const b=document.createElement('button');b.className='b s';b.textContent='Desfazer';
-  b.onclick=()=>{clearTimeout(el._t);el.remove();fn()};el.append(sp,b);document.body.appendChild(el);el._t=setTimeout(()=>el.remove(),3500);
+  el.setAttribute('role','status');b.onclick=()=>{clearTimeout(el._t);el.remove();fn()};el.append(sp,b);document.body.appendChild(el);el._t=setTimeout(()=>el.remove(),5000);
 }
 function qaSalvar(){
   const bruto=QA.texto.trim();if(!bruto){toast('Escreva a tarefa');return}
-  const pad={quando:QA.quando,dias:[...QA.dias],area:QA.area,urg:QA.urg,det:QA.det.trim()};
+  const pad={quando:QA.quando,dias:[...QA.dias],area:QA.area,urg:QA.urg,det:QA.det.trim(),prioridade:QA.prioridade,hora:QA.hora,lembrete:QA.lembrete,repetir:QA.repetir,etiquetas:QA.etiquetas};
+  if(smTextoOpcoes(bruto,smHoje(),pad).some(r=>r.repetir?.tipo==='semanal'&&!r.repetir.dias?.length)){toast('Escolha pelo menos um dia para repetir.');return}
   if(!SM.d){   // calendário ainda não carregou nem está guardado no aparelho: guarda e grava quando chegar
     qaFechaEl();qaRascSalva({salvar:true,aberto:false});toast('Vai salvar assim que o calendário carregar.');smCarga.then(smRascPend);return}
   const novos=smCriaDeTexto(bruto,pad);if(!novos.length)return;
@@ -749,7 +883,7 @@ function qaSalvar(){
   const ids=novos.map(x=>x.id);
   smDesfazToast('Salvei: '+smResumoNovos(novos),()=>{
     smMudar(d=>{d.tarefas=d.tarefas.filter(t=>!ids.includes(t.id))},'desfez item');
-    try{localStorage.setItem(QA_RASC,JSON.stringify({texto:bruto,det:pad.det,area:pad.area,quando:pad.quando,dias:pad.dias,urg:!!pad.urg,aberto:true}))}catch(e){}
+    try{localStorage.setItem(QA_RASC,JSON.stringify({...pad,texto:bruto,aberto:true}))}catch(e){}
     qaAbre();
   });
 }
@@ -758,7 +892,7 @@ function smRascPend(){
   const r=qaRascLer();if(!r||!r.salvar)return;
   if(!SM.d){toast('Não consegui salvar a tarefa agora. O texto está guardado neste aparelho.');return}
   const bruto=(r.texto||'').trim();qaRascLimpa();if(!bruto)return;
-  const novos=smCriaDeTexto(bruto,{quando:r.quando,dias:r.dias,area:r.area,urg:r.urg,det:(r.det||'').trim()});
+  const novos=smCriaDeTexto(bruto,{...r,det:(r.det||'').trim()});
   if(novos.length)toast('Salvei: '+smResumoNovos(novos));
 }
 // ---- voz (Web Speech API; sem ela o botão 🎤 nem aparece) ----
@@ -771,9 +905,20 @@ function qaVoz(){
   rec.onresult=e=>{let f='',pv='';for(let i=0;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)f+=r[0].transcript;else pv+=r[0].transcript}
     final=f;QA.texto=((base?base+' ':'')+(f+pv)).trim();const c=document.getElementById('qa_in');if(c)c.value=QA.texto;qaRascSalva();qaPinta()};
   rec.onerror=e=>{const c=e.error;if(c==='not-allowed'||c==='service-not-allowed')toast('Permita o microfone para ditar.');else if(c==='no-speech')toast('Não ouvi nada.');else if(c!=='aborted')toast('Não consegui ouvir ('+c+').')};
-  rec.onend=()=>{if(QA.rec===rec){QA.rec=null;QA.ouvindo=false;qaPinta();if(final.trim()&&QA.on)qaSalvar()}};
+  rec.onend=()=>{if(QA.rec===rec){QA.rec=null;QA.ouvindo=false;qaPinta()}};
   QA.rec=rec;QA.ouvindo=true;qaPinta();
   try{rec.start()}catch(e){QA.rec=null;QA.ouvindo=false;qaPinta()}
+}
+function qaCampo(campo,valor){QA[campo]=valor;qaRascSalva();qaPinta()}
+function qaRepetir(tipo){QA.repetir=tipo?{tipo,...(tipo==='semanal'?{dias:[smDt(smHoje()).getDay()]}:{})}:null;qaRascSalva();qaDesenha()}
+function qaRepDia(dia,marcado){if(QA.repetir?.tipo!=='semanal')return;const dias=new Set(QA.repetir.dias);marcado?dias.add(dia):dias.delete(dia);QA.repetir={tipo:'semanal',dias:[...dias]};qaRascSalva();qaPinta()}
+function qaExtrasHtml(){
+  const op=(lista,valor)=>lista.map(([v,n])=>`<option value="${v}" ${v===String(valor??'')?'selected':''}>${n}</option>`).join('');
+  return `<div class="sm-extras"><label>Prioridade<select id="qa_prioridade" onchange="qaCampo('prioridade',this.value)">${op([['','Sem prioridade'],['alta','Alta'],['media','Média'],['baixa','Baixa']],QA.prioridade)}</select></label>
+    <label>Hora<input id="qa_hora" type="time" value="${esc(QA.hora)}" onchange="qaCampo('hora',this.value)"></label>
+    <label>Lembrete<select id="qa_lembrete" onchange="qaCampo('lembrete',this.value)">${op([['','Nenhum'],['0','Na hora'],['15','15 min antes'],['60','1 h antes']],QA.lembrete)}</select></label>
+    <label>Repetir<select id="qa_repetir" onchange="qaRepetir(this.value)">${op([['','Não repetir'],['diaria','Todo dia'],['uteis','Dias úteis'],['semanal','Toda semana'],['mensal','Todo mês']],QA.repetir?.tipo)}</select></label></div>
+    <div class="sm-rep-dias" ${QA.repetir?.tipo==='semanal'?'':'hidden'}>${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" ${(QA.repetir?.dias||[]).includes(d)?'checked':''} onchange="qaRepDia(${d},this.checked)">${smDOW[d]}</label>`).join('')}</div>`;
 }
 function qaDesenha(){
   let el=document.getElementById('qa');
@@ -786,8 +931,9 @@ function qaDesenha(){
     <div id="qa_dias" class="sm-chips" ${QA.diasAberto?'':'hidden'}>${QA.diasAberto?qaDiasHtml():''}</div>
     <div class="qa-opts"><span class="sm-lbl">Tipo</span><select id="qa_area" aria-label="Tipo" onchange="qaTipoSel(this.value)">${smOpcoes(tp)}<option value="__novo">+ novo tipo…</option></select><input id="qa_tn" class="sm-date" placeholder="Nome do novo tipo + Enter" aria-label="Nome do novo tipo" hidden style="flex:1 1 140px;min-width:0"><button type="button" id="qa_urg" class="sm-tagb" onclick="qaUrgente()" title="Alt+U">! urgente</button><button type="button" id="qa_detb" class="sm-tagb" onclick="qaDetAlterna()">≡ detalhes</button></div>
     <textarea id="qa_det" class="qa-in qa-det" rows="2" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa" oninput="QA.det=this.value;qaRascSalva()" ${QA.detAberto?'':'hidden'}>${esc(QA.det)}</textarea>
+    ${qaExtrasHtml()}
     <div class="row" style="margin-top:6px"><button class="b" onclick="qaSalvar()">Salvar</button><span style="flex:1"></span><button class="b s sm-ghost" onclick="qaLimpa()">Limpar</button></div>
-    <div class="qa-dica"><kbd>Enter</kbd> salva na hora (sem data, tipo Tarefas, a menos que o texto diga) · <kbd>Alt</kbd>+<kbd>U</kbd> urgente · <kbd>Esc</kbd> fecha e guarda o rascunho · ex.: “amanhã 9h”, “dia 30/10”, “urgente”, “estudo …”, “próxima tarefa …”</div></div>`;
+    <div class="qa-dica"><kbd>Enter</kbd> salva · <kbd>Alt</kbd>+<kbd>U</kbd> urgente · <kbd>Esc</kbd> guarda o rascunho · ex.: “plantão ter 18h”, “ração sexta 9h30 !alta”, “questões todo dia”, “!! #pacs”. O texto prevalece sobre as opções. Anexos e subtarefas ficam no editor após salvar.</div></div>`;
   const s=document.getElementById('qa_area');if(s)s.value=tp;
   qaPinta();const i=document.getElementById('qa_in');i.focus();i.setSelectionRange(i.value.length,i.value.length);
 }
@@ -830,14 +976,14 @@ window.addEventListener('keydown',e=>{
 const SMK={on:false,i:-1,id:null,cel:'hoje'};
 function smkIni(){SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel='hoje'}
 const smkItens=dia=>smVisiveis(dia);
-const smkNh=()=>smAgrupa(smkItens(smHoje())).flatMap(g=>g.l).length;
+const smkNh=()=>smkItens(smHoje()).length;
 function smkSelecionada(id){if(!SMK.on)return false;if(SMK.id)return SMK.id===id;const x=smkLista()[SMK.i];return !!x&&x.id===id}
 function smkSeleciona(id){const i=smkLista().findIndex(t=>t.id===id);SMK.on=true;SMK.cel=null;if(i>=0){SMK.i=i;SMK.id=null}else{SMK.i=-1;SMK.id=id}smkPinta()}
-function smkLista(){return [...smAgrupa(smkItens(smHoje())).flatMap(g=>g.l),...smAgrupa(smkItens('sem')).flatMap(g=>g.l)]}
-function smkPinta(){if(tela!=='semana')return;const c=document.querySelector('#app .sm-hoje1'),d=document.querySelector('#app .sm-sd');if(!c)return;
-  const rh=[...c.querySelectorAll('.sm-grp .sm-row')],rs=d?[...d.querySelectorAll('.sm-grp .sm-row')]:[],rows=[...rh,...rs];
+function smkLista(){return [...smkItens(smHoje()),...smkItens('sem')]}
+function smkPinta(){if(tela!=='semana')return;const c=document.querySelector('#app .sm-hoje1'),d=document.querySelector('#app .sm-sd');
+  const rh=c?[...c.querySelectorAll('.sm-grp .sm-row')]:[],rs=d?[...d.querySelectorAll('.sm-grp .sm-row')]:[],rows=[...rh,...rs];
   const naSd=SMK.i<0?SMK.cel==='sd':SMK.i>=rh.length,cel=SMK.on&&!SMK.id;
-  c.classList.toggle('kbsel',cel&&!naSd);if(d)d.classList.toggle('kbsel',cel&&naSd);
+  if(c)c.classList.toggle('kbsel',cel&&!naSd);if(d)d.classList.toggle('kbsel',cel&&naSd);
   document.querySelectorAll('#app .sm-row.kbsel').forEach(r=>r.classList.remove('kbsel'));
   rows.forEach((r,i)=>{if(cel&&i===SMK.i)r.classList.add('kbsel')});
   if(SMK.on&&SMK.id)document.querySelectorAll('#app .sm-row[data-tid]').forEach(r=>{if(r.dataset.tid===SMK.id)r.classList.add('kbsel')});
@@ -868,11 +1014,12 @@ document.addEventListener('click',e=>{if(tela!=='semana')return;const t=e.target
 // ===== EVENTOS DO DIA (pedido do Artur, 23/10/2026): selos como BR/HSI, largura toda da célula =====
 // dias[iso].ev = [{id, t, c}] · c = cor (roxo, azul, laranja, rosa, turquesa, cinza). Criar/apagar no painel do dia.
 const SM_EVC=[['roxo','Roxo'],['azul','Azul'],['laranja','Laranja'],['rosa','Rosa'],['turquesa','Turquesa'],['cinza','Cinza']];
-const smEvL=iso=>(smDia(iso).ev||[]);
-const smEvs=iso=>smEvL(iso).map(v=>`<span class="sm-ev c-${esc(v.c||'roxo')}" title="${esc(v.t)}">${esc(v.t)}</span>`).join('');
+const SM_AGENDA_TIPOS=['br','norte','hsi','br-manha','almoco','estagio','cobre-pos'];
+const smEvL=iso=>{const manuais=smDia(iso).ev||[];return [...manuais,...dedupeAgenda(SM.agenda||[],[...manuais,{t:smDia(iso).agenda}],iso).map(e=>({t:e.titulo,c:SM_AGENDA_TIPOS.includes(e.tipo)?'escala-'+e.tipo:'escala',leitura:true,inicio:e.inicio,fim:e.fim,diaInteiro:e.diaInteiro,local:e.local}))]};
+const smEvs=iso=>smEvL(iso).map(v=>`<span class="sm-ev c-${esc(v.c||'roxo')}" title="${esc(v.t+(v.leitura?' · escala automática (somente leitura)':''))}">${esc(v.t)}${v.leitura?`<small>${v.diaInteiro?'Dia inteiro':esc(String(v.inicio).slice(11,16)+(v.fim?' – '+String(v.fim).slice(11,16):''))}${v.local?' · '+esc(v.local):''}</small>`:''}</span>`).join('');
 function smEvEditor(iso){
   const c=SM.evc||'roxo';
-  return `<div class="row sm-evr"><span class="sm-lbl">Eventos</span>${smEvL(iso).map(v=>`<span class="sm-ev c-${esc(v.c||'roxo')} sm-evx">${esc(v.t)}<button onclick="smEvDel('${iso}','${v.id}')" aria-label="Apagar evento">×</button></span>`).join('')}
+  return `<div class="row sm-evr"><span class="sm-lbl">Eventos</span>${smEvL(iso).map(v=>`<span class="sm-ev c-${esc(v.c||'roxo')} sm-evx">${esc(v.t)}${v.leitura?'<small>Escala · somente leitura</small>':`<button onclick="smEvDel('${iso}','${v.id}')" aria-label="Apagar evento">×</button>`}</span>`).join('')}
    <input id="sm_ev_${iso}" placeholder="Novo evento (ex.: Aniversário, Prova USG)" onkeydown="if(event.key==='Enter')smEvAdd('${iso}')" style="flex:1 1 180px;min-width:0" aria-label="Novo evento">
    <span class="sm-evcs">${SM_EVC.map(([k,n])=>`<button type="button" class="sm-evc c-${k}" aria-pressed="${c===k}" title="${n}" aria-label="${n}" onclick="smEvCor('${k}',this)"></button>`).join('')}</span>
    <button class="b s" onclick="smEvAdd('${iso}')">+ evento</button></div>`;
@@ -913,7 +1060,8 @@ function smdComeca(){
   document.body.classList.add('smd-on');try{getSelection().removeAllRanges()}catch(e){}
   if(navigator.vibrate)try{navigator.vibrate(25)}catch(e){}
   smdPos();
-  d.auto=setInterval(()=>{const h=innerHeight;if(d.cy<70)scrollBy(0,-16);else if(d.cy>h-70)scrollBy(0,16);else return;smdPos()},16);
+  d.auto=setInterval(()=>{const h=innerHeight;if(d.cy<70)scrollBy(0,-16);else if(d.cy>h-70)scrollBy(0,16);
+    const q=document.getElementById('sm_quadro');if(q){const b=q.getBoundingClientRect();if(d.cy>=b.top&&d.cy<=b.bottom){if(d.cx<b.left+38)q.scrollLeft-=8;else if(d.cx>b.right-38)q.scrollLeft+=8}}smdPos()},16);
 }
 document.addEventListener('pointerdown',e=>{
   if(SMD||tela!=='semana'||(e.pointerType==='mouse'&&e.button!==0))return;
@@ -971,6 +1119,7 @@ function smNativoResumo(){
   return {geradoEm:new Date().toISOString(),hoje:hj,tarefasHoje:lista(hj),tarefasSem:lista('sem'),dias,mes:hj.slice(0,7)};
 }
 function smNativo(forca){
+  smNativoTarefas();
   try{if(!window.BCBRNativo)return;const r=smNativoResumo();if(!r)return;
     const s=JSON.stringify({...r,geradoEm:''});if(!forca&&s===smNatUlt)return;smNatUlt=s;window.BCBRNativo.dados(JSON.stringify(r))}catch(e){console.warn('ponte Android',e)}
 }
@@ -990,14 +1139,16 @@ function smNativoImporta(){
     if(!SM.d){smCarga.then(()=>{if(SM.d)smNativoImporta()});return}
     let lista=JSON.parse(B.pendentes()||'[]');if(!Array.isArray(lista)||!lista.length)return;
     let jaImp=[];try{jaImp=JSON.parse(localStorage.getItem(SM_NAT_IMP)||'[]')}catch(e){}
-    const ids=[];smNatBusy=true;
+    const ids=[],gravacoes=[];smNatBusy=true;
     lista.forEach(p=>{
       if(!p||p.id==null)return;const id=String(p.id);ids.push(id);if(jaImp.includes(id))return;
-      const t=String(p.texto||'').trim();if(t&&p.tipo==='ideia'){smIdeiaNova=true}else if(t){const nv=smCriaDeTexto(t,{});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}
+      if(p.tipo==='concluir'){
+        const tarefa=smTar(String(p.tarefa));if(!tarefa){ids.pop();return}
+        gravacoes.push(smCheck(String(p.tarefa),true,true));
+      }else{const t=String(p.texto||'').trim();if(t&&p.tipo==='ideia'){smIdeiaNova=true}else if(t){const nv=smCriaDeTexto(t,{nativoId:id});if(nv.length)toast('Salvei: '+smResumoNovos(nv))}}
       jaImp.push(id);
     });
-    try{localStorage.setItem(SM_NAT_IMP,JSON.stringify(jaImp.slice(-500)))}catch(e){}
-    SM.fila.then(()=>{smNatBusy=false;if(!SM.erro&&ids.length&&typeof B.confirmar==='function'){try{B.confirmar(JSON.stringify(ids))}catch(e){console.warn('confirmar',e)}}});
+    Promise.all([SM.fila,...gravacoes]).then(([, ...resultados])=>{smNatBusy=false;if(resultados.every(Boolean)&&!SM.erro&&ids.length){try{localStorage.setItem(SM_NAT_IMP,JSON.stringify(jaImp.slice(-500)));if(typeof B.confirmar==='function')B.confirmar(JSON.stringify(ids))}catch(e){console.warn('confirmar',e)}}});
   }catch(e){smNatBusy=false;console.warn('ponte Android (pendentes)',e)}
 }
 // ---- Caixa de ideias (ideias/caixa.md do repo privado) -> tarefas em Ferramenta, sem data ----
@@ -1027,6 +1178,86 @@ async function smIdeiasSync(forca){
 smIdeiasSync(true);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')smIdeiasSync()});
 setInterval(()=>{if(smIdeiaNova){smIdeiaNova=false;setTimeout(()=>smIdeiasSync(true),12000)}},3000);   // widget acabou de mandar: relê a caixa
 if(window.BCBRNativo){smNativoImporta();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')smNativoImporta()})}
+
+// ===== Semana 1.21: campos opcionais; nenhum dado privado vai para o código público =====
+function smMetadados(t){
+  const p=prioridadeTarefa(t),subs=t.subtarefas||[];
+  return `<div class="sm-metadados">${p?`<span class="sm-prio sm-prio-${p}">${({u:'U',alta:'Alta',media:'Média',baixa:'Baixa'})[p]}</span>`:''}${t.hora?`<time>${esc(t.hora)}</time>`:''}${subs.length?`<span aria-label="Subtarefas concluídas">${subs.filter(s=>s.feito).length}/${subs.length}</span>`:''}${t.repetir?'<span title="Tarefa recorrente">↻</span>':''}${(t.etiquetas||[]).map(s=>`<span>#${esc(s)}</span>`).join('')}${t.anexos?.length?`<span>${t.anexos.length} anexo(s)</span>`:''}</div>`;
+}
+function smExtrasLer(){
+  const valor=id=>document.getElementById(id)?.value||'',tipo=valor('sm_ed_rep');
+  return {prioridade:valor('sm_ed_prioridade')||null,hora:valor('sm_ed_hora')||null,lembrete:valor('sm_ed_lembrete')===''?null:+valor('sm_ed_lembrete'),
+    repetir:tipo?{tipo,...(tipo==='semanal'?{dias:[...document.querySelectorAll('[name="sm_rep_dia"]:checked')].map(e=>+e.value)}:{})}:null,
+    etiquetas:[...new Set(valor('sm_ed_etiquetas').split(/[\s,]+/).map(s=>s.replace(/^#/, '').trim()).filter(Boolean))]};
+}
+function smExtrasHtml(t,rd){
+  const x={...t,...rd},rep=x.repetir||{},dias=rep.dias||[smDt(dataTarefaValida(t.dia)?t.dia:smHoje()).getDay()];
+  const muda=`smRascEdSalva('${t.id}')`;
+  return `<div class="sm-extras"><label>Prioridade<select id="sm_ed_prioridade" onchange="${muda}">${[['','Sem prioridade'],['alta','Alta'],['media','Média'],['baixa','Baixa']].map(([v,n])=>`<option value="${v}" ${v===(x.prioridade||'')?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label>Hora<input id="sm_ed_hora" type="time" value="${esc(x.hora||'')}" onchange="${muda}"></label>
+    <label>Lembrete<select id="sm_ed_lembrete" onchange="${muda}">${[['','Nenhum'],['0','Na hora'],['15','15 min antes'],['60','1 h antes']].map(([v,n])=>`<option value="${v}" ${v===String(x.lembrete??'')?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label>Repetir<select id="sm_ed_rep" onchange="${muda};render()">${[['','Não repetir'],['diaria','Todo dia'],['uteis','Dias úteis'],['semanal','Toda semana'],['mensal','Todo mês']].map(([v,n])=>`<option value="${v}" ${v===(rep.tipo||'')?'selected':''}>${n}</option>`).join('')}</select></label></div>
+    <div class="sm-rep-dias" ${rep.tipo==='semanal'?'':'hidden'}>${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" name="sm_rep_dia" value="${d}" ${dias.includes(d)?'checked':''} onchange="${muda}">${smDOW[d]}</label>`).join('')}</div>
+    <label>Etiquetas<input id="sm_ed_etiquetas" value="${esc((x.etiquetas||[]).join(' '))}" placeholder="#pacs" oninput="${muda}"></label>
+    ${smSubHtml(t)}${smAnexosHtml(t)}<label>Anexar foto ou arquivo (até 3 MB)<input type="file" aria-label="Anexar foto ou arquivo" onchange="smAnexa('${t.id}',this)"></label>`;
+}
+function smSubHtml(t){
+  return `<div class="sm-subtarefas"><b>Subtarefas</b>${(t.subtarefas||[]).map((s,i)=>`<div class="sm-sub"><label><input type="checkbox" ${s.feito?'checked':''} onchange="smSubMarca('${t.id}',${i},this.checked)"><span>${esc(s.texto)}</span></label><button class="sm-tagb" onclick="smSubApaga('${t.id}',${i})" aria-label="Apagar subtarefa">×</button></div>`).join('')}<form onsubmit="smSubAdd(event,'${t.id}')"><input name="texto" aria-label="Nova subtarefa" placeholder="Nova subtarefa" required><button class="sm-tagb" type="submit">+</button></form></div>`;
+}
+function smSubAdd(e,id){e.preventDefault();const i=e.currentTarget.elements.texto,texto=i.value.trim();if(!texto)return;const sub={id:smId(),texto,feito:false};i.value='';
+  smMudar(d=>{const t=d.tarefas.find(t=>t.id===id);if(t){t.subtarefas=t.subtarefas||[];if(!t.subtarefas.some(s=>s.id===sub.id))t.subtarefas.push({...sub})}},'adicionou subtarefa');
+}
+function smSubMarca(id,i,feito){const sub=smTar(id)?.subtarefas?.[i];if(!sub)return;const sid=sub.id;smMudar(d=>{const l=d.tarefas.find(t=>t.id===id)?.subtarefas||[],s=sid?l.find(s=>s.id===sid):l[i];if(s)s.feito=feito},'marcou subtarefa')}
+function smSubApaga(id,i){const sub=smTar(id)?.subtarefas?.[i];if(!sub)return;const sid=sub.id;smMudar(d=>{const t=d.tarefas.find(t=>t.id===id);if(t)t.subtarefas=(t.subtarefas||[]).filter((s,j)=>sid?s.id!==sid:j!==i)},'apagou subtarefa')}
+const smAnexoImagem=a=>/^image\/(jpeg|png|gif|webp|avif)$/.test(a.tipo||'');
+function smAnexosHtml(t){
+  setTimeout(smAnexosMiniaturas,0);
+  return `<div class="sm-anexos">${(t.anexos||[]).map((a,i)=>`<button class="sm-anexo sm-tagb" onclick="smAnexoAbre('${t.id}',${i})">${smAnexoImagem(a)?`<img data-anexo-t="${t.id}" data-anexo-i="${i}" alt="Miniatura de ${esc(a.nome)}">`:'📎'}<span>${esc(a.nome)}</span></button>`).join('')}</div>`;
+}
+async function smAnexa(id,input){
+  const file=input.files?.[0];if(!file)return;if(file.size>3*1024*1024){toast('O arquivo deve ter até 3 MB.');input.value='';return}
+  input.disabled=true;smRascEdSalva(id);
+  try{
+    const conteudo=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=()=>reject(new Error('Falha ao ler arquivo'));r.readAsDataURL(file)});
+    const pasta=String(id).replace(/[^a-zA-Z0-9_-]/g,'_'),nome=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'),caminho=`semana/anexos/${pasta}/${smId()}-${nome}`;
+    const r=await BCBR.api(`/repos/${BCBR.REPO}/contents/${caminho}`,{method:'PUT',body:JSON.stringify({message:'semana: anexo da tarefa',content:conteudo,branch:'main'})});
+    const anexo={id:smId(),nome:file.name,caminho,sha:r.content.sha,tipo:file.type,tamanho:file.size};
+    const ok=await smMudar(d=>{const t=d.tarefas.find(t=>t.id===id);if(t){t.anexos=t.anexos||[];if(!t.anexos.some(a=>a.id===anexo.id))t.anexos.push(anexo)}},'anexou arquivo');
+    toast(ok?'Anexo salvo':'Anexo enviado; os dados da tarefa ainda precisam sincronizar.');
+  }catch(e){toast('Não foi possível anexar: '+e.message)}finally{input.disabled=false;input.value=''}
+}
+async function smAnexoUrl(a){
+  SM.urlsAnexos=SM.urlsAnexos||{};const chave=a.sha||a.caminho;
+  if(!SM.urlsAnexos[chave])SM.urlsAnexos[chave]=(async()=>{
+    let f=a.sha?await BCBR.api(`/repos/${BCBR.REPO}/git/blobs/${encodeURIComponent(a.sha)}`):await BCBR.api(`/repos/${BCBR.REPO}/contents/${a.caminho}`);
+    if(!f.content&&f.sha)f=await BCBR.api(`/repos/${BCBR.REPO}/git/blobs/${encodeURIComponent(f.sha)}`);
+    const raw=atob(String(f.content||'').replace(/\s/g,'')),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+    return URL.createObjectURL(new Blob([bytes],{type:smAnexoImagem(a)||a.tipo==='application/pdf'?a.tipo:'application/octet-stream'}));
+  })().catch(e=>{delete SM.urlsAnexos[chave];throw e});
+  return SM.urlsAnexos[chave];
+}
+async function smAnexosMiniaturas(){
+  for(const img of document.querySelectorAll('img[data-anexo-t]:not([src])')){
+    const a=smTar(img.dataset.anexoT)?.anexos?.[+img.dataset.anexoI];if(!a)continue;
+    try{img.src=await smAnexoUrl(a)}catch(e){img.alt='Toque para tentar abrir o anexo'}
+  }
+}
+async function smAnexoAbre(id,i){
+  const a=smTar(id)?.anexos?.[i];if(!a)return;const visual=smAnexoImagem(a)||a.tipo==='application/pdf',aba=visual?window.open('about:blank','_blank'):null;if(aba)aba.opener=null;
+  try{const url=await smAnexoUrl(a);if(aba)aba.location.replace(url);else{const link=document.createElement('a');link.href=url;link.download=a.nome;link.click()}}
+  catch(e){if(aba)aba.close();toast('Não foi possível abrir o anexo: '+e.message)}
+}
+async function smAgendaPuxar(){
+  if(SM.agendaLendo)return;SM.agendaLendo=true;
+  const aplica=a=>{const n=normalizarAgenda(a);SM.agenda=n.eventos;SM.avisosAgenda=n.avisos;SM.agendaAtualizado=n.atualizado};
+  if(!SM.agenda){try{aplica(JSON.parse(localStorage.getItem('sm_agenda')||'[]'))}catch(e){aplica([])}}
+  try{const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/semana/agenda.json`);if(f.sha!==SM.agendaSha){const a=JSON.parse(smDec(f.content));if(!Array.isArray(a)&&!Array.isArray(a?.eventos))throw new Error('Formato de agenda inválido');aplica(a);SM.agendaSha=f.sha;try{localStorage.setItem('sm_agenda',JSON.stringify(a))}catch(e){}smRender()}}
+  catch(e){if(e.status===404){const tinha=SM.agenda.length||SM.avisosAgenda?.length;aplica([]);SM.agendaSha=null;try{localStorage.removeItem('sm_agenda')}catch(e){}if(tinha)smRender()}}
+  finally{SM.agendaLendo=false}
+}
+function smNativoTarefas(){
+  try{const b=window.BCBRNativo;if(SM.d&&b&&typeof b.tarefas==='function')b.tarefas(JSON.stringify(tarefasNativas(SM.d.tarefas,smHoje())))}catch(e){console.warn('ponte Android (tarefas)',e)}
+}
 
 
 
