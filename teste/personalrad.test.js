@@ -179,6 +179,32 @@ test('ponte de dados mantém estatísticas e dificuldade sem substituir campos a
   assert.equal(executar(c,'adaptar(entrada)[0].acerto'),85);
 });
 
+test('recarregar questão existente com novos pr_stats conserva classificação e progresso e exibe A–E',()=>{
+  const c=contexto();
+  executar(c,trecho(shim,'const limpa =','// fundo=true:'));
+  c.entrada=[{id:'q1',n:27,ar:'msk',cl:['Trauma','Joelho','Segond'],tags:['Banco'],classif:'claude',
+    alts:{A:'A',B:'B',C:'C',D:'D',E:'E'},gab:'C',dif:'d',acerto:20,
+    pr_stats:{acerto:29,respostas:15},dif_pr:'d'}];
+  executar(c,`const esc=String;let q=adaptar(entrada)[0];aplicaEd(q);Q=[q];
+    log=[{q:'q1',ok:true,esc:'C'}];pon={'e:q1':{e:{enunciado:'Texto editado'}}};`);
+  const progresso=executar(c,'JSON.stringify({log,pon})');
+  c.entrada[0].pr_stats={acerto:61,respostas:60,respondentes:50,tempos:{media:32},
+    alternativas:Object.fromEntries([...'ABCDE'].map((l,i)=>[l,{percentual:i*10,respostas:i}]))};
+  for(const [acerto,dif] of [[61,'f'],[60,'m'],[30,'m'],[29,'d']]){
+    c.entrada[0].pr_stats.acerto=acerto;
+    executar(c,'q=adaptar(entrada)[0];aplicaEd(q);Q=[q]');
+    assert.equal(executar(c,'q._d'),dif);
+    assert.equal(executar(c,'q.id'),'q1');assert.equal(executar(c,'q.ar'),'msk');
+    assert.equal(executar(c,'q.cl.join("/")'),'Trauma/Joelho/Segond');
+    assert.equal(executar(c,'q.classif'),'claude');assert.equal(executar(c,'q.dif'),'d');
+    assert.equal(executar(c,'JSON.stringify({log,pon})'),progresso);
+    for(const [i,l] of [...'ABCDE'].entries())assert.match(executar(c,`prAlternativa(q,'${l}',true)`),new RegExp(`${i*10}%`));
+    assert.match(executar(c,"prAlternativa(q,'C',true)"),/✓ 20%/);
+    assert.match(executar(c,'prDadosBloco(q)'),/Alunos: 50/);
+    assert.match(executar(c,'prDadosBloco(q)'),/media: 32 s/);
+  }
+});
+
 test('pesos moderados: aviso, prova real e incidência normalizada, sem casamento é neutro',()=>{
   const c=contexto();preparar(c);
   assert.equal(executar(c,'pesoPR(q)'),1);
