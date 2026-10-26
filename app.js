@@ -1,4 +1,4 @@
-// Banco CBR app 1.21.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.21.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -250,9 +250,9 @@ const smDt=iso=>{const[y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d
 const smMais=(iso,n)=>{const x=smDt(iso);x.setDate(x.getDate()+n);return dKey(+x)};
 const smRot=iso=>{if(iso==='proxima')return'Sem dia';if(iso==='sem')return'Sem data';const x=smDt(iso);return smDOW[x.getDay()]+' '+x.getDate()};
 const smRotL=iso=>{const x=smDt(iso);return smDOW[x.getDay()]+' '+x.getDate()+'/'+String(x.getMonth()+1).padStart(2,'0')};
-const smSeg=iso=>smMais(iso,-((smDt(iso).getDay()+6)%7)); // segunda a domingo
-const smSemana=iso=>{const s=smSeg(iso);return Array.from({length:7},(_,i)=>smMais(s,i))};
-const smNumSem=iso=>{const x=smDt(smMais(smSeg(iso),3)),a=new Date(x.getFullYear(),0,1,12);return Math.ceil((Math.round((x-a)/DAY)+1)/7)}; // semana ISO pela quinta-feira
+const smDom=iso=>smMais(iso,-smDt(iso).getDay()); // domingo a sábado
+const smSemana=iso=>{const s=smDom(iso);return Array.from({length:7},(_,i)=>smMais(s,i))};
+const smNumSem=iso=>{const x=smDt(smDom(iso)),a=smDt(smDom(`${x.getFullYear()}-01-01`));return Math.floor((Math.round((x-a)/DAY))/7)+1}; // semana iniciada no domingo
 function smGuardaCache(){try{localStorage.setItem('sm_cache2',JSON.stringify({sha:SM.sha,d:SM.d}))}catch(e){}}
 
 // ---------- leitura / gravação ----------
@@ -686,21 +686,21 @@ function smSelo(x,longo){   // questões feitas/meta: só a letra colorida
 const smCorTipo=a=>(a||'estudo')==='estudo'?'e':a==='ferramenta'?'f':'t';   // bolinha: azul estudo, amarelo ferramenta, verde tarefas (e outros tipos)
 const smDots=x=>{const its=smItensDe(x),hj=smHoje();return its.length?`<span class="dots">${its.map(i=>`<i class="t-${smCorTipo(i.area)} ${i.feito?'ok':x<hj?'late':''}"></i>`).join('')}</span>`:''};
 function smCalCab(mes,y,m){
-  const hj=smHoje(),est=smEstagio(mes),vis=SM.vis||'semana',sem=vis==='semana',seg=SM.semana||smSeg(hj);
+  const hj=smHoje(),est=smEstagio(mes),vis=SM.vis||'semana',sem=vis==='semana',seg=SM.semana||smDom(hj);
   const titulo=sem?`${smRotL(seg)} – ${smRotL(smMais(seg,6))}`:`${smMES[m-1][0].toUpperCase()+smMES[m-1].slice(1)} ${y}`;
-  return `<div class="sm-calh"><button class="b s sm-ghost" onclick="smCalVai(-1)" aria-label="${sem?'Semana anterior':'Mês anterior'}">‹</button><h3>${titulo}</h3><button class="sm-est ${est?'':'vazio'}" onclick="smEstagioEdita('${mes}')" title="Estágio do mês (toque para mudar)">${est?esc(est):'+ estágio'}</button><button class="b s sm-ghost" onclick="smCalVai(1)" aria-label="${sem?'Próxima semana':'Próximo mês'}">›</button>${(sem?seg!==smSeg(hj):mes!==hj.slice(0,7))?`<button class="b s sm-ghost" onclick="SM.mes=null;SM.semana=null;render()">Hoje</button>`:''}<span style="flex:1"></span>
+  return `<div class="sm-calh"><button class="b s sm-ghost" onclick="smCalVai(-1)" aria-label="${sem?'Semana anterior':'Mês anterior'}">‹</button><h3>${titulo}</h3><button class="sm-est ${est?'':'vazio'}" onclick="smEstagioEdita('${mes}')" title="Estágio do mês (toque para mudar)">${est?esc(est):'+ estágio'}</button><button class="b s sm-ghost" onclick="smCalVai(1)" aria-label="${sem?'Próxima semana':'Próximo mês'}">›</button>${(sem?seg!==smDom(hj):mes!==hj.slice(0,7))?`<button class="b s sm-ghost" onclick="SM.mes=null;SM.semana=null;render()">Hoje</button>`:''}<span style="flex:1"></span>
    <div class="sm-seg"><button type="button" aria-pressed="${vis==='mes'}" onclick="smVis('mes')">Mês</button><button type="button" aria-pressed="${sem}" onclick="smVis('semana')">Semana</button><button type="button" aria-pressed="${vis==='lista'}" onclick="smVis('lista')">Lista</button></div>
    ${sem?`<button class="b s sm-ghost" onclick="smSem('${seg}')">editar semana</button>`:''}
    <button class="b s ${SM.plan?'':'sm-ghost'}" onclick="SM.plan=!SM.plan;SM.conf=null;render()">✎ Planejar mês</button></div>`;
 }
 function smVis(v){SM.vis=v;try{localStorage.setItem('sm_vis',v)}catch(e){}render()}
-function smCalVai(k){if(SM.vis!=='semana'){smMesVai(k);return}SM.semana=smMais(SM.semana||smSeg(smHoje()),k*7);render()}
+function smCalVai(k){if(SM.vis!=='semana'){smMesVai(k);return}SM.semana=smMais(SM.semana||smDom(smHoje()),k*7);render()}
 SM.vis='semana';
 function smCalendario(){
-  const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smSeg(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smSeg(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
+  const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smDom(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smDom(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
   const corpo=SM.vis==='lista'?smLista(mes,ini,fim,p,r):smGrade(mes,ini,fim,p,r,sem);
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${SM.plan?smPainelMes():''}${corpo}
-   <p class="mut sm-dica">Toque num dia para editar (tema, foco, noite, feriado, itens) · <button class="sm-tagb" onclick="smSem('${sem?seg:smSeg(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar. Plantões e sobreavisos vêm do Google Agenda na revisão de domingo.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
+   <p class="mut sm-dica">Toque num dia para editar (tema, foco, noite, feriado, itens) · <button class="sm-tagb" onclick="smSem('${sem?seg:smDom(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar. Plantões e sobreavisos vêm do Google Agenda na revisão de domingo.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
 }
 function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
@@ -717,10 +717,10 @@ function smGrade(mes,ini,fim,p,r,sem=false){
     if(SM.sem===s)h+=smPainelSemana(s);
     if(SM.sel&&ds.includes(SM.sel))h+=smPainelDia(SM.sel);
   }
-  return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
+  return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
 }
 function smLista(mes,ini,fim,p,r){
-  const hj=smHoje(),esta=smSeg(hj);let h='';
+  const hj=smHoje(),esta=smDom(hj);let h='';
   for(let s=ini;s<=fim;s=smMais(s,7)){
     h+=`<div class="sm-lh"><b>Semana ${smNumSem(s)}${s===esta?' · esta':''}</b><button class="sm-tagb ${SM.sem===s?'on2':''}" onclick="smSem('${s}')">editar semana</button></div>`;
     if(SM.sem===s)h+=smPainelSemana(s);

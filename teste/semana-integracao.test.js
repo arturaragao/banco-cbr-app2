@@ -39,7 +39,7 @@ test('semana usa grade ampliada, mantém Hoje e faixa de atrasadas e ordena tare
   vm.runInContext("SM.d.dias['2026-10-26']={ev:[{id:'e',t:'Evento',c:'azul'}]}",a.c);
   const html=a.c.vSemana();assert.equal((html.match(/class="sm-cel /g)||[]).length,7);
   assert.ok(html.includes('sm-grid sm-vsem'));assert.ok(!html.includes('sm-colunas'));assert.ok(!html.includes('sm_quadro'));
-  assert.ok(html.indexOf('data-drop="2026-10-26"')<html.indexOf('data-drop="2026-11-01"'));
+  assert.ok(html.indexOf('data-drop="2026-10-25"')<html.indexOf('data-drop="2026-10-26"'));
   assert.ok(html.indexOf('Evento')<html.indexOf('Urgente'));assert.ok(html.indexOf('Urgente')<html.indexOf('Baixa'));
   assert.ok(html.indexOf('Passar tudo para hoje')<html.indexOf('sm-grid sm-vsem'));
   assert.ok(!html.includes('Temas fracos'));assert.ok(!html.includes('💡'));assert.equal(a.lista()[2].dia,'2020-01-01');
