@@ -264,7 +264,7 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   }
   executar(c,trecho(script,'function vQuiz(){','function reclass('));
   const antes=executar(c,'vQuiz()');
-  assert.match(antes,/Classificação: Neuro › Tema Claude/);
+  assert.doesNotMatch(antes,/Classificação:|Tema Claude/);
   assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|NÃO EXIBIR|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.sel='B'`);
   assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
@@ -273,6 +273,7 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   assert.match(depois,/class="dif d"/);
   assert.match(depois,nome==='app gerado'?/class="dif d"/:/acerto dos alunos 20%/);
   assert.match(depois,/possível erro na questão/);
+  assert.match(depois,/Classificação: Neuro › Tema Claude/);
   for(const texto of ['Tags Claude','Tema Claude','Neuro','por dificuldade','Difícil'])assert.ok(depois.includes(texto),texto);
   assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
   assert.match(depois,/class="alt bad [^"]*"[^]*?Errada marcada[^]*?30%/);
