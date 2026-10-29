@@ -1,10 +1,10 @@
 // Service worker do Banco CBR: guarda o app para abrir sem internet e serve as imagens (./img/<arquivo>)
 // lendo do repositório privado com a chave do aparelho. Imagem vista uma vez fica no aparelho.
-const VERSAO = "bcbr-1.23.1";
+const VERSAO = "bcbr-1.25.1";
 const APP = ["./", "./index.html", "./shim.js", "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./icon-mask.png", "./apple-touch-icon.png"];
 const REPO = "arturaragao/banco-cbr-app";
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(APP)).catch(() => {})); self.skipWaiting(); });
-self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith("bcbr-v") && k !== VERSAO).map((k) => caches.delete(k))))); self.clients.claim(); });
+self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => (k.startsWith("bcbr-v") || /^bcbr-\d/.test(k)) && k !== VERSAO).map((k) => caches.delete(k))))); self.clients.claim(); });
 async function token() { const c = await caches.open("bcbr-cfg"); const r = await c.match("./__token"); return r ? r.text() : ""; }
 async function imagem(req, nome) {
   const cache = await caches.open("bcbr-img");

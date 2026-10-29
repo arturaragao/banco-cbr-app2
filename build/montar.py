@@ -121,4 +121,9 @@ assert head.count("</svg>Banco CBR</div>") == 1
 head = head.replace("</svg>Banco CBR</div>", f'</svg>Banco CBR<small class="versao">v{VERSAO}</small></div>')
 open(f"{R}/index.html", "w", encoding="utf8").write(head + f'\n<script>window.BCBR_VERSAO="{VERSAO}"</script><script src="shim.js?v={VERSAO}"></script>\n</body></html>\n')
 open(f"{R}/versao.txt", "w", encoding="utf8").write(VERSAO)  # o app confere ao abrir (atualização instantânea)
+sw_path = f"{R}/sw.js"
+sw = open(sw_path, encoding="utf8").read()
+sw, n = re.subn(r'^const VERSAO = "[^"]+";', f'const VERSAO = "bcbr-{VERSAO}";', sw, count=1, flags=re.M)
+assert n == 1, f"esperava 1 declaração const VERSAO em sw.js, achei {n}"
+open(sw_path, "w", encoding="utf8").write(sw)
 print("ok: app.js", len(js), "bytes · index.html", VERSAO)
