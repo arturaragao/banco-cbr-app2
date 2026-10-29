@@ -883,7 +883,7 @@ function vQuiz(){
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
   <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?difTag(q)+prAcertoBloco(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
-  ${q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
+  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
