@@ -8,12 +8,12 @@ assert.ok(fixos.includes('RI_DIARIA=50'));
 const fonte=fixos+'\n'+['interpretar','semana'].map(n=>fs.readFileSync(require.resolve('../build/'+n+'.js'),'utf8')).join('\n');
 const copia=x=>JSON.parse(JSON.stringify(x));
 async function app(tarefas=[],nativo=false){
-  const inicial={v:2,dias:{},tarefas:copia(tarefas)},salvos=[],avisos=[],recebidos=[],confirmados=[],elementos=new Map(),tempos=[],mem=new Map([['sm_cache2',JSON.stringify({sha:'s0',d:inicial})]]);
+  const inicial={v:2,dias:{},tarefas:copia(tarefas)},salvos=[],avisos=[],recebidos=[],confirmados=[],elementos=new Map(),tempos=[],teclas=[],mem=new Map([['sm_cache2',JSON.stringify({sha:'s0',d:inicial})]]);
   const estado={remoto:copia(inicial),pendentes:[],conflito:false,falhar:false};
   const el=tag=>({tagName:tag.toUpperCase(),children:[],querySelector(){return null},querySelectorAll(){return []},setAttribute(k,v){this[k]=v},append(...xs){this.children.push(...xs)},remove(){elementos.delete(this.id)}});
   const document={visibilityState:'visible',addEventListener(){},querySelector(){return null},querySelectorAll(){return []},getElementById:id=>elementos.get(id)||null,createElement:el,body:{appendChild(x){elementos.set(x.id,x)},classList:{remove(){},add(){}}}};
   const B={tarefas:json=>recebidos.push(JSON.parse(json)),pendentes:()=>JSON.stringify(estado.pendentes),confirmar:json=>confirmados.push(JSON.parse(json)),dados(){}};
-  const c=vm.createContext({console,document,window:{addEventListener(){},...(nativo?{BCBRNativo:B}:{})},navigator:{},
+  const c=vm.createContext({console,document,window:{addEventListener(tipo,fn){if(tipo==='keydown')teclas.push(fn)},...(nativo?{BCBRNativo:B}:{})},navigator:{},
     localStorage:{getItem:k=>mem.get(k)||null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)},
     setTimeout:(fn,ms)=>{tempos.push({fn,ms});return tempos.length},clearTimeout(){},setInterval(){},clearInterval(){},
     atob:s=>Buffer.from(s,'base64').toString('binary'),btoa:s=>Buffer.from(s,'binary').toString('base64'),
@@ -35,8 +35,176 @@ async function app(tarefas=[],nativo=false){
     esc:s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),URL,Blob,
   });
   vm.runInContext(fonte,c);await vm.runInContext('smCarga',c);await new Promise(r=>setImmediate(r));
-  return{c,estado,salvos,avisos,recebidos,confirmados,elementos,tempos,mem,lista:()=>copia(vm.runInContext('SM.d.tarefas',c)),fila:()=>vm.runInContext('SM.fila',c)};
+  return{c,estado,salvos,avisos,recebidos,confirmados,elementos,tempos,teclas,mem,lista:()=>copia(vm.runInContext('SM.d.tarefas',c)),fila:()=>vm.runInContext('SM.fila',c)};
 }
+
+test('Calendário mantém chave da aba, ordem e Tab/Shift+Tab; remove atalho urgente da UI',async()=>{
+  const a=await app();
+  vm.runInContext("const TABS=[['hoje','Hoje'],['semana','Semana'],['questoes','Questões']];const KEYLAB={smurg:'Urgente',smdel:'Apagar'};const KG={sem:['smdel','smurg']};",a.c);
+  const layout=fs.readFileSync(require.resolve('../build/layout.js'),'utf8');
+  vm.runInContext(layout.slice(layout.indexOf('const lyCalendario='),layout.indexOf('lyIni();',layout.indexOf('const lyCalendario='))),a.c);
+  assert.deepEqual(copia(vm.runInContext('TABS[1]',a.c)),['semana','Calendário']);
+  assert.deepEqual(copia(vm.runInContext('KG.sem',a.c)),['smdel']);assert.equal(vm.runInContext('KEYLAB.smurg',a.c),undefined);
+  a.c.tabsOrdenadas=()=>vm.runInContext('TABS',a.c);a.c.go=t=>{a.c.tela=t};
+  const tab=a.teclas.find(fn=>fn.toString().includes('tabsOrdenadas()'));assert.ok(tab);
+  let impedidos=0;const e={key:'Tab',target:{tagName:'BODY'},preventDefault(){impedidos++}};
+  tab(e);assert.equal(a.c.tela,'questoes');tab({...e,shiftKey:true});assert.equal(a.c.tela,'semana');assert.equal(impedidos,2);
+});
+
+test('cards sem lápis nem edição simples; toggle só com subtarefas, sem emoji ou urgente',async()=>{
+  const a=await app([{id:'a',dia:'2026-10-26',texto:'Título antigo',det:'Texto puro',urg:true},{id:'b',dia:'2026-10-26',texto:'Com etapas',subtarefas:[{texto:'Etapa'}]}]);
+  const simples=a.c.smItem(a.lista()[0]),sub=a.c.smItem(a.lista()[1]);
+  assert.doesNotMatch(simples,/class="sm-tg"|sm-edb|smTxtIni|smDetIni|contenteditable|sm-urg/);
+  assert.match(simples,/ondblclick=.*smEdita\('a'\)/);assert.match(simples,/sm-arrastar/);assert.match(simples,/--sm-pastel:/);
+  assert.match(sub,/class="sm-tg"/);assert.doesNotMatch(a.c.smGrupos(a.lista()),/[📚🛠✅]/u);
+  assert.equal(a.c.smAddLinha('2026-10-26'),'');assert.equal(a.lista()[0].urg,true);
+  vm.runInContext("SM.ed={id:'a',esc:'todos',dias:new Set(['2026-10-26'])}",a.c);
+  const editor=a.c.smEditor(a.lista()[0]);assert.match(editor,/contenteditable="true"/);assert.match(editor,/Ctrl\+B/);assert.match(editor,/Ctrl\+U/);assert.match(editor,/Ctrl\+Shift\+H/);assert.doesNotMatch(editor,/sm_ed_urg|Urgente/);
+});
+
+test('clique no dia muda célula e lista do teclado; dia vazio não cria célula; duplo clique escolhe data',async()=>{
+  const a=await app([{id:'hoje',dia:'2026-10-26',texto:'Hoje'},{id:'outro',dia:'2026-10-27',texto:'Amanhã'}]);
+  a.c.smDiaClique('2026-10-27');assert.equal(vm.runInContext('SM.sel',a.c),'2026-10-27');assert.equal(vm.runInContext('QA.on',a.c),false);
+  assert.match(a.c.smHojeGrande(),/data-drop="2026-10-27"/);assert.match(a.c.smHojeGrande(),/Amanhã/);assert.equal(vm.runInContext('smkLista()[0].id',a.c),'outro');
+  a.c.smDiaClique('2026-10-28');assert.equal(a.c.smHojeGrande(),'');
+  const grade=a.c.smCalendario();assert.match(grade,/onclick="smDiaClique\('/);assert.match(grade,/ondblclick="qaAbreDia\('/);
+  a.c.qaAbreDia('2026-10-29');assert.equal(vm.runInContext('QA.on',a.c),true);assert.equal(vm.runInContext('QA.quando',a.c),'2026-10-29');assert.equal(vm.runInContext('qaModoQuando()',a.c),'data');
+});
+
+test('Lista contém só semana atual domingo–sábado, inclusive quando atravessa o mês',async()=>{
+  const a=await app([{id:'dentro',dia:'2026-11-01',texto:'Dentro'},{id:'fora',dia:'2026-11-08',texto:'Fora'}]);
+  a.c.Date.now=()=>new Date('2026-11-01T12:00').getTime();a.c.smVis('lista');let html=a.c.smCalendario();
+  assert.equal((html.match(/class="sm-li /g)||[]).length,7);assert.match(html,/data-drop="2026-11-01"/);assert.match(html,/data-drop="2026-11-07"/);assert.match(html,/Dentro/);assert.doesNotMatch(html,/Fora/);
+  a.c.Date.now=()=>new Date('2026-10-31T12:00').getTime();html=a.c.smCalendario();assert.match(html,/data-drop="2026-10-25"/);assert.match(html,/data-drop="2026-10-31"/);assert.doesNotMatch(html,/data-drop="2026-11-01"/);
+  a.c.Date.now=()=>new Date('2026-11-30T12:00').getTime();html=a.c.smCalendario();assert.match(html,/data-drop="2026-11-29"/);assert.match(html,/data-drop="2026-12-05"/);
+});
+
+test('vários dias usa calendário mensal; setas só movem cursor, Espaço/Enter alternam sem salvar',async()=>{
+  const a=await app();a.c.qaAbre();a.c.qaTxt('Vários dias');a.c.qaPasso(2);a.c.qaEscolhe('quando','varios');
+  assert.equal((a.c.qaCalendario().match(/data-cal=/g)||[]).length,42);
+  const tecla=(key,dia)=>a.c.qaTecla({key,target:{tagName:'BUTTON',dataset:{cal:dia}},preventDefault(){}});
+  tecla('ArrowRight','2026-10-26');assert.equal(vm.runInContext('QA.calCursor',a.c),'2026-10-27');assert.equal(vm.runInContext('QA.dias.length',a.c),0);
+  tecla(' ','2026-10-27');assert.deepEqual(copia(vm.runInContext('QA.dias',a.c)),['2026-10-27']);
+  tecla('Enter','2026-10-27');assert.equal(vm.runInContext('QA.dias.length',a.c),0);assert.equal(a.lista().length,0);assert.equal(vm.runInContext('QA.on',a.c),true);
+  a.c.qaSalvar();assert.equal(a.avisos.at(-1),'Escolha pelo menos um dia.');assert.equal(a.lista().length,0);
+  a.c.qaCalMes(2);tecla('Enter','2026-12-05');assert.deepEqual(copia(vm.runInContext('QA.dias',a.c)),['2026-12-05']);
+});
+
+test('passos: tipos ordenados, sem Urgente, Hora só com data; Detalhes antes do Lembrete',async()=>{
+  const a=await app();a.c.qaAbre();vm.runInContext("SM.d.tipos=[{id:'estudo',nome:'Estudo'},{id:'tarefas',nome:'Tarefas'},{id:'ferramenta',nome:'Ferramenta'}]",a.c);
+  assert.deepEqual(copia(a.c.qaTipos()).map(t=>t[0]),['ferramenta','tarefas','estudo']);assert.deepEqual(copia(vm.runInContext('smTipos()',a.c)).map(t=>t.id),['ferramenta','tarefas','estudo']);
+  a.c.qaPasso(2);a.c.qaEscolhe('quando','sem');a.c.qaPasso(3);assert.equal(vm.runInContext('QA.passo',a.c),4);assert.doesNotMatch(a.c.qaHtml(),/id="qa_hora"|Urgente/);
+  a.c.qaPasso(3);assert.equal(vm.runInContext('QA.passo',a.c),2);
+  a.c.qaEscolhe('quando','data');a.c.qaPasso(3);assert.match(a.c.qaHtml(),/id="qa_hora"/);a.c.qaPasso(4);a.c.qaPasso(5);
+  const html=a.c.qaHtml();assert.ok(html.indexOf('Detalhes')<html.indexOf('Lembrete'));
+});
+
+test('duplo clique na adição cria campos de subtarefa; rascunho e tarefas agrupadas preservam etapas',async()=>{
+  const a=await app();a.c.qaAbre();assert.match(a.c.qaHtml(),/ondblclick="qaSubNova\(\)"/);
+  a.c.qaTxt('Projeto fictício');a.c.qaSubNova();vm.runInContext("QA.subtarefas[0]='Etapa 1'",a.c);a.c.qaSubNova();vm.runInContext("QA.subtarefas[1]='Etapa 2'",a.c);a.c.qaRascSalva();a.c.qaFecha();a.c.qaAbre();
+  assert.deepEqual(copia(vm.runInContext('QA.subtarefas',a.c)),['Etapa 1','Etapa 2']);
+  a.c.qaMultiDia('2026-10-27');a.c.qaMultiDia('2026-11-02');a.c.qaSalvar();await a.fila();
+  assert.equal(a.lista().length,2);assert.equal(a.lista()[0].grupo,a.lista()[1].grupo);assert.deepEqual(a.lista()[0].subtarefas.map(s=>s.texto),['Etapa 1','Etapa 2']);assert.ok(a.lista()[0].subtarefas.every(s=>s.id&&!s.feito));
+  a.c.qaZera();assert.equal(vm.runInContext('QA.subtarefas.length',a.c),0);
+});
+
+test('sanitização mantém só b/strong, u, span color e texto; descarta scripts, atributos e URLs',async()=>{
+  const a=await app(),txt=s=>({nodeType:3,textContent:s}),node=(tag,filhos=[],attrs={},cor='')=>({nodeType:1,tagName:tag.toUpperCase(),childNodes:filhos,style:{color:cor},getAttribute:k=>attrs[k]||null});
+  // A árvore DOM é simulada: valida a política de saída, sem substituir o aceite do parser real no Chrome.
+  const nodes=[node('script',[txt('alert(1)')]),node('img',[],{onerror:'alert(1)',src:'javascript:x'}),node('strong',[txt('A & B')],{onclick:'x'}),node('u',[txt('U')]),node('span',[txt('Cor')],{style:'background:url(x)',onmouseover:'x'},'rgb(132, 103, 188)'),node('a',[txt('Link')],{href:'javascript:x'}),node('svg',[txt('x')]),node('span',[txt('Sem estilo')],{},'url(x)')];
+  a.c.document.createElement=()=>({content:{childNodes:nodes}});
+  assert.equal(a.c.smSanitiza('HTML hostil'),'<strong>A &amp; B</strong><u>U</u><span style="color:rgb(132, 103, 188)">Cor</span>LinkSem estilo');
+  nodes.splice(0,nodes.length,node('font',[node('b',[node('u',[txt('Cor legada')])])],{color:'#8467bc',face:'Arial',size:'7',onclick:'x'}),node('span',[txt('Sem cor CSS')],{color:'red'}));
+  const esperado='<span style="color:#8467bc"><b><u>Cor legada</u></b></span>Sem cor CSS';
+  assert.equal(a.c.smSanitiza('<font color="#8467bc">'),esperado);
+  const card=a.c.smItem({id:'rich',dia:'sem',texto:'Cor legada',textoHtml:'<font color="#8467bc">',det:'Cor legada',detHtml:'<font color="#8467bc">'});
+  assert.ok(card.includes(`<span class="sm-texto">${esperado}</span>`));
+  assert.ok(card.includes(`<div class="sm-det">${esperado}</div>`));
+  assert.doesNotMatch(card,/<font\b|onclick="x"|face=|size=/);
+});
+
+test('editor salva HTML opcional e detalhes, mantém título puro e urgência legada',async()=>{
+  const a=await app([{id:'a',dia:'sem',texto:'Antigo',urg:true,hora:'09:00'}]);
+  const txt=s=>({nodeType:3,textContent:s}),b={nodeType:1,tagName:'B',childNodes:[txt('Novo')],style:{},getAttribute(){return null}};
+  a.c.document.createElement=()=>({content:{childNodes:[b]}});
+  a.elementos.set('sm_ed_txt',{innerText:'Novo',innerHTML:'<b>Novo</b>'});a.elementos.set('sm_ed_det',{innerText:'Nota',innerHTML:'<b>Nota</b>'});a.elementos.set('sm_ed_area',{value:'tarefas'});
+  vm.runInContext("SM.ed={id:'a',esc:'todos',dias:new Set()}",a.c);a.c.smSalvar();await a.fila();
+  assert.equal(a.lista()[0].texto,'Novo');assert.equal(a.lista()[0].textoHtml,'<b>Novo</b>');assert.equal(a.lista()[0].urg,true);assert.equal(a.lista()[0].dia,'sem');
+  assert.match(a.c.smItem(a.lista()[0]),/<b>Novo<\/b>/);assert.equal(a.salvos.at(-1).tarefas[0].textoHtml,'<b>Novo</b>');
+});
+
+test('copiar para outros dias isola o array e os objetos das subtarefas, inclusive ao sincronizar',async()=>{
+  const a=await app([{id:'original',dia:'2026-10-26',texto:'Projeto',subtarefas:[{id:'etapa',texto:'Etapa',feito:false}]}]);
+  a.c.document.createElement=()=>({content:{childNodes:[]}});
+  a.elementos.set('sm_ed_txt',{innerText:'Projeto',innerHTML:'Projeto'});a.elementos.set('sm_ed_area',{value:'tarefas'});
+  vm.runInContext("SM.ed={id:'original',esc:'todos',dias:new Set(['2026-10-26','2026-10-27','2026-10-28'])}",a.c);
+  a.c.smSalvar();
+  assert.equal(a.lista().length,3);
+  assert.equal(vm.runInContext('new Set(SM.d.tarefas.map(t=>t.subtarefas)).size',a.c),3);
+  assert.equal(vm.runInContext('new Set(SM.d.tarefas.map(t=>t.subtarefas[0])).size',a.c),3);
+  const id=a.lista()[1].id;a.c.smSubMarca(id,0,true);
+  assert.deepEqual(a.lista().map(t=>t.subtarefas[0].feito),[false,true,false]);
+  assert.equal(await a.fila(),true);
+  assert.deepEqual(a.salvos.at(-1).tarefas.map(t=>t.subtarefas[0].feito),[false,true,false]);
+  a.c.smSubMarca(id,0,false);assert.equal(await a.fila(),true);
+  assert.deepEqual(a.lista().map(t=>t.subtarefas[0].feito),[false,false,false]);
+});
+
+test('detalhes mantêm texto puro e HTML separado em três round-trips e no rascunho',async()=>{
+  const casos=[{det:'A & B'},{det:'A &amp; B'},{det:'<b>literal</b>'},{det:'A & B',detHtml:'<b>A &amp; B</b>'}];
+  for(const caso of casos){
+    const a=await app([{id:'detalhes',dia:'sem',texto:'Título',...caso}]);
+    // Simula apenas os nós de texto, entidades e B destas fixtures. O parser real é coberto no teste Chrome.
+    const decodifica=s=>s.replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&quot;','"').replaceAll('&amp;','&');
+    const conteudo=html=>{const b=/^<b>(.*)<\/b>$/s.exec(html);return {negrito:!!b,texto:decodifica(b?b[1]:html)}};
+    a.c.document.createElement=()=>({set innerHTML(html){const {negrito,texto}=conteudo(html),txt={nodeType:3,textContent:texto};this.content={childNodes:negrito?[{nodeType:1,tagName:'B',childNodes:[txt],style:{}}]:[txt]}}});
+    let anterior;
+    for(let rodada=0;rodada<3;rodada++){
+      a.c.smEdita('detalhes');
+      const editor=a.c.smEditor(a.lista()[0]),campo=editor.match(/id="sm_ed_det"[^>]*>([\s\S]*?)<\/div><\/div>/);
+      assert.ok(campo,'campo de detalhes presente');const html=campo[1],dom=conteudo(html);
+      assert.equal(dom.texto,caso.det);assert.equal(dom.negrito,!!caso.detHtml);
+      if(anterior!==undefined)assert.equal(html,anterior,'HTML idempotente');anterior=html;
+      a.elementos.set('sm_ed_txt',{innerText:'Título',innerHTML:'Título',focus(){}});a.elementos.set('sm_ed_area',{value:'tarefas'});
+      a.elementos.set('sm_ed_det',{innerText:dom.texto,innerHTML:html});
+      a.c.smRascEdSalva('detalhes');
+      const rascunho=vm.runInContext("smRascEd('detalhes')",a.c);assert.equal(rascunho.det,caso.det);assert.equal(rascunho.detHtml,html);
+      assert.equal(a.c.smEditor(a.lista()[0]).match(/id="sm_ed_det"[^>]*>([\s\S]*?)<\/div><\/div>/)[1],html);
+      a.c.smSalvar();assert.equal(await a.fila(),true);
+      assert.equal(a.lista()[0].det,caso.det);assert.equal(a.lista()[0].detHtml,html);
+      assert.equal(a.salvos.at(-1).tarefas[0].det,caso.det);assert.equal(a.salvos.at(-1).tarefas[0].detHtml,html);
+      assert.ok(a.c.smItem(a.lista()[0]).includes(`<div class="sm-det">${html}</div>`));
+    }
+  }
+});
+
+test('Hora some e é limpa no rascunho e na gravação ao retirar data, inclusive só neste dia',async()=>{
+  for(const agrupada of [false,true]){
+    const a=await app([{id:'hora',dia:'2026-10-26',texto:'Horário',hora:'09:30',...(agrupada?{grupo:'horarios'}:{})},...(agrupada?[{id:'outra',dia:'2026-10-27',texto:'Outro dia',hora:'09:30',grupo:'horarios'}]:[])]);
+    a.c.document.createElement=()=>({content:{childNodes:[]}});
+    a.c.smEdita('hora');assert.match(a.c.smEditor(a.lista()[0]),/id="sm_ed_hora"/);
+    if(agrupada){
+      assert.doesNotMatch(a.c.smEditor(a.lista()[0]),/id="sm_ed_dia"/);
+      a.elementos.set('sm_ed_hora',{value:'09:30'});assert.equal(a.c.smExtrasLer().hora,'09:30');a.c.smEdEsc('este');
+    }
+    a.elementos.set('sm_ed_txt',{innerText:'Horário',innerHTML:'Horário',focus(){}});a.elementos.set('sm_ed_area',{value:'tarefas'});
+    a.elementos.set('sm_ed_dia',{value:''});a.elementos.set('sm_ed_hora',{value:'09:30'});
+    assert.equal(a.c.smExtrasLer().hora,null,'ignora hora antiga mesmo com input presente');a.c.smRascEdSalva('hora');
+    assert.equal(vm.runInContext("smRascEd('hora').hora",a.c),null);assert.doesNotMatch(a.c.smEditor(a.lista()[0]),/id="sm_ed_hora"/);
+    a.c.smSalvar();assert.equal(await a.fila(),true);
+    assert.equal(a.lista()[0].dia,'sem');assert.equal(a.lista()[0].hora,null);assert.equal(a.salvos.at(-1).tarefas[0].hora,null);
+    if(agrupada)assert.equal(a.lista()[1].hora,'09:30');
+    a.c.smEdita('hora');assert.doesNotMatch(a.c.smEditor(a.lista()[0]),/id="sm_ed_hora"/);
+  }
+});
+
+test('atalhos ricos só formatam com comando e usam a cor do tipo; colagem é texto puro',async()=>{
+  const a=await app(),comandos=[];a.c.document.execCommand=(...args)=>comandos.push(args);
+  a.c.smFormata=(...args)=>comandos.push(args);const el={id:'sm_ed_txt'};
+  for(const [key,shiftKey,cmd] of [['b',false,'bold'],['u',false,'underline'],['H',true,'foreColor']]){let impedido=false;a.c.smRichTecla({key,ctrlKey:true,shiftKey,preventDefault(){impedido=true},stopPropagation(){}},el);assert.equal(impedido,true);assert.deepEqual(comandos.at(-1),['sm_ed_txt',cmd])}
+  a.c.smRichTecla({key:'b',ctrlKey:false},el);assert.equal(comandos.length,3);
+  assert.notEqual(vm.runInContext("smCorTexto('ferramenta')",a.c),vm.runInContext("smCorTexto('estudo')",a.c));a.c.smRichCola({preventDefault(){},clipboardData:{getData:()=>'<script>texto literal</script>'}});assert.deepEqual(comandos.at(-1),['insertText',false,'<script>texto literal</script>']);
+});
 test('semana usa grade ampliada, mantém Hoje e faixa de atrasadas e ordena tarefas',async()=>{
   const a=await app([{id:'baixa',dia:'2026-10-26',texto:'Baixa',prioridade:'baixa'},{id:'u',dia:'2026-10-26',texto:'Urgente',urg:true},{id:'velha',dia:'2020-01-01',texto:'Vencida'}]);
   vm.runInContext("SM.d.dias['2026-10-26']={ev:[{id:'e',t:'Evento',c:'azul'}]}",a.c);
@@ -128,7 +296,7 @@ test('campos de Nova tarefa persistem no rascunho e entram na gravação pendent
   vm.runInContext("Object.assign(QA,{texto:'Revisar',on:true,quando:'2026-10-27',prioridade:'media',hora:'08:30',lembrete:'60',repetir:{tipo:'semanal',dias:[2,4]}})",a.c);
   a.c.qaRascSalva({salvar:true});const r=JSON.parse(a.mem.get('bcbr_rasc_tarefa'));
   assert.equal(r.prioridade,'media');assert.equal(r.hora,'08:30');assert.equal(r.lembrete,'60');assert.deepEqual(r.repetir.dias,[2,4]);
-  vm.runInContext('QA.passo=4;QA.alcance=6',a.c);
+  vm.runInContext('QA.passo=3;QA.alcance=5',a.c);
   const html=a.c.qaExtrasHtml();assert.ok(html.includes('id="qa_hora"'));assert.doesNotMatch(html,/Prioridade|Repetir|qa_prioridade|qa_repetir/);
   assert.match(a.c.qaPrevTxt(),/27\/10 · 08:30 · média · toda semana/);
   a.c.smRascPend();await a.fila();const t=a.lista()[0];assert.equal(t.dia,'2026-10-27');assert.equal(t.prioridade,'media');assert.equal(t.lembrete,60);assert.deepEqual(t.repetir.dias,[2,4]);
@@ -165,7 +333,7 @@ test('HSI de sexta 13/11 a sábado 14/11 usa a mesma etiqueta, sem cartão nem h
   assert.equal(vm.runInContext("smNoite('2026-11-14')",a.c),'');
 });
 
-test('dia e Tarefas sem data recuperam grupos, ícones e cores, com prioridades e campos novos',async()=>{
+test('dia e Tarefas sem data recuperam grupos sem emojis, com cores e campos legados',async()=>{
   const tarefas=['2026-10-26','sem'].flatMap(dia=>[
     {id:dia+'b',dia,area:'estudo',texto:'Baixa',prioridade:'baixa'},
     {id:dia+'u',dia,area:'estudo',texto:'Urgente',urg:true},
@@ -175,7 +343,7 @@ test('dia e Tarefas sem data recuperam grupos, ícones e cores, com prioridades 
   const a=await app(tarefas);
   for(const html of [a.c.smPainelDia('2026-10-26'),a.c.smSemData()]){
     for(const [tipo,icone] of [['estudo','📚'],['ferramenta','🛠️'],['tarefas','✅']]){
-      assert.ok(html.includes('sm-grp sm-'+tipo));assert.ok(html.includes(icone));
+      assert.ok(html.includes('sm-grp sm-'+tipo));assert.ok(!html.includes(icone));
     }
     assert.ok(html.indexOf('Urgente')<html.indexOf('Baixa'));
     for(const texto of ['09:00','↻','1/1','1 anexo(s)'])assert.ok(html.includes(texto));
@@ -227,7 +395,7 @@ test('setas do calendário escolhem data; chips de toque avançam e vários dias
   a.c.qaTecla({key:'ArrowDown',target:{dataset:{cal:'2026-10-26'}},preventDefault(){}});
   assert.equal(vm.runInContext('QA.quando',a.c),'2026-11-02');
   a.c.qaCalDia('2026-11-03',true);assert.equal(vm.runInContext('QA.passo',a.c),3);
-  a.c.qaEscolhe('lembrete','15',true);assert.equal(vm.runInContext('QA.passo',a.c),4);
+  a.c.qaPasso(5);a.c.qaEscolhe('lembrete','15',true);assert.equal(vm.runInContext('QA.passo',a.c),5);
   a.c.qaPasso(2);a.c.qaEscolhe('quando','varios',true);
   a.c.qaMultiDia('2026-10-27');a.c.qaMultiDia('2026-10-29');a.c.qaSalvar();await a.fila();
   assert.deepEqual(a.lista().map(t=>t.dia),['2026-10-27','2026-10-29']);

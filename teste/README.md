@@ -2,6 +2,11 @@
 Serve o app direto desta pasta e simula a API do GitHub com os dados de `../banco-cbr-app` (privado, nada é copiado para cá). PUT = só 200, nada grava. O `sw.js` é trocado por um nulo.
 
 **Subir:** `node teste/servidor.js [pasta-dados] [porta]` (padrão: `../banco-cbr-app`, 8765; ou `BCBR_DADOS`/`PORT`). Rodar com o diretório do repo como base.
+
+**Calendário 1.27, sem dados privados:** `node teste/servidor.js --simulado 8765` usa apenas as seis tarefas fictícias em memória de `calendario-dados.js`; PUT não grava nada.
+O aceite visual completo está em `node --test teste/calendario-browser.test.js` (Chrome local, porta 8766; bloqueia requisições externas).
+Se o ambiente negar processos filhos, rode os testes Node com `--test-isolation=none` e execute `teste/interpretar.test.js` separadamente: ele chama `process.exit` e encerraria a suíte antes das outras asserções.
+Resultados e limites desta entrega: [calendario-validacao.md](calendario-validacao.md).
 **Abrir (Browser pane):** navegar para `http://localhost:8765/`. O servidor injeta (só na resposta) um fetch que desvia `api.github.com` para `/api` e grava token falso em `bcbr_gh_token`. O app não precisa de linha nenhuma.
 **Prova/meta:** prova fixa em 12/12/2026; `cfg.prova` salvo/sincronizado não altera o prazo. RI fixa em 50 questões nos dois modos. Nota: `requestAnimationFrame` fica travado no Browser pane; para testar `qRola` use `window.requestAnimationFrame=f=>setTimeout(()=>f(performance.now()),16)`.
 **Dica:** esperar ~4 s após carregar; eventos de teclado: `document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'g',bubbles:true,cancelable:true}))`.

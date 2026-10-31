@@ -111,4 +111,8 @@ function lyIni(){
   new MutationObserver(()=>lyAplica()).observe(app,{childList:true});
   lyAplica();
 }
+// Mantém a chave interna e a ordem salva das abas; só o rótulo muda.
+const lyCalendario=TABS.find(t=>t[0]==='semana');if(lyCalendario)lyCalendario[1]='Calendário';
+delete KEYLAB.smurg;KG.sem=KG.sem.filter(k=>k!=='smurg');
 lyIni();
+render();

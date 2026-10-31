@@ -5,7 +5,8 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
 const D = path.resolve(process.argv[2] || process.env.BCBR_DADOS || path.join(RAIZ, '..', 'banco-cbr-app'));
 const PORT = +(process.argv[3] || process.env.PORT || 8765);
-if (!fs.existsSync(D + '/dados/questoes.json')) { console.error('Dados não encontrados em ' + D + ' (passe a pasta como 1º argumento)'); process.exit(1); }
+const SIMULADO=process.argv[2]==='--simulado',simulado=SIMULADO?require('./calendario-dados.js'):null;
+if (!SIMULADO&&!fs.existsSync(D + '/dados/questoes.json')) { console.error('Dados não encontrados em ' + D + ' (passe a pasta como 1º argumento)'); process.exit(1); }
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/json' };
 // interceptor injetado no index.html (só na resposta; o arquivo do app não muda): desvia api.github.com para /api e põe token falso
 const PRE = `(()=>{const f=window.fetch;window.fetch=(u,o)=>{u=String(u);if(u.startsWith('https://api.github.com'))u=u.replace('https://api.github.com','/api');return f(u,o)};
@@ -16,6 +17,14 @@ http.createServer((req, res) => {
   const u = decodeURIComponent(req.url.split('?')[0]);
   const j = (o, c = 200) => { res.writeHead(c, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   if (u.startsWith('/api/')) {
+    if(SIMULADO){
+      if(req.method==='PUT'){req.resume();return j({content:{sha:'fake'+(++n)}})}
+      const rel=u.replace(/^.*contents\//,'');
+      if(Object.hasOwn(simulado,rel))return j({sha:'sintetico',content:Buffer.from(JSON.stringify(simulado[rel])).toString('base64'),encoding:'base64'});
+      if(['dados','progresso','semana'].includes(rel))return j(Object.keys(simulado).filter(k=>k.startsWith(rel+'/')).map(k=>({name:path.basename(k),type:'file',sha:k})));
+      const blob=u.split('/git/blobs/')[1];if(blob&&Object.hasOwn(simulado,blob))return j(simulado[blob]);
+      return j({},404);
+    }
     let m;
     if ((m = u.match(/contents\/(dados|progresso|semana)$/))) {
       const d = D + '/' + m[1]; if (!fs.existsSync(d)) return j([]);
@@ -38,4 +47,4 @@ http.createServer((req, res) => {
   let body = fs.readFileSync(p);
   if (rel === '/index.html') body = Buffer.from(body.toString('utf8').replace(/<script/, '<script>' + PRE + '</script><script'));
   res.writeHead(200, { 'content-type': mime[path.extname(p)] || 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body);
-}).listen(PORT, () => console.log(`Banco CBR (teste) em http://localhost:${PORT}/  dados: ${D}`));
+}).listen(PORT, () => console.log(`Banco CBR (teste) em http://localhost:${PORT}/  dados: ${SIMULADO?'fictícios, somente em memória':D}`));
