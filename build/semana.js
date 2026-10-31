@@ -73,7 +73,7 @@ function smTipo(iso){
   if(smNoite(iso)==='BR')return'estudo';   // plantão BR: estudo, até em fim de semana/feriado
   const w=smDt(iso).getDay();return w===0||w===6||smFeriado(iso)?'descanso':'estudo';   // HSI em dia útil = estudo normal
 }
-const smProvaIso=()=>cfg.prova||null;
+const smProvaIso=()=>DATA_PROVA;
 const smRetaIni=()=>{const p=smProvaIso();return p?smMais(p,-(+(PARAM.revisao_final_dias??14))):null};
 // dias de estudo de hoje (se hoje for de estudo) até a véspera da reta final — usado pela meta (banco.js › metaDia)
 function smDiasEstudoRestantes(){
@@ -288,7 +288,7 @@ function smNota(){
 }
 function smNotaFraco(id){smMudar(d=>{const n=(d.notas||[]).find(x=>x.id===id);if(n){if(n.fraco)delete n.fraco;else n.fraco=true}},'tema fraco')}
 function smNotaDel(id){smMudar(d=>{d.notas=(d.notas||[]).filter(x=>x.id!==id)},'apagou anotação')}
-function smProva(v){if(!v)return;cfg.prova=v;persist('_est');render()}
+function smProva(){cfg.prova=DATA_PROVA;persist('_est');render()}
 
 // ---------- telas ----------
 const smVal=(id,pad)=>esc(SM.dr[id]??pad??'');
@@ -471,7 +471,7 @@ function smCalendario(){
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${SM.plan?smPainelMes():''}${corpo}
    <p class="mut sm-dica">Toque num dia para editar (tema, foco, noite, feriado, itens) · <button class="sm-tagb" onclick="smSem('${sem?seg:smDom(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar. Plantões e sobreavisos vêm do Google Agenda na revisão de domingo.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
 }
-function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.dias=[];qaRascSalva();qaPinta()}
+function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.quandoManual=true;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
   const hj=smHoje();let h='';
   for(let s=ini;s<=fim;s=smMais(s,7)){
@@ -546,14 +546,13 @@ function smMetaHoje(){
 }
 
 // ===== NOVA TAREFA — Alt+A, botão +, ?acao=tarefa / ?acao=voz (1.17.0: campo único, Enter salva na hora) =====
-// Um campo só. Enter (ou Salvar) grava na hora: tipo "Tarefas", sem data, não urgente, a não ser que o texto diga outra coisa
-// (interpretarTarefa, build/interpretar.js). Quando / tipo / urgente / detalhes são botões opcionais. O que estiver digitado fica em
-// localStorage (QA_RASC) a cada tecla e volta ao reabrir, mesmo depois de recarregar o app; só some ao salvar ou em "Limpar".
+// Passos progressivos: texto → tipo → quando → lembrete → hora → urgente → detalhes.
+// Enter salva em qualquer passo. O rascunho mantém inclusive os metadados legados.
 const QA_RASC='bcbr_rasc_tarefa';
-const QA={on:false,texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,prioridade:'',hora:'',lembrete:'',repetir:null,etiquetas:[],ouvindo:false,rec:null,detAberto:false,diasAberto:false};
+const QA={on:false,texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,prioridade:'',hora:'',lembrete:'',repetir:null,etiquetas:[],ouvindo:false,rec:null,detAberto:false,diasAberto:false,passo:0,alcance:0,calAberto:false,calCursor:null};
 const qaRascLer=()=>{try{return JSON.parse(localStorage.getItem(QA_RASC)||'null')}catch(e){return null}};
 function qaRascSalva(extra){
-  try{const r={texto:QA.texto,det:QA.det,area:QA.area,quando:QA.quando,dias:QA.dias,urg:!!QA.urg,prioridade:QA.prioridade,hora:QA.hora,lembrete:QA.lembrete,repetir:QA.repetir,etiquetas:QA.etiquetas,aberto:QA.on,...(extra||{})};
+  try{const r={texto:QA.texto,det:QA.det,area:QA.area,quando:QA.quando,quandoManual:!!QA.quandoManual,dias:QA.dias,urg:!!QA.urg,prioridade:QA.prioridade,hora:QA.hora,lembrete:QA.lembrete,repetir:QA.repetir,etiquetas:QA.etiquetas,aberto:QA.on,...(extra||{})};
     if(!r.texto.trim()&&!r.det.trim()&&r.area==='tarefas'&&!r.quando&&!(r.dias||[]).length&&!r.urg&&!r.salvar&&!r.prioridade&&!r.hora&&r.lembrete===''&&!r.repetir&&!r.etiquetas.length)localStorage.removeItem(QA_RASC);else localStorage.setItem(QA_RASC,JSON.stringify(r))}catch(e){}
 }
 const qaRascLimpa=()=>{try{localStorage.removeItem(QA_RASC)}catch(e){}};
@@ -561,42 +560,52 @@ const qaRascLimpa=()=>{try{localStorage.removeItem(QA_RASC)}catch(e){}};
 // o app importa ao voltar (MainActivity.onResume chama smNativoImporta). APK antigo sem falar(): sem 🎤 (pedido do Artur, 24/10/2026).
 const qaVozNativa=()=>!!(window.BCBRNativo&&typeof window.BCBRNativo.falar==='function');
 const qaVozAPI=()=>window.BCBRNativo?qaVozNativa():(window.SpeechRecognition||window.webkitSpeechRecognition);
-function qaZera(){Object.assign(QA,{texto:'',det:'',area:'tarefas',quando:'',dias:[],urg:false,prioridade:'',hora:'',lembrete:'',repetir:null,etiquetas:[],detAberto:false,diasAberto:false})}
+function qaZera(){Object.assign(QA,{texto:'',det:'',area:'tarefas',quando:'',quandoManual:false,dias:[],urg:false,prioridade:'',hora:'',lembrete:'',repetir:null,etiquetas:[],detAberto:false,diasAberto:false,passo:0,alcance:0,calAberto:false,calCursor:null})}
 function qaAbre(){
   if(QA.on){const i=document.getElementById('qa_in');i&&i.focus();return}
+  QA.focoAnterior=document.activeElement;
   const r=qaRascLer()||{};
   Object.assign(QA,{on:true,texto:r.texto||'',det:r.det||'',area:r.area||'tarefas',quando:r.quando||'',dias:Array.isArray(r.dias)?r.dias:[],urg:!!r.urg,prioridade:r.prioridade||'',hora:r.hora||'',lembrete:r.lembrete??'',repetir:r.repetir||null,etiquetas:r.etiquetas||[],ouvindo:false,rec:null,detAberto:!!r.det,diasAberto:Array.isArray(r.dias)&&r.dias.length>0});
+  Object.assign(QA,{passo:0,alcance:0,calAberto:false,calCursor:dataTarefaValida(QA.quando)?QA.quando:smHoje()});
+  QA.quandoManual=r.quandoManual??!!(r.quando||r.dias?.length);qaSugereData();
   qaRascSalva();qaDesenha();
 }
-function qaFechaEl(){if(QA.rec){try{QA.rec.abort()}catch(e){}QA.rec=null}QA.ouvindo=false;QA.on=false;const el=document.getElementById('qa');if(el)el.remove()}
+function qaFechaEl(){if(QA.rec){try{QA.rec.abort()}catch(e){}QA.rec=null}QA.ouvindo=false;QA.on=false;const el=document.getElementById('qa');if(el)el.remove();const foco=QA.focoAnterior;QA.focoAnterior=null;if(foco?.isConnected)foco.focus()}
 function qaFecha(){qaFechaEl();qaRascSalva()}                       // fechar NÃO apaga o rascunho
 function qaLimpa(){qaZera();qaRascLimpa();qaRascSalva();if(QA.on){qaDesenha()}}   // "Limpar": apaga o rascunho de propósito
-function qaTxt(v){QA.texto=v;qaRascSalva();qaPinta()}
-function qaQuando(v){QA.quando=QA.quando===v?'':v;if(QA.quando)QA.dias=[];qaRascSalva();qaPinta()}
+function qaSugereData(){
+  if(QA.quandoManual||QA.dias.length)return;
+  QA.quando=interpretarTarefa(QA.texto,smHoje()).find(r=>dataTarefaValida(r.dia))?.dia||'';
+  QA.calCursor=QA.quando||smHoje();
+}
+function qaTxt(v){QA.texto=v;qaSugereData();qaRascSalva();qaPinta()}
+function qaQuando(v){QA.quandoManual=true;QA.quando=QA.quando===v?'':v;if(QA.quando)QA.dias=[];qaRascSalva();qaPinta()}
 // vários dias (opcional): chips dos próximos 14 dias; escolher dias apaga o "Quando" e vice-versa (pedido do Artur, 24/10/2026)
 const qaDiasLista=()=>Array.from({length:14},(_,i)=>smMais(smHoje(),i));
 const qaDiasHtml=()=>qaDiasLista().map(x=>`<button type="button" class="sm-chip ${smTipo(x)!=='estudo'?'fraco':''}" data-d="${x}" onclick="qaDia('${x}')">${smRot(x)}</button>`).join('');
 function qaDiasAlterna(){QA.diasAberto=!QA.diasAberto;const el=document.getElementById('qa_dias');if(el){if(QA.diasAberto&&!el.childElementCount)el.innerHTML=qaDiasHtml();el.hidden=!QA.diasAberto}qaPinta()}
-function qaDia(x){const i=QA.dias.indexOf(x);if(i<0)QA.dias.push(x);else QA.dias.splice(i,1);if(QA.dias.length)QA.quando='';qaRascSalva();qaPinta()}
+function qaDia(x){QA.quandoManual=true;const i=QA.dias.indexOf(x);if(i<0)QA.dias.push(x);else QA.dias.splice(i,1);if(QA.dias.length)QA.quando='';qaRascSalva();qaPinta()}
 // "+ novo tipo" (opcional): campo pequeno; Enter cria o tipo e já escolhe
 function qaTipoSel(v){if(v==='__novo'){const s=document.getElementById('qa_area');if(s)s.value=QA.area;const n=document.getElementById('qa_tn');if(n){n.hidden=false;n.focus()}return}QA.area=v;qaRascSalva()}
 function qaTipoCria(){
   const n=document.getElementById('qa_tn'),nome=(n&&n.value||'').trim();if(!nome)return;
   if(!SM.d){toast('Espere o calendário carregar para criar um tipo.');return}
   const id=smTipoNovo(nome);if(!id)return;QA.area=id;qaRascSalva();
-  const s=document.getElementById('qa_area');if(s){s.innerHTML=smOpcoes(id)+'<option value="__novo">+ novo tipo…</option>';s.value=id}
-  n.value='';n.hidden=true;const i=document.getElementById('qa_in');i&&i.focus();toast('Tipo “'+nome+'” criado');
+  qaPasso(2);toast('Tipo “'+nome+'” criado');
 }
 function qaUrgente(){QA.urg=!QA.urg;qaRascSalva();qaPinta()}
 function qaDetAlterna(){QA.detAberto=!QA.detAberto;const d=document.getElementById('qa_det');if(d){d.hidden=!QA.detAberto;if(QA.detAberto)d.focus()}qaPinta()}
 const qaDM=iso=>iso.slice(8)+'/'+iso.slice(5,7);
-function qaPrevTxt(){return smPreviaTexto(QA.texto,QA)}
+function qaPrevTxt(){return smPreviaTexto(QA.texto,{...QA,painel:true})}
 function smTextoOpcoes(texto,hoje,pad={}){
-  return interpretarTarefa(texto,hoje).map(r=>{
+  const partes=String(texto).split(/\s*(?:[;\n]+|(?:pr[oó]xima|nova)\s+tarefa)\s*/i).filter(x=>x.trim());
+  const itens=interpretarTarefa(texto,hoje);
+  return itens.map((r,i)=>{
     const repetir=r.repetir||pad.repetir||null;
     let dias=r.dia?[r.dia]:pad.dias?.length?[...pad.dias].sort():[pad.quando==='hoje'?hoje:pad.quando||'sem'];
-    if(repetir&&!r.dia&&!pad.dias?.length&&!pad.quando)dias=[repetir.tipo==='mensal'?hoje:proximaData(smMais(hoje,-1),repetir)||hoje];
-    return {...r,dias,hora:r.hora||pad.hora||null,prioridade:r.prioridade||pad.prioridade||null,urg:r.urg||!!pad.urg,repetir,
+    if(pad.painel)dias=pad.dias?.length?[...pad.dias].sort():[dataTarefaValida(pad.quando)?pad.quando:'sem'];
+    else if(repetir&&!r.dia&&!pad.dias?.length&&!pad.quando)dias=[repetir.tipo==='mensal'?hoje:proximaData(smMais(hoje,-1),repetir)||hoje];
+    return {...r,...(pad.painel?{area:null,...(dataTarefaValida(r.dia)?{texto:(partes.length===itens.length?partes[i]:texto).trim()}:{})}:{}),dias,hora:r.hora||pad.hora||null,prioridade:r.prioridade||pad.prioridade||null,urg:r.urg||!!pad.urg,repetir,
       lembrete:pad.lembrete==null||pad.lembrete===''?null:+pad.lembrete,etiquetas:[...new Set([...r.etiquetas,...(pad.etiquetas||[])])]};
   });
 }
@@ -609,6 +618,7 @@ function smPreviaTexto(texto,pad={}){
 }
 function qaPinta(){   // atualiza só o que mudou (não refaz o campo: não perde foco nem teclado do celular)
   const el=document.getElementById('qa');if(!el)return;
+  el.querySelectorAll('[data-campo]').forEach(b=>{const c=b.dataset.campo,v=c==='quando'?qaModoQuando():c==='urg'?QA.urg?'sim':'':String(QA[c]);b.setAttribute('aria-pressed',String(b.dataset.valor===v))});
   el.querySelectorAll('[data-q]').forEach(b=>b.setAttribute('aria-pressed',String(QA.quando===b.dataset.q)));
   const dt=document.getElementById('qa_dt');if(dt)dt.value=/^\d{4}-/.test(QA.quando)?QA.quando:'';
   el.querySelectorAll('[data-d]').forEach(b=>b.setAttribute('aria-pressed',String(QA.dias.includes(b.dataset.d))));
@@ -640,10 +650,10 @@ function smDesfazToast(msg,fn){
 function qaSalvar(){
   const bruto=QA.texto.trim();if(!bruto){toast('Escreva a tarefa');return}
   const pad={quando:QA.quando,dias:[...QA.dias],area:QA.area,urg:QA.urg,det:QA.det.trim(),prioridade:QA.prioridade,hora:QA.hora,lembrete:QA.lembrete,repetir:QA.repetir,etiquetas:QA.etiquetas};
-  if(smTextoOpcoes(bruto,smHoje(),pad).some(r=>r.repetir?.tipo==='semanal'&&!r.repetir.dias?.length)){toast('Escolha pelo menos um dia para repetir.');return}
+  if(smTextoOpcoes(bruto,smHoje(),{...pad,painel:true}).some(r=>r.repetir?.tipo==='semanal'&&!r.repetir.dias?.length)){toast('Escolha pelo menos um dia para repetir.');return}
   if(!SM.d){   // calendário ainda não carregou nem está guardado no aparelho: guarda e grava quando chegar
     qaFechaEl();qaRascSalva({salvar:true,aberto:false});toast('Vai salvar assim que o calendário carregar.');smCarga.then(smRascPend);return}
-  const novos=smCriaDeTexto(bruto,pad);if(!novos.length)return;
+  const novos=smCriaDeTexto(bruto,{...pad,painel:true});if(!novos.length)return;
   qaFechaEl();qaZera();qaRascLimpa();
   const ids=novos.map(x=>x.id);
   smDesfazToast('Salvei: '+smResumoNovos(novos),()=>{
@@ -657,7 +667,7 @@ function smRascPend(){
   const r=qaRascLer();if(!r||!r.salvar)return;
   if(!SM.d){toast('Não consegui salvar a tarefa agora. O texto está guardado neste aparelho.');return}
   const bruto=(r.texto||'').trim();qaRascLimpa();if(!bruto)return;
-  const novos=smCriaDeTexto(bruto,{...r,det:(r.det||'').trim()});
+  const novos=smCriaDeTexto(bruto,{...r,det:(r.det||'').trim(),painel:true});
   if(novos.length)toast('Salvei: '+smResumoNovos(novos));
 }
 // ---- voz (Web Speech API; sem ela o botão 🎤 nem aparece) ----
@@ -668,7 +678,7 @@ function qaVoz(){
   const rec=new API(),base=QA.texto.trim();let final='';
   rec.lang='pt-BR';rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=1;
   rec.onresult=e=>{let f='',pv='';for(let i=0;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)f+=r[0].transcript;else pv+=r[0].transcript}
-    final=f;QA.texto=((base?base+' ':'')+(f+pv)).trim();const c=document.getElementById('qa_in');if(c)c.value=QA.texto;qaRascSalva();qaPinta()};
+    final=f;qaTxt(((base?base+' ':'')+(f+pv)).trim());const c=document.getElementById('qa_in');if(c)c.value=QA.texto};
   rec.onerror=e=>{const c=e.error;if(c==='not-allowed'||c==='service-not-allowed')toast('Permita o microfone para ditar.');else if(c==='no-speech')toast('Não ouvi nada.');else if(c!=='aborted')toast('Não consegui ouvir ('+c+').')};
   rec.onend=()=>{if(QA.rec===rec){QA.rec=null;QA.ouvindo=false;qaPinta()}};
   QA.rec=rec;QA.ouvindo=true;qaPinta();
@@ -678,41 +688,102 @@ function qaCampo(campo,valor){QA[campo]=valor;qaRascSalva();qaPinta()}
 function qaRepetir(tipo){QA.repetir=tipo?{tipo,...(tipo==='semanal'?{dias:[smDt(smHoje()).getDay()]}:{})}:null;qaRascSalva();qaDesenha()}
 function qaRepDia(dia,marcado){if(QA.repetir?.tipo!=='semanal')return;const dias=new Set(QA.repetir.dias);marcado?dias.add(dia):dias.delete(dia);QA.repetir={tipo:'semanal',dias:[...dias]};qaRascSalva();qaPinta()}
 function qaExtrasHtml(){
-  const op=(lista,valor)=>lista.map(([v,n])=>`<option value="${v}" ${v===String(valor??'')?'selected':''}>${n}</option>`).join('');
-  return `<div class="sm-extras"><label>Prioridade<select id="qa_prioridade" onchange="qaCampo('prioridade',this.value)">${op([['','Sem prioridade'],['alta','Alta'],['media','Média'],['baixa','Baixa']],QA.prioridade)}</select></label>
-    <label>Hora<input id="qa_hora" type="time" value="${esc(QA.hora)}" onchange="qaCampo('hora',this.value)"></label>
-    <label>Lembrete<select id="qa_lembrete" onchange="qaCampo('lembrete',this.value)">${op([['','Nenhum'],['0','Na hora'],['15','15 min antes'],['60','1 h antes']],QA.lembrete)}</select></label>
-    <label>Repetir<select id="qa_repetir" onchange="qaRepetir(this.value)">${op([['','Não repetir'],['diaria','Todo dia'],['uteis','Dias úteis'],['semanal','Toda semana'],['mensal','Todo mês']],QA.repetir?.tipo)}</select></label></div>
-    <div class="sm-rep-dias" ${QA.repetir?.tipo==='semanal'?'':'hidden'}>${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" ${(QA.repetir?.dias||[]).includes(d)?'checked':''} onchange="qaRepDia(${d},this.checked)">${smDOW[d]}</label>`).join('')}</div>`;
+  return qaLinha(3,'Lembrete',qaLembretes().find(x=>x[0]===String(QA.lembrete))?.[1]||'Nenhum',qaChips('lembrete',qaLembretes(),String(QA.lembrete)))+
+    qaLinha(4,'Hora',QA.hora||'Sem hora',`<input id="qa_hora" type="time" aria-label="Hora" value="${esc(QA.hora)}" onchange="qaCampo('hora',this.value)">`)+
+    qaLinha(5,'Urgente',QA.urg?'Sim':'Não',qaChips('urg',[['','Não'],['sim','Sim']],QA.urg?'sim':''))+
+    qaLinha(6,'Detalhes',QA.det||'Sem detalhes',`<textarea id="qa_det" class="qa-in" rows="2" aria-label="Detalhes" placeholder="Detalhes opcionais" oninput="QA.det=this.value;qaRascSalva()">${esc(QA.det)}</textarea>`);
 }
-function qaDesenha(){
+const qaLembretes=()=>[['','Nenhum'],['0','Na hora'],['15','15 min antes'],['60','1 h antes']];
+function qaTipos(){
+  const tipos=[SM_TIPOS0[2],SM_TIPOS0[0],SM_TIPOS0[1],...smTipos().filter(t=>!SM_TIPOS0.some(x=>x.id===t.id))];
+  return tipos.flatMap(t=>{const atual=smTipos().find(x=>x.id===t.id)||t;return [[t.id,t.id==='tarefas'?'Tarefa':atual.nome],...(atual.subs||[]).map(s=>[t.id+'|'+s,atual.nome+' › '+s])]});
+}
+function qaCor(tipo){
+  const id=tipo.split('|')[0],fixas={tarefas:'#E9E3FF',estudo:'#DCEBFF',ferramenta:'#DDF5E8'};
+  const i=smTipos().filter(t=>!fixas[t.id]).findIndex(t=>t.id===id);
+  return fixas[id]||['#FFE4D6','#FFE0EC','#FFF4CC'][Math.max(0,i)%3];
+}
+function qaChips(campo,opcoes,valor){return `<div class="qa-chips" role="group" aria-label="${({area:'Tipo',quando:'Quando',lembrete:'Lembrete',urg:'Urgente'})[campo]}">${opcoes.map(([v,n])=>`<button type="button" class="qa-chip" data-campo="${campo}" data-valor="${esc(v)}" ${campo==='area'?`style="--qa-cor:${qaCor(v)}"`:''} aria-pressed="${v===valor}" onclick="qaEscolhe('${campo}',this.dataset.valor,true)">${esc(n)}</button>`).join('')}</div>`}
+function qaLinha(n,nome,resumo,conteudo){return `<section class="qa-passo ${QA.passo===n?'atual':''}" data-passo="${n}" ${n>QA.alcance?'hidden':''}>
+  ${QA.passo===n?`<div class="sm-lbl">${nome}</div>${conteudo}`:`<button type="button" class="qa-resumo" onclick="qaPasso(${n})"><span>${nome}</span><b>${esc(resumo)}</b></button>`}</section>`}
+const qaModoQuando=()=>QA.diasAberto||QA.dias.length?'varios':QA.calAberto||dataTarefaValida(QA.quando)?'data':'sem';
+function qaEscolhe(campo,valor,avancar=false){
+  if(campo==='quando'){
+    QA.quandoManual=true;
+    QA.calAberto=valor==='data';QA.diasAberto=valor==='varios';
+    if(valor!=='varios')QA.dias=[];
+    QA.quando=valor==='data'?(dataTarefaValida(QA.quando)?QA.quando:QA.calCursor||smHoje()):'';
+    QA.calCursor=QA.quando||QA.calCursor||smHoje();
+  }else QA[campo]=campo==='urg'?valor==='sim':valor;
+  qaRascSalva();
+  if(avancar&&(campo!=='quando'||valor==='sem'))qaPasso(QA.passo+1);
+  else qaDesenha(campo==='quando'&&valor==='data'?'cal':null);
+}
+function qaPasso(n){QA.passo=Math.max(0,Math.min(6,n));QA.alcance=Math.max(QA.alcance,QA.passo);qaDesenha()}
+function qaCalendario(){
+  const cur=QA.calCursor||smHoje(),d=smDt(cur),primeiro=dKey(+new Date(d.getFullYear(),d.getMonth(),1,12)),ini=smDom(primeiro);
+  return `<div class="qa-cal"><div class="row"><button type="button" class="qa-chip" aria-label="Mês anterior" onclick="qaCalMes(-1)">‹</button><b>${smMES[d.getMonth()]} ${d.getFullYear()}</b><button type="button" class="qa-chip" aria-label="Próximo mês" onclick="qaCalMes(1)">›</button></div>
+    <div class="qa-cg" role="group" aria-label="Calendário; setas mudam o dia">${smDOW.map(x=>`<span class="qa-ch">${x}</span>`).join('')}${Array.from({length:42},(_,i)=>{const iso=smMais(ini,i);return `<button type="button" class="qa-cd ${iso.slice(0,7)!==cur.slice(0,7)?'fora':''} ${iso===QA.quando?'cur':''}" data-cal="${iso}" tabindex="${iso===cur?0:-1}" aria-label="${iso}" aria-pressed="${iso===QA.quando}" onclick="qaCalDia(this.dataset.cal,true)">${+iso.slice(8)}</button>`}).join('')}</div>
+    <button type="button" class="qa-chip" onclick="qaPasso(3)">Usar data · ${qaDM(QA.quando)}</button></div>`;
+}
+function qaCalDia(iso,avancar=false){QA.quandoManual=true;QA.calCursor=iso;QA.quando=iso;QA.dias=[];qaRascSalva();avancar?qaPasso(3):qaDesenha('cal')}
+function qaCalMes(n){const d=smDt(QA.calCursor||smHoje());QA.calCursor=dKey(+new Date(d.getFullYear(),d.getMonth()+n,1,12));qaDesenha('cal')}
+function qaMultiDia(iso){QA.quandoManual=true;const i=QA.dias.indexOf(iso);if(i<0)QA.dias.push(iso);else QA.dias.splice(i,1);QA.quando='';qaRascSalva();qaDesenha()}
+function qaHtml(){
+  const modo=qaModoQuando(),tipo=qaTipos().find(x=>x[0]===QA.area)?.[1]||QA.area;
+  const quando=QA.dias.length?QA.dias.map(qaDM).join(', '):dataTarefaValida(QA.quando)?qaDM(QA.quando):'Sem data';
+  return `<div class="qa-caixa" role="dialog" aria-modal="true" aria-label="Nova tarefa"><div class="row"><b>Nova tarefa</b><span style="flex:1"></span>${qaVozAPI()?'<button type="button" id="qa_mic" class="qa-chip" onclick="qaVoz()" aria-label="Falar a tarefa">🎤</button>':''}<button type="button" class="qa-chip" onclick="qaFecha()" aria-label="Fechar">✕</button></div>
+    <div class="qa-corpo">${qaLinha(0,'Tarefa',QA.texto||'Escreva a tarefa',`<input id="qa_in" class="qa-in" placeholder="O que você precisa fazer?" value="${esc(QA.texto)}" oninput="qaTxt(this.value)" autocomplete="off" enterkeyhint="done" aria-label="Tarefa">`)}
+    ${qaLinha(1,'Tipo',tipo,qaChips('area',qaTipos(),QA.area)+`<div class="qa-novo"><input id="qa_tn" aria-label="Nome do novo tipo" placeholder="Novo tipo (opcional)"><button type="button" class="qa-chip" onclick="qaTipoCria()">Criar tipo</button></div>`)}
+    ${qaLinha(2,'Quando',quando,qaChips('quando',[['sem','Sem data'],['data','Data'],['varios','Vários dias']],modo)+(modo==='data'?qaCalendario():modo==='varios'?`<div class="qa-chips">${qaDiasLista().map(iso=>`<button type="button" class="qa-chip" data-multi="${iso}" aria-pressed="${QA.dias.includes(iso)}" onclick="qaMultiDia(this.dataset.multi)">${smRot(iso)}</button>`).join('')}</div><button type="button" class="qa-chip" onclick="qaPasso(3)">Pronto</button>`:''))}
+    ${qaExtrasHtml()}</div>
+    <div class="qa-rodape"><button type="button" class="b" onclick="qaSalvar()">Salvar</button><button type="button" class="qa-chip" onclick="qaPasso(QA.passo+1)" ${QA.passo===6?'hidden':''}>Próximo ↓</button><button type="button" class="qa-chip" onclick="qaLimpa()">Limpar</button></div>
+    <div class="qa-dica">↑ ↓ passos · ← → escolhem · Enter salva · Esc fecha</div></div>`;
+}
+function qaDesenha(foco){
   let el=document.getElementById('qa');
   if(!el){el=document.createElement('div');el.id='qa';el.className='qa-fundo';el.onclick=e=>{if(e.target===el)qaFecha()};document.body.appendChild(el)}
-  const tp=QA.area&&smTipos().some(t=>QA.area.split('|')[0]===t.id)?QA.area:smTipos()[0].id;
-  el.innerHTML=`<div class="qa-caixa" role="dialog" aria-label="Nova tarefa"><div class="row" style="justify-content:space-between;align-items:center"><b>➕ Nova tarefa</b><span style="flex:1"></span>${qaVozAPI()?`<button type="button" id="qa_mic" class="b s sm-ghost" onclick="qaVoz()" aria-label="Falar a tarefa" aria-pressed="false">🎤</button>`:''}<button class="b s sm-ghost" onclick="qaFecha()" aria-label="Fechar">✕</button></div>
-    <input id="qa_in" class="qa-in" placeholder="Ex.: consulta neurologista dia 30/10 11 horas" value="${esc(QA.texto)}" oninput="qaTxt(this.value)" autocomplete="off" enterkeyhint="done" aria-label="Tarefa">
-    <div id="qa_prev" class="qa-prev" aria-live="polite"></div>
-    <div class="qa-opts"><span class="sm-lbl">Quando</span><button type="button" class="sm-tagb" data-q="sem" onclick="qaQuando('sem')">Sem data</button><button type="button" class="sm-tagb" data-q="hoje" onclick="qaQuando('hoje')">Hoje</button><input type="date" id="qa_dt" class="sm-date" aria-label="Escolher o dia" onchange="QA.quando=this.value;if(QA.quando)QA.dias=[];qaRascSalva();qaPinta()"><button type="button" id="qa_diasb" class="sm-tagb" onclick="qaDiasAlterna()">📅 vários dias</button></div>
-    <div id="qa_dias" class="sm-chips" ${QA.diasAberto?'':'hidden'}>${QA.diasAberto?qaDiasHtml():''}</div>
-    <div class="qa-opts"><span class="sm-lbl">Tipo</span><select id="qa_area" aria-label="Tipo" onchange="qaTipoSel(this.value)">${smOpcoes(tp)}<option value="__novo">+ novo tipo…</option></select><input id="qa_tn" class="sm-date" placeholder="Nome do novo tipo + Enter" aria-label="Nome do novo tipo" hidden style="flex:1 1 140px;min-width:0"><button type="button" id="qa_urg" class="sm-tagb" onclick="qaUrgente()" title="Alt+U">! urgente</button><button type="button" id="qa_detb" class="sm-tagb" onclick="qaDetAlterna()">≡ detalhes</button></div>
-    <textarea id="qa_det" class="qa-in qa-det" rows="2" placeholder="Detalhes (opcional): aparecem ao abrir a tarefa" oninput="QA.det=this.value;qaRascSalva()" ${QA.detAberto?'':'hidden'}>${esc(QA.det)}</textarea>
-    ${qaExtrasHtml()}
-    <div class="row" style="margin-top:6px"><button class="b" onclick="qaSalvar()">Salvar</button><span style="flex:1"></span><button class="b s sm-ghost" onclick="qaLimpa()">Limpar</button></div>
-    <div class="qa-dica"><kbd>Enter</kbd> salva · <kbd>Alt</kbd>+<kbd>U</kbd> urgente · <kbd>Esc</kbd> guarda o rascunho · ex.: “plantão ter 18h”, “ração sexta 9h30 !alta”, “questões todo dia”, “!! #pacs”. O texto prevalece sobre as opções. Anexos e subtarefas ficam no editor após salvar.</div></div>`;
-  const s=document.getElementById('qa_area');if(s)s.value=tp;
-  qaPinta();const i=document.getElementById('qa_in');i.focus();i.setSelectionRange(i.value.length,i.value.length);
+  el.innerHTML=qaHtml();
+  qaAjustaTela();
+  const atual=el.querySelector('.qa-passo.atual');
+  const i=foco==='cal'?el.querySelector(`[data-cal="${QA.calCursor}"]`):atual&&(atual.querySelector('input:not(#qa_tn),textarea')||atual.querySelector('[aria-pressed="true"]')||atual.querySelector('button'));
+  if(i){i.focus();if(i.id==='qa_in')i.setSelectionRange(i.value.length,i.value.length)}
+}
+function qaAjustaTela(){
+  const el=document.getElementById('qa'),v=window.visualViewport;if(!el||!v)return;
+  el.style.height=v.height+'px';el.style.top=v.offsetTop+'px';el.style.bottom='auto';el.style.setProperty('--qa-altura',v.height+'px');
+}
+window.visualViewport?.addEventListener('resize',qaAjustaTela);
+window.visualViewport?.addEventListener('scroll',qaAjustaTela);
+function qaTecla(e){
+  const k=e.key,alvo=e.target||{};
+  if(k==='Escape'){e.preventDefault();qaFecha();return}
+  if(k==='Tab'){
+    const el=document.getElementById('qa');if(!el)return;
+    const campos=[...el.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')].filter(x=>!x.disabled&&x.tabIndex>=0&&!x.closest('[hidden]')&&x.getClientRects().length);
+    e.preventDefault();const i=campos.indexOf(document.activeElement),n=campos.length;
+    if(n)campos[i<0?(e.shiftKey?n-1:0):(i+(e.shiftKey?-1:1)+n)%n].focus();return;
+  }
+  if(k==='Enter'&&!e.isComposing){e.preventDefault();qaSalvar();return}
+  if(alvo.id==='qa_tn'&&k.startsWith('Arrow'))return;
+  if(alvo.dataset?.cal&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(k)){
+    e.preventDefault();qaCalDia(smMais(alvo.dataset.cal,({ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7})[k]));return;
+  }
+  if(k==='ArrowDown'||k==='ArrowUp'){e.preventDefault();qaPasso(QA.passo+(k==='ArrowDown'?1:-1));return}
+  if(k==='ArrowLeft'||k==='ArrowRight'){
+    if(/^(INPUT|TEXTAREA)$/.test(alvo.tagName)||alvo.isContentEditable)return;
+    const c=({1:'area',2:'quando',3:'lembrete',5:'urg'})[QA.passo];if(!c)return;
+    const ops=c==='area'?qaTipos():c==='quando'?[['sem'],['data'],['varios']]:c==='urg'?[[''],['sim']]:qaLembretes();
+    const valor=c==='quando'?qaModoQuando():c==='urg'?QA.urg?'sim':'':String(QA[c]);
+    const i=Math.max(0,ops.findIndex(x=>x[0]===valor)),j=(i+(k==='ArrowRight'?1:-1)+ops.length)%ops.length;
+    e.preventDefault();qaEscolhe(c,ops[j][0]);
+  }
 }
 window.addEventListener('keydown',e=>{
   if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
-  e.stopImmediatePropagation();const k=e.key,alvo=e.target||{};
-  if(alvo.id==='qa_tn'&&(k==='Enter'||k==='Escape')){e.preventDefault();if(k==='Enter')qaTipoCria();else{alvo.value='';alvo.hidden=true;const i=document.getElementById('qa_in');i&&i.focus()}return}
-  if(k==='Escape'){e.preventDefault();qaFecha();return}
+  e.stopImmediatePropagation();
   if(e.altKey&&e.code==='KeyU'){e.preventDefault();qaUrgente();return}
-  if(k==='Enter'&&!e.isComposing){
-    if(alvo.tagName==='BUTTON')return;                    // Enter num botão = aperta o botão
-    if(alvo.id==='qa_det'&&!e.ctrlKey)return;              // nos detalhes, Enter = nova linha (Ctrl+Enter salva)
-    e.preventDefault();qaSalvar();
-  }
+  qaTecla(e);
 },true);
 // botão flutuante "+" (celular e mouse) nas abas Hoje e Semana — chamado a cada render
 function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoje'||tela==='semana';

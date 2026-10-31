@@ -119,8 +119,9 @@ const TIPOS=[
  {k:'ri',nome:'Revisão Inteligente',desc:'Questões dos temas mais frequentes, com revisão espaçada'},
  {k:'rt',nome:'Revisão Teórica',desc:'Resumo do tema + 10 questões'},
  {k:'ps',nome:'Provas e simulados',desc:'Simulado cronometrado'}];
-const defCfg=()=>({pesos:{},diario:20,fcNovos:20,fcMax:200,prova:'',tema:'auto',fs:93,tabs:[],pnOrd:[],keys:{},ri:null,est:null,etDone:{},agenda:{et:[1,1,1,0,0,0,0],ri:[1,1,1,1,1,0,0],rt:[0,0,1,1,0,0,0],ps:[0,0,0,0,0,1,1]}});
-const normCfg=c=>{c=Object.assign(defCfg(),c||{});c.nomes=c.nomes||{};c.ests=c.ests||[];
+const DATA_PROVA='2026-12-12',RI_DIARIA=50;
+const defCfg=()=>({pesos:{},diario:20,fcNovos:20,fcMax:200,prova:DATA_PROVA,tema:'auto',fs:93,tabs:[],pnOrd:[],keys:{},ri:null,est:null,etDone:{},agenda:{et:[1,1,1,0,0,0,0],ri:[1,1,1,1,1,0,0],rt:[0,0,1,1,0,0,0],ps:[0,0,0,0,0,1,1]}});
+const normCfg=c=>{c=Object.assign(defCfg(),c||{});c.prova=DATA_PROVA;c.nomes=c.nomes||{};c.ests=c.ests||[];
   if(c.est){if(!c.ests.some(x=>x.ids===c.est.ids))c.ests.push({id:'m'+(c.est.u||0),...c.est});c.est=null}/* migra o estudo único antigo */c.agenda=Object.assign(defCfg().agenda,c.agenda||{});c.keys=c.keys||{};c.etDone=c.etDone||{};return c};
 let Q=window.QUESTOES||[];
 let all=load('cbr_log',[]);          // {q,t,ok,conf,ms,modo,x} (x = anulada)
@@ -292,13 +293,14 @@ function riPreserva(local,remota){
   if(!valida(remota))return local;
   return {...local,meta:Math.max(local.meta||0,remota.meta||0),ids:[...new Set([...local.ids,...remota.ids])]};
 }
-function riHoje(){ // no mesmo dia, só acrescenta ao fim; nunca invalida a lista salva
-  const d=dKey(Date.now()),meta=modoProva()?tamanhoRI():cfg.diario;
+function riHoje(){ // mantém a ordem salva; completa até 50 e limita listas de versões antigas
+  const d=dKey(Date.now()),meta=RI_DIARIA;
   let mudou=false;
   if(!cfg.ri||cfg.ri.d!==d||!Array.isArray(cfg.ri.ids)){
     cfg.ri={d,meta,ids:revisaoDoDia()};mudou=true;
   }
-  const r=cfg.ri,alvo=Math.max(r.meta||0,meta,r.ids.length);
+  const r=cfg.ri,alvo=meta;
+  if(r.ids.length>alvo){r.ids=r.ids.slice(0,alvo);mudou=true} // migra listas antigas; respostas continuam no histórico
   if(r.meta!==alvo){r.meta=alvo;mudou=true}
   if(r.ids.length<alvo){
     const exclui=new Set(r.ids),n=alvo-r.ids.length;
@@ -457,7 +459,7 @@ const idxHoje=()=>(new Date().getDay()+6)%7;
 const CK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
 
 // progresso por tipo em um dia (di = deslocamento em ms desde segunda da semana atual)
-const MODO={ri:'hoje',rt:'rt',ps:'simulado'},ALVO={ri:()=>cfg.diario,rt:()=>10,ps:()=>30};
+const MODO={ri:'hoje',rt:'rt',ps:'simulado'},ALVO={ri:()=>metaHoje(),rt:()=>10,ps:()=>30};
 function progDia(k,ini){
   if(k==='et'){const n=cfg.etDone[dKey(ini)]?1:0;return {n,alvo:1,ok:!!n}}
  const n=log.filter(l=>l.t>=ini&&l.t<ini+DAY&&l.modo===MODO[k]).length;return {n,alvo:ALVO[k](),ok:n>=ALVO[k]()}}
@@ -469,7 +471,7 @@ function vHoje(){
   const okH=hojeLog.filter(l=>l.ok).length,tot=log.length,ok=log.filter(l=>l.ok).length;
   const dias=new Set(log.map(l=>new Date(l.t).toDateString()));let seq=0;
   for(let d=new Date();dias.has(d.toDateString())||(seq===0&&(d.setDate(d.getDate()-1),dias.has(d.toDateString())));d.setDate(d.getDate()-1))seq++;
-  const diasProva=cfg.prova?Math.ceil((new Date(cfg.prova)-now)/DAY):null;
+  const diasProva=Math.ceil((new Date(DATA_PROVA+'T12:00')-now)/DAY);
   const ti=idxHoje(),hoje=segunda()+ti*DAY;
   const agendados=TIPOS.filter(t=>cfg.agenda[t.k][ti]),extras=TIPOS.filter(t=>!cfg.agenda[t.k][ti]);
   const tm=temas()[0];
@@ -537,7 +539,7 @@ function vAgenda(){
   return `<div class="card"><h2>Agenda semanal</h2><p class="mut">Marque os dias de cada atividade. O app monta o plano de hoje a partir daqui. Bolinha verde = concluída naquele dia.</p>
   <div class="tw"><table class="ag"><thead><tr><th></th>${DIAS.map((d,i)=>`<th><span class="dia-l">${d}</span><span class="dia-s">${DIAS_S[i]}</span></th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table></div>
   <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="b s" ${agMudou()?'':'disabled'} onclick="desfazAg()">Desfazer alterações</button><button class="b" ${agMudou()?'':'disabled'} onclick="salvaAg()">Salvar alterações</button></div></div>
-  <div class="card"><h3>Como cada atividade funciona</h3>${TIPOS.map(t=>`<div class="sk"><b>${t.nome}</b><div class="mut">${t.desc}.${t.k==='ri'?` Concluída ao responder ${cfg.diario} questões.`:t.k==='rt'?' Concluída ao responder 10 questões do tema.':' Concluída ao responder 30 questões em simulado.'}</div></div>`).join('')}</div>`;
+  <div class="card"><h3>Como cada atividade funciona</h3>${TIPOS.map(t=>`<div class="sk"><b>${t.nome}</b><div class="mut">${t.desc}.${t.k==='ri'?` Concluída ao responder ${RI_DIARIA} questões.`:t.k==='rt'?' Concluída ao responder 10 questões do tema.':' Concluída ao responder 30 questões em simulado.'}</div></div>`).join('')}</div>`;
 }
 
 // ---- revisão teórica ----
@@ -1286,11 +1288,11 @@ function cfgGeral(){
   const S=statsPor(q=>q._a);
   return `<div class="card"><h2>Aparência</h2><p class="row"><label>Tamanho do texto <input id="c_fs" type="range" min="80" max="125" step="1" value="${cfg.fs||93}" oninput="cfg.fs=+this.value;aplicaTema();$('#fsv').textContent=this.value+'%'" onchange="persist('_est')" style="width:200px"><b id="fsv">${cfg.fs||93}%</b></label> <button class="b s" onclick="cfg.fs=93;aplicaTema();persist('_est');render()">Padrão</button></p><div class="row">${[['auto','Automático'],['claro','Claro'],['escuro','Escuro']].map(([k,n])=>`<button class="b ${cfg.tema===k?'':'s'}" onclick="cfg.tema='${k}';saveL('cbr_tema',cfg.tema);aplicaTema();persist('_est');render()">${n}</button>`).join('')}</div></div>
   <div class="card"><h2>Estudo</h2>
-  <p class="row"><label>Questões na Revisão Inteligente <input id="c_d" type="number" min="5" max="200" value="${cfg.diario}" onchange="cfg.diario=+this.value;persist('_est')" style="width:80px"></label>
+  <p class="row"><label>Questões na Revisão Inteligente <input id="c_d" type="number" value="${RI_DIARIA}" readonly style="width:80px"></label>
   <label>Cartões novos por dia <input id="c_fn" type="number" min="0" max="500" value="${cfg.fcNovos}" onchange="cfg.fcNovos=+this.value;persist('_est')" style="width:80px"></label>
   <label>Máx. revisões de cartões por dia <input id="c_fm" type="number" min="10" max="2000" value="${cfg.fcMax}" onchange="cfg.fcMax=+this.value;persist('_est')" style="width:90px"></label>
-  <label>Data da prova <input id="c_p" type="date" value="${cfg.prova}" onchange="cfg.prova=this.value;persist('_est');render()"></label></p>
-  <p class="mut">A lista de hoje é preservada. Aumentar a meta só acrescenta questões ao fim; reduzir vale a partir de amanhã.</p>
+  <label>Data da prova <input id="c_p" type="text" value="12/12/2026" readonly></label></p>
+  <p class="mut">Revisão Inteligente: 50 questões por dia. Prova em 12/12/2026.</p>
   <h3>Peso das áreas na prova (%)</h3><p class="mut">Vazio = usa a incidência no banco. Preencha com o peso real quando tiver.</p>
   <div class="row">${AREAS.map(a=>`<label style="width:46%;min-width:240px">${a.nome} <input id="p_${a.id}" type="number" step="0.5" style="width:70px" placeholder="${(S[a.id]?.banco/(Q.length||1)*100||0).toFixed(1)}" value="${cfg.pesos[a.id]??''}" onchange="setPeso('${a.id}',this.value)"></label>`).join('')}</div></div>`;
 }

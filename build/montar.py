@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.25.1"
+VERSAO = "1.26.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -61,7 +61,6 @@ troca("function simulado(et){", "function simuladoOrig(et){")
 troca("function novasArea(id){", "function novasAreaOrig(id){")
 troca("function comecaFiltro(){", "function comecaFiltroOrig(){")
 # cartão da RI: texto e contador seguem a lista de verdade (22/10/2026)
-troca("ALVO={ri:()=>cfg.diario,", "ALVO={ri:()=>metaHoje(),")
 troca("`<p class=\"mut\">${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.</p>", "`<p class=\"mut\">${riDesc(devidas)}</p>")
 js = js.replace("${layoutUI()}${pesosUI()}", "${modoProvaUI()}${layoutUI()}${pesosUI()}", 1)
 # sugestões 1–5

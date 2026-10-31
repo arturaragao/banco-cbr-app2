@@ -179,11 +179,11 @@ function pacoteVolume(n,filtro=()=>true){
 }
 // texto do cartão da Revisão Inteligente = o que a lista de hoje tem de fato
 function riDesc(devidas){
-  if(!modoProva())return `${cfg.diario} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.`;
+  if(!modoProva())return `${RI_DIARIA} questões do dia (a lista só muda à 00:00): ${devidas} vencidas no total, o restante sorteado com mais peso nos temas frequentes e fracos.`;
   const ids=riHoje(),ini=hoje0(),vistas=new Set(log.filter(l=>l.t<ini).map(l=>l.q)),rep=ids.filter(i=>vistas.has(i)).length,nov=ids.length-rep;
   const d=diasProva(),fim=+(PARAM.revisao_final_dias??14),cnt={f:0,m:0,d:0,sem:0};ids.forEach(i=>{const q=QID[i];if(q&&!vistas.has(i))cnt[q._d??'sem']++});
   const reta=emReta();
-  return `<b>${nov} questões novas</b>${reta?'':' (a meta de hoje)'}${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
+  return `Meta diária: <b>${RI_DIARIA} questões</b>. <b>${nov} questões novas</b>${rep?` + <b>${rep} errada${rep>1?'s':''} para rever</b>${reta?' (reta final: erradas fáceis e médias)':' (errou com certeza ou era fácil)'}`:''}. `+
    `${cnt.f} fáceis · ${cnt.m} médias${cnt.sem?' · '+cnt.sem+' sem dificuldade':''}${cnt.d?' · '+cnt.d+(cnt.d>1?' difíceis':' difícil'):''}, sorteadas com mais peso nas áreas e temas que mais caem e nos que você mais erra. A lista só muda à meia-noite.`;
 }
 // repetidas eventuais (pedido do Artur, 22/10/2026): ~1 a cada 25, no máx. 2 por RI — só erradas COM CERTEZA ou erradas FÁCEIS, última resposta errada há 5+ dias
@@ -194,10 +194,10 @@ function pacoteRepeteRaro(n){
   return k?sorteioPonderado(pool,q=>pesoVolume(q)*(ult[q.id].conf==='certeza'?2:1),k,false).map(q=>q.id):[];
 }
 function revisaoDoDia(){
-  if(!modoProva())return revisaoDoDiaOrig();
+  if(!modoProva())return revisaoDoDiaOrig(RI_DIARIA);
   const n=tamanhoRI(),d=diasProva(),fim=+(PARAM.revisao_final_dias??14);
   if(emReta()){const e=pacoteErradas(Math.round(n*.3));return embaralha([...pacoteVolume(n-e.length),...e])}
-  const r=pacoteRepeteRaro(n);return r.length?embaralha([...pacoteVolume(n),...r]):pacoteVolume(n);   // repetidas vêm a mais: as novas seguem a meta
+  const r=pacoteRepeteRaro(n);return r.length?embaralha([...pacoteVolume(n-r.length),...r]):pacoteVolume(n); // repetidas fazem parte das 50
 }
 function questoesTema(t){return modoProva()?pacoteVolume(10,q=>q._x&&(q._x.t.includes(t)||q._x.o.includes(t))):questoesTemaOrig(t)}
 function simulado(et){
@@ -244,25 +244,23 @@ function blocoFeedback(q,r,html){
 }
 // 5) meta diária para cobrir todas as fáceis e médias até a prova (últimos 14 dias ficam para rever os erros)
 function _restantesFM(){const v=new Set(all.map(l=>l.q));return Q.filter(q=>q.gab&&!(q.classif&&q._a==='sem')&&!v.has(q.id)&&q._d!=='d').length}
-function diasProva(){return cfg.prova?Math.ceil((new Date(cfg.prova+'T12:00')-Date.now())/DAY):null}
+function diasProva(){return Math.ceil((new Date(DATA_PROVA+'T12:00')-Date.now())/DAY)}
 // questões fáceis/médias ainda não vistas no começo de hoje (a meta não cai ao longo do dia)
 function _restantesInicioDia(){const hj=dKey(Date.now()),ant=new Set(),hoje=new Set();all.forEach(l=>{if(dKey(l.t)<hj)ant.add(l.q);else hoje.add(l.q)});
   return _restantesFM()+[...hoje].filter(id=>!ant.has(id)&&QID[id]&&QID[id].gab&&!(QID[id].classif&&QID[id]._a==='sem')&&QID[id]._d!=='d').length}
-// UMA meta só (22/10/2026): meta de HOJE = tamanho da Revisão do dia (novas da meta + erradas para rever), congelada à 00:00;
-// dias futuros = metaDia() = fáceis/médias não vistas ÷ dias de estudo (calendário) de hoje até a véspera da reta final.
-// Sem o calendário carregado não há meta (nada de dias corridos); a RI feita sem calendário é refeita quando ele chega (riRefaz).
+// RI fixa em 50; metaDia mantém apenas a estimativa de cobertura do banco no calendário.
 function emReta(){const r=typeof smRetaIni==='function'?smRetaIni():null;return !!r&&smHoje()>=r}
 function metaDia(){const d=diasProva();if(d==null||d<=0||emReta())return null;
   if(!(typeof smDiasEstudoRestantes==='function'&&SM.d))return null;return Math.ceil(_restantesInicioDia()/Math.max(1,smDiasEstudoRestantes()))}
-function tamanhoRI(){if(emReta())return cfg.diario;const m=metaDia();return modoProva()&&m?Math.min(80,Math.max(10,m)):cfg.diario}
-function metaHoje(){return modoProva()?riHoje().length:cfg.diario}
+function tamanhoRI(){return RI_DIARIA}
+function metaHoje(){return RI_DIARIA}
 function riRefaz(){return !!(cfg.ri&&!cfg.ri.cal&&modoProva()&&typeof SM!=='undefined'&&SM.d&&!log.some(l=>l.t>=hoje0()&&l.modo==='hoje'))}
 function metaProvaCard(){
   if(!modoProva())return'';const d=diasProva(),r=_restantesFM(),fim=+(PARAM.revisao_final_dias??14);
   if(d==null)return `<div class="card"><span class="kick">Meta até a prova</span><p class="mut">Coloque a <b>data da prova</b> em Config para eu calcular quantas questões por dia você precisa para ver todas as fáceis e médias. Faltam ${r}.</p></div>`;
   const fase=emReta(),mh=metaHoje();
   return `<div class="card"><span class="kick">Meta até a prova</span><p><b>${d} dias</b> até a prova · <b>${r}</b> questões fáceis e médias ainda não vistas.</p>
-   <p class="mut">${fase?`<b>Reta final:</b> a Revisão do dia mistura 70% novas e 30% das fáceis e médias que você errou.`:`Meta de hoje: <b>${mh} questões</b> = a Revisão do dia. Calculada à meia-noite: questões fáceis e médias ainda não vistas no banco ÷ dias de estudo até ${fim} dias antes da prova (sáb, dom e feriado sem plantão BR não contam; os últimos ${fim} dias ficam para rever os erros), mais as poucas erradas que voltam.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
+   <p class="mut">Meta de hoje: <b>${mh} questões</b> na Revisão do dia.${fase?' <b>Reta final:</b> mistura 70% novas e 30% das fáceis e médias que você errou.':` Os últimos ${fim} dias ficam para rever os erros.`}</p>${typeof smMetaHoje==='function'?smMetaHoje():''}</div>`;
 }
 // 3) reta final: erradas fáceis/médias voltam (30%) nos últimos dias
 function pacoteErradas(k){
