@@ -412,7 +412,7 @@ test('painel acompanha altura do teclado virtual, mantém rascunho no Esc e core
   a.c.window.visualViewport={height:320,offsetTop:12};a.c.qaAjustaTela();
   assert.equal(el.style.height,'320px');assert.equal(el.style.top,'12px');assert.equal(el.style['--qa-altura'],'320px');
   vm.runInContext("SM.d.tipos=[...SM_TIPOS0,{id:'a',nome:'Pessoal'},{id:'b',nome:'Casa'},{id:'c',nome:'Trabalho'}]",a.c);
-  assert.deepEqual(['tarefas','estudo','ferramenta','a','b','c'].map(a.c.qaCor),['#E9E3FF','#DCEBFF','#DDF5E8','#FFE4D6','#FFE0EC','#FFF4CC']);
+  assert.deepEqual(['tarefas','estudo','ferramenta','a','b','c'].map(a.c.qaCor),['#DDF5E8','#DCEBFF','#FFF1C2','#FFE4D6','#FFE0EC','#E9E3FF']);
   a.c.qaTecla({key:'Escape',preventDefault(){}});assert.equal(a.elementos.has('qa'),false);
   assert.equal(JSON.parse(a.mem.get('bcbr_rasc_tarefa')).texto,'Texto preservado');
   delete a.c.window.visualViewport;a.c.qaAbre();assert.equal(vm.runInContext('QA.texto',a.c),'Texto preservado');

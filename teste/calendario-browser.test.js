@@ -29,7 +29,12 @@ test('Calendário, Tarefas e Notas 1.30: aceite no Chrome, desktop e celular', {
   await call('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
   for(let i=0;i<50;i++){try{if((await fetch('http://127.0.0.1:8766/')).ok)break}catch{}await espera(100)}
   await call('Page.navigate',{url:'http://127.0.0.1:8766/'});
-  for(let i=0;i<100;i++){if(await ev("typeof SM!=='undefined'&&SM.ok&&typeof TABS!=='undefined'&&document.querySelector('.sm-cal')!==null"))break;await espera(100)}
+  for(let i=0;i<100;i++){if(await ev("typeof SM!=='undefined'&&SM.ok&&typeof TABS!=='undefined'&&document.querySelector('.sm.sm-tarefas')!==null"))break;await espera(100)}
+  // 1.31.0: o app abre direto na aba Tarefas, sem moldura/seleção na célula única
+  assert.equal(await ev("tela==='tarefas'&&!!document.querySelector('.sm.sm-tarefas')"),true,'abre na aba Tarefas');
+  assert.equal(await ev("(()=>{const c=document.querySelector('.sm-tarefas .sm-hoje1');if(!c)return true;c.classList.add('kbsel');const s=getComputedStyle(c);const r=s.outlineStyle==='none'&&s.boxShadow==='none';c.classList.remove('kbsel');return r})()"),true,'célula da aba Tarefas sem seleção');
+  await ev("go('semana')");
+  for(let i=0;i<50;i++){if(await ev("document.querySelector('.sm-cal')!==null"))break;await espera(100)}
   assert.equal(await ev("SM.ok&&!!document.querySelector('.sm-cal')"),true,'app carregou no kit');
   const click=async(s,duplo=false)=>{const p=await ev(`(()=>{const el=document.querySelector(${JSON.stringify(s)});if(!el)throw Error('Ausente: '+${JSON.stringify(s)});el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);for(let n=1;n<=(duplo?2:1);n++){await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:n,...p});await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:n,...p})}};
   const tecla=async(key,extra={})=>{await call('Input.dispatchKeyEvent',{type:'keyDown',key,...extra});await call('Input.dispatchKeyEvent',{type:'keyUp',key,...extra})};
@@ -115,7 +120,7 @@ test('Calendário, Tarefas e Notas 1.30: aceite no Chrome, desktop e celular', {
     await ev('smSalvar();SM.fila');assert.equal(await ev("smTar('teste-t').urg"),true);assert.equal(await ev("smTar('teste-t').texto"),'Tarefa fictícia');
     html=await ev("smTar('teste-t').textoHtml");assert.match(html,/<u>/);assert.equal(await ev("!!document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-texto u')"),true);
     assert.match(html,/<span style="color:/);assert.doesNotMatch(html,/<font\b/);
-    assert.deepEqual(await ev("(()=>{const e=document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-texto');return [!!e.querySelector('b,strong'),!!e.querySelector('u'),getComputedStyle(e.querySelector('span[style]')).color]})()"),[true,true,'rgb(132, 103, 188)']);
+    assert.deepEqual(await ev("(()=>{const e=document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-texto');return [!!e.querySelector('b,strong'),!!e.querySelector('u'),getComputedStyle(e.querySelector('span[style]')).color]})()"),[true,true,'rgb(54, 130, 97)']);
     assert.equal(await ev("smTar('teste-t').det"),'Detalhes formatados');
     assert.match(await ev("smTar('teste-t').detHtml"),/<u>/);
     assert.equal(await ev("smTar('teste-e').det"),'Detalhes antigos sem formatação');

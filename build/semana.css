@@ -416,3 +416,33 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 .sm-row.smd-linha{box-shadow:inset 0 3px 0 var(--pri)}
 .sm-ed-topo{flex-wrap:wrap;gap:6px}.sm-ed-topo h3{margin:0}
 @media(max-width:600px){.sm-tarefas .sm-itens-tipo{column-count:1}}
+/* 1.31.0 — aba Tarefas clean (estilo Todoist/Things): sem moldura nem seleção na célula única, grupos na cor do tipo
+   (Ferramenta amarelo, Tarefa verde), tipografia e espaçamentos uniformes, controles discretos. */
+.sm.sm-tarefas{max-width:980px;margin:0 auto;gap:18px}
+.sm-tarefas .sm-hoje,.sm-tarefas .sm-hoje1,.sm-tarefas .sm-sd{border:0!important;box-shadow:none!important;outline:none!important;background:transparent;padding:4px 0}
+.sm-tarefas .sm-hoje1.kbsel,.sm-tarefas .sm-sd.kbsel{outline:none!important}
+.sm.sm-tarefas>.card{border:0;box-shadow:none;background:transparent;padding:4px 0}
+.sm-tarefas h3,.sm-tarefas .kick{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+.sm-tarefas .sm-grp{padding:12px 12px 6px;border-radius:14px;background:color-mix(in srgb,var(--sm-g) 14%,var(--card));border:1px solid color-mix(in srgb,var(--sm-g) 22%,transparent)}
+.sm-tarefas .sm-grp.sm-ferramenta{--sm-g:#e2b33a}
+.sm-tarefas .sm-grp.sm-tarefas,.sm-tarefas .sm-grp:not(.sm-estudo):not(.sm-ferramenta){--sm-g:#3fa66f}
+.sm-tarefas .sm-grp.sm-estudo{--sm-g:#5687be}
+.sm-tarefas .sm-lbl{font-size:.8rem;font-weight:700;letter-spacing:.03em;margin:0 2px 6px}
+.sm-tarefas .sm-grp.sm-ferramenta .sm-lbl{color:#9a6d06}
+.sm-tarefas .sm-row[data-tid]{background:var(--card);border:1px solid transparent;border-radius:10px;padding:7px 10px;box-shadow:0 1px 2px rgba(15,24,48,.06)}
+.sm-tarefas .sm-row[data-tid]:hover{background:var(--card);border-color:color-mix(in srgb,var(--sm-cor) 30%,transparent)}
+.sm-tarefas .sm-row.kbsel{outline:none;border-color:color-mix(in srgb,var(--pri) 55%,transparent)}
+.sm-tarefas .sm-tx{font-size:.95rem;line-height:1.4}
+.sm-tarefas .sm-row .sm-it input[type="checkbox"]{width:18px;height:18px;border-radius:50%;background:transparent}
+.sm-tarefas .sm-tag{font-size:.72rem;opacity:.75}
+.sm-tarefas .sm-arrastar{opacity:.35;transition:opacity .15s}
+@media(hover:hover){.sm-tarefas .sm-arrastar{opacity:0}.sm-tarefas .sm-row:hover .sm-arrastar{opacity:.5}}
+.sm-tarefas .sm-tg{opacity:.55}.sm-tarefas .sm-tg:hover{opacity:1}
+.sm-tarefas .sm-planejar{justify-content:center;gap:8px}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .sm-tarefas .sm-grp{background:color-mix(in srgb,var(--sm-g) 12%,var(--card))}:root:not([data-theme="light"]) .sm-tarefas .sm-grp.sm-ferramenta .sm-lbl{color:#f0c55a}:root:not([data-theme="light"]) .sm-tarefas .sm-row[data-tid]{background:color-mix(in srgb,var(--card) 85%,#000);box-shadow:none}}
+:root[data-theme="dark"] .sm-tarefas .sm-grp{background:color-mix(in srgb,var(--sm-g) 12%,var(--card))}
+:root[data-theme="dark"] .sm-tarefas .sm-grp.sm-ferramenta .sm-lbl{color:#f0c55a}
+:root[data-theme="dark"] .sm-tarefas .sm-row[data-tid]{background:color-mix(in srgb,var(--card) 85%,#000);box-shadow:none}
+@media(max-width:600px){.sm-tarefas .sm-grp{padding:10px 8px 4px}}
+.sm-tarefas .sm-row .sm-it input[type="checkbox"]{flex:0 0 18px;min-width:18px;min-height:18px;aspect-ratio:1;padding:0}
+.sm.sm-tarefas .sm-sd{margin-left:0;margin-right:0}

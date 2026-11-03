@@ -1,4 +1,4 @@
-// Banco CBR app 1.30.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.31.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -585,9 +585,9 @@ function smFormata(id,cmd){
   document.execCommand(cmd,false,cmd==='foreColor'?smCorTexto(area):null);if(SM.ed)smRascEdSalva(SM.ed.id);
 }
 function smCorTexto(area){
-  const fixas={ferramenta:'#368261',tarefas:'#8467bc',estudo:'#5687be'};
+  const fixas={ferramenta:'#a87a12',tarefas:'#368261',estudo:'#5687be'};
   const i=smTipos().filter(t=>!fixas[t.id]).findIndex(t=>t.id===area);
-  return fixas[area]||['#af724d','#b26080','#a68c35'][Math.max(0,i)%3];
+  return fixas[area]||['#af724d','#b26080','#8467bc'][Math.max(0,i)%3];
 }
 function smRichTecla(e,el){if(e.ctrlKey&&!e.altKey&&(['b','u'].includes(e.key.toLowerCase())||(e.shiftKey&&e.key.toLowerCase()==='h'))){e.preventDefault();e.stopPropagation();smFormata(el.id,e.key.toLowerCase()==='b'?'bold':e.key.toLowerCase()==='u'?'underline':'foreColor')}else if(e.key==='Escape'){e.preventDefault();smEdFecha()}}
 function smRichCola(e){e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'))}
@@ -944,9 +944,9 @@ function qaTipos(){
   return tipos.flatMap(t=>{const atual=smTipos().find(x=>x.id===t.id)||t;return [[t.id,t.id==='tarefas'?'Tarefa':atual.nome],...(atual.subs||[]).map(s=>[t.id+'|'+s,atual.nome+' › '+s])]});
 }
 function qaCor(tipo){
-  const id=tipo.split('|')[0],fixas={tarefas:'#E9E3FF',estudo:'#DCEBFF',ferramenta:'#DDF5E8'};
+  const id=tipo.split('|')[0],fixas={tarefas:'#DDF5E8',estudo:'#DCEBFF',ferramenta:'#FFF1C2'};
   const i=smTipos().filter(t=>!fixas[t.id]).findIndex(t=>t.id===id);
-  return fixas[id]||['#FFE4D6','#FFE0EC','#FFF4CC'][Math.max(0,i)%3];
+  return fixas[id]||['#FFE4D6','#FFE0EC','#E9E3FF'][Math.max(0,i)%3];
 }
 function qaChips(campo,opcoes,valor){return `<div class="qa-chips" role="group" aria-label="${({area:'Tipo',quando:'Quando',lembrete:'Lembrete',urg:'Urgente'})[campo]}">${opcoes.map(([v,n])=>`<button type="button" class="qa-chip" data-campo="${campo}" data-valor="${esc(v)}" ${campo==='area'?`style="--qa-cor:${qaCor(v)}"`:''} aria-pressed="${v===valor}" onclick="qaEscolhe('${campo}',this.dataset.valor,true)">${esc(n)}</button>`).join('')}</div>`}
 function qaLinha(n,nome,resumo,conteudo){return `<section class="qa-passo ${QA.passo===n?'atual':''}" data-passo="${n}" ${n>QA.alcance?'hidden':''}>
@@ -1939,7 +1939,7 @@ function questoesTemaOrig(t){   // prioriza questões ainda não vistas; só ent
 }let temaSel=null;
 
 // ===== sessão de quiz =====
-let sess=null,tela='semana',sub=null;
+let sess=null,tela='tarefas',sub=null;
 const cur=()=>QID[sess.ids[sess.i]];
 function iniciar(ids,modo,sim){
   ids=ids.filter(i=>QID[i]&&QID[i].gab);

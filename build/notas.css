@@ -9,3 +9,17 @@
 .nt-nota .row{justify-content:space-between}
 .nt-nota input{font-weight:600}
 @media(max-width:600px){.nt-criar,.nt-nota{padding:12px}.nt textarea{font-size:16px}}
+
+/* 1.31.0 — Notas clean (estilo Apple Notes/Notion): cartões neutros, borda fina, sem cores alternadas */
+.nt{max-width:980px;gap:18px}
+.nt-criar,.nt-nota,.nt-nota:nth-child(3n+2),.nt-nota:nth-child(3n){background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 1px 2px rgba(15,24,48,.05);padding:14px 16px;gap:8px}
+.nt-nota:hover{border-color:color-mix(in srgb,var(--pri) 35%,var(--bd))}
+.nt input,.nt textarea{border:0;background:transparent;padding:4px 0;outline:none}
+.nt input:focus,.nt textarea:focus{box-shadow:0 1px 0 var(--pri)}
+.nt-nota input{font-size:1rem;font-weight:650}
+.nt textarea{font-size:.94rem;color:var(--tx)}
+.nt-nota small,.nt-nota .mut{font-size:.75rem;color:var(--mut)}
+.nt-nota .b{padding:4px 10px;font-size:.8rem}
+.nt-grade{gap:12px}
+.nt input[type="search"]{border:1px solid var(--bd);background:var(--card);border-radius:10px;padding:9px 12px}
+.nt input[type="search"]:focus{border-color:var(--pri);box-shadow:none}
