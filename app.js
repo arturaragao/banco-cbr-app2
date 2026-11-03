@@ -1,4 +1,4 @@
-// Banco CBR app 1.31.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.31.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1483,20 +1483,7 @@ window.addEventListener('online',()=>{ntSync().then(()=>smPuxar())});
 window.addEventListener('storage',e=>{if(e.key?.startsWith(NT_PREFIX)){if(SM.d)ntAplica(SM.d,ntPendentes());smRender()}});
 
 
-// Metadados PersonalRad: nunca entram nas tags/classificação do app.
-function prTags(q){
-  const vistos=new Set();
-  return Object.values(q.pr_tags||{}).flat().filter(t=>{
-    if(typeof t!=='string')return false;
-    const k=prNorm(t);if(!k||k==='radiologia'||vistos.has(k))return false;
-    vistos.add(k);return true;
-  }).map(t=>t.trim());
-}
-function prTagsBloco(q,limite=Infinity){
-  if(q.tags?.length)return '';
-  const tags=prTags(q).slice(0,limite);
-  return tags.length?`<span class="pr-tags"><small class="mut">PersonalRad</small> ${tags.map(t=>`<span class="tag pr-tag">${esc(t)}</span>`).join('')}</span>`:'';
-}
+// Metadados PersonalRad: nunca entram nas tags/classificação ou na interface do app.
 function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
 function prStats(q){
   const s={...(q.pr_stats||{})},texto=prLinhas(q).join('\n');
@@ -2444,7 +2431,7 @@ function vQuiz(){
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
   <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?qDificuldade(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
-  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${!q.tags.length?`<div class="tagstop">${prTagsBloco(q)}</div>`:fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
+  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${q.tags.length&&fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
   ${qEnunciado(q,imgs)}${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
@@ -2852,7 +2839,7 @@ function bCorpo(q){
   const alts=qAlternativas(q,{r,fb:true,leitura:true});
   return `<div class="bc">
     <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
-    ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:prTagsBloco(q)}
+    ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
     <div class="row">${qDificuldade(q)}<span class="mut">${r?'Feita · '+(r.ok?'acertou':'errou'):'Não feita'}</span></div>
     ${qEnunciado(q,imgs)}${alts}
     <p style="margin:8px 0"><b>Gabarito: ${q.gab||'—'}</b>${prAcertoBloco(q)}${r?` · <span class="mut">sua última resposta: ${r.e||'?'} (${r.ok?'acertou':'errou'}, ${r.conf||''})</span>`:''}</p>
@@ -2879,7 +2866,7 @@ function vBanco(){
   const linhas=L.slice(0,bLim).map(q=>`<details class="bq" ${bAbertos.has(q.id)?'open':''} ontoggle="bTog('${q.id}',this)"><summary>
       <span class="bs">${bStatus(q,ult)}</span>
       <span class="bm"><span class="be"><b>Questão ${q.n??'—'}</b> · ${esc(q.enunciado.slice(0,130))}${q.enunciado.length>130?'…':''} ${q._d?' · '+qDificuldade(q):''}</span>
-      <span class="bl"><span class="ba">${AREA_BY[q._a].nome}</span>${q.classif?'':'<span class="tag">sem classificação</span>'}${q.tags.length?q.tags.filter(t=>!isMeta(t)).slice(0,4).map(t=>`<span class="tag">${esc(t)}</span>`).join(''):prTagsBloco(q,4)}${q.imgs&&q.imgs.length?'<span class="tag">🖼 '+q.imgs.length+'</span>':''}${recente(q)?'<span class="nova">nova</span>':''}${q.gab?'':'<span class="tag">sem gabarito</span>'}</span></span>
+      <span class="bl"><span class="ba">${AREA_BY[q._a].nome}</span>${q.classif?'':'<span class="tag">sem classificação</span>'}${q.tags.length?q.tags.filter(t=>!isMeta(t)).slice(0,4).map(t=>`<span class="tag">${esc(t)}</span>`).join(''):''}${q.imgs&&q.imgs.length?'<span class="tag">🖼 '+q.imgs.length+'</span>':''}${recente(q)?'<span class="nova">nova</span>':''}${q.gab?'':'<span class="tag">sem gabarito</span>'}</span></span>
     </summary>${bAbertos.has(q.id)?bCorpo(q):''}</details>`).join('');
   return `<div class="card"><h2>Banco (${Q.length} questões)</h2>
   <p class="mut">${feitas} feitas · ${semc} sem classificação · ${sg} sem gabarito (não entram nos estudos) · ${nov} novas nos últimos 7 dias</p>

@@ -1,17 +1,4 @@
-// Metadados PersonalRad: nunca entram nas tags/classificação do app.
-function prTags(q){
-  const vistos=new Set();
-  return Object.values(q.pr_tags||{}).flat().filter(t=>{
-    if(typeof t!=='string')return false;
-    const k=prNorm(t);if(!k||k==='radiologia'||vistos.has(k))return false;
-    vistos.add(k);return true;
-  }).map(t=>t.trim());
-}
-function prTagsBloco(q,limite=Infinity){
-  if(q.tags?.length)return '';
-  const tags=prTags(q).slice(0,limite);
-  return tags.length?`<span class="pr-tags"><small class="mut">PersonalRad</small> ${tags.map(t=>`<span class="tag pr-tag">${esc(t)}</span>`).join('')}</span>`:'';
-}
+// Metadados PersonalRad: nunca entram nas tags/classificação ou na interface do app.
 function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
 function prStats(q){
   const s={...(q.pr_stats||{})},texto=prLinhas(q).join('\n');

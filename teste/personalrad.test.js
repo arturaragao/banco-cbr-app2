@@ -242,7 +242,7 @@ test('percentuais só após resposta; 0% é válido; metadados não viram tags',
   assert.equal(executar(c,'adaptar(entrada)[0].pr_qualidade.needsReview'),true);
 });
 
-for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}: pistas só com gabarito; correta verde, marcada errada vermelha e demais neutras`,()=>{
+for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com gabarito; correta verde, marcada errada vermelha e demais neutras`,()=>{
   const c=contexto();preparar(c);
   executar(c,`const esc=String,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[],TES='';
     const etapaDe=()=>'',anoDe=()=>'',norm=x=>x,posDe=()=>1,keyLab=()=>'',tgHtml=q=>'Tags Claude',
@@ -282,18 +282,18 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   executar(c,'sess.sim=true');
   assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.resp={};sess.sim=false;q.tags=[];q.pr_tags={specialty:['Radiologia'],session:['Mama','mama'],tag:['PR']}`);
-  const fallback=executar(c,'vQuiz()');
-  assert.match(fallback,/PersonalRad/);assert.match(fallback,/class="tag pr-tag">Mama/);
-  assert.doesNotMatch(fallback,/Classificação:|class="dif |acerto dos alunos|pr-percentual|Tags Claude|gabarito|alt ok|<b>PR<\/b>/);
-  assert.match(fallback,/class="tag pr-tag">PR/);
+  const antesSemTags=executar(c,'vQuiz()');
+  for(const valor of ['Radiologia','Mama','PR'])assert.doesNotMatch(antesSemTags,new RegExp(valor));
   executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
-  assert.match(executar(c,'vQuiz()'),/PersonalRad/);
+  const depoisSemTags=executar(c,'vQuiz()');
+  for(const valor of ['Radiologia','Mama','PR'])assert.doesNotMatch(depoisSemTags,new RegExp(valor));
   executar(c,'sess.sim=true');
-  const simulado=executar(c,'vQuiz()');assert.match(simulado,/PersonalRad/);
+  const simulado=executar(c,'vQuiz()');
+  for(const valor of ['Radiologia','Mama','PR'])assert.doesNotMatch(simulado,new RegExp(valor));
   assert.doesNotMatch(simulado,/class="dif |acerto dos alunos|pr-percentual|gabarito|alt ok/);
 });
 
-test('fallback PersonalRad achata valores, deduplica e escapa; ponte preserva tags vazias e cl',()=>{
+test('pr_tags é preservado nos dados, mas não no HTML; ponte preserva tags vazias e cl',()=>{
   const c=contexto();
   executar(c,trecho(fonte,'const esc=','// ===== texto formatado'));
   executar(c,trecho(shim,'const limpa =','// fundo=true:'));
@@ -303,15 +303,10 @@ test('fallback PersonalRad achata valores, deduplica e escapa; ponte preserva ta
   assert.equal(executar(c,'q.tags.length'),0);
   assert.equal(executar(c,'q.cl[0]'),'Tema existente');
   assert.equal(executar(c,'JSON.stringify(q.pr_tags)'),JSON.stringify(c.entrada[0].pr_tags));
-  assert.equal(executar(c,'JSON.stringify(prTags(q))'),JSON.stringify(['Mama','<b>PR</b>']));
-  const h=executar(c,'prTagsBloco(q)');
-  assert.match(h,/PersonalRad/);assert.match(h,/&lt;b&gt;PR&lt;\/b&gt;/);
-  assert.doesNotMatch(h,/Radiologia|<b>PR<\/b>/);
-  executar(c,"q.tags=['Claude']");assert.equal(executar(c,'prTagsBloco(q)'),'');
-  executar(c,'q.tags=[];q.pr_tags={}');assert.equal(executar(c,'prTagsBloco(q)'),'');
+  assert.match(executar(c,'JSON.stringify(q)'),/Radiologia|Mama|PR/);
 });
 
-test('Banco fechado e aberto mostra fallback PR e conserva tags Claude',()=>{
+test('Banco fechado e aberto não mostra pr_tags e conserva tags Claude',()=>{
   const c=contexto();preparar(c);
   executar(c,`const esc=String,norm=s=>String(s||''),isMeta=()=>false,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[];
     const qDificuldade=()=>'',qEnunciado=()=>'',qAlternativas=()=>'',galeria=()=>'',cursoBloco=()=>'',
@@ -322,8 +317,8 @@ test('Banco fechado e aberto mostra fallback PR e conserva tags Claude',()=>{
   executar(c,trecho(banco,'function bStatus(','function prAcertoBloco('));
   executar(c,trecho(banco,'function bCorpo(q){','async function bBaixar'));
   executar(c,trecho(banco,'function vBanco(){','// ===== comentário novo'));
-  assert.match(executar(c,'vBanco()'),/PersonalRad/);
-  assert.match(executar(c,'bCorpo(q)'),/class="tag pr-tag">Mama/);
+  assert.doesNotMatch(executar(c,'vBanco()'),/Radiologia|Mama|PR|PersonalRad|pr-tag/);
+  assert.doesNotMatch(executar(c,'bCorpo(q)'),/Radiologia|Mama|PR|PersonalRad|pr-tag/);
   executar(c,"q.tags=['Claude']");
   const h=executar(c,'vBanco()');assert.match(h,/class="tag">Claude/);assert.doesNotMatch(h,/PersonalRad/);
 });
