@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {spawn}=require('node:child_process');
 const espera=ms=>new Promise(r=>setTimeout(r,ms));
-test('Calendário, Tarefas e Notas 1.28: aceite no Chrome, desktop e celular', {timeout:90000},async t=>{
+test('Calendário, Tarefas e Notas 1.30: aceite no Chrome, desktop e celular', {timeout:90000},async t=>{
   const chrome=process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   assert.ok(fs.existsSync(chrome),'Chrome disponível');
   const raiz=path.resolve(__dirname,'..'),perfil=fs.mkdtempSync(path.join(os.tmpdir(),'bcbr-calendario-'));
@@ -45,9 +45,9 @@ test('Calendário, Tarefas e Notas 1.28: aceite no Chrome, desktop e celular', {
     assert.equal(await ev("document.querySelectorAll('.sm-hoje1 .sm-row').length"),3);
     assert.equal(await ev("document.querySelector('.sm-hoje1 [data-tid=\"teste-f\"] .sm-tg')"),null);
     assert.equal(await ev("!!document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg')"),true);
-    assert.deepEqual(await ev("(()=>{const b=document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg');return [b.clientWidth,b.clientHeight,b.textContent]})()"),[24,24,'▸']);
+    assert.deepEqual(await ev("(()=>{const b=document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg');return [b.clientWidth,b.clientHeight,b.textContent]})()"),[18,22,'▸']);
     assert.equal(await ev("/[📚🛠✅]/u.test(document.querySelector('.sm-hoje1 .sm-gs').textContent)"),false);
-    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-row')).borderRadius"),'16px');
+    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-row')).borderRadius"),'10px');
     assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-it input')).appearance"),'none');
     assert.equal(await ev("document.querySelector('.sm-hoje1 .sm-arrastar').textContent"),'⠿');
     await click('.sm-hoje1 [data-tid="teste-t"] .sm-tg');assert.equal(await ev("document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-sub').textContent.includes('Etapa fictícia')"),true);
@@ -79,9 +79,9 @@ test('Calendário, Tarefas e Notas 1.28: aceite no Chrome, desktop e celular', {
     const s=`.sm-cel[data-drop="${amanha}"]`;await click(s);
     assert.equal(await ev('QA.on'),false);assert.equal(await ev('SM.sel'),amanha);
     assert.equal(await ev("document.querySelector('.sm-hoje1')"),null);
-    await click(s,true);assert.equal(await ev('QA.quando'),amanha);assert.equal(await ev('QA.on'),true);await ev('qaFecha();qaLimpa()');
+    await click(s,true);assert.equal(await ev('SM.diaEditor'),amanha);await click('.sm-pan button[onclick*="qaAbreDia"]');assert.equal(await ev('QA.quando'),amanha);assert.equal(await ev('QA.on'),true);await ev('qaFecha();qaLimpa()');
     const vazio=await ev('smMais(smHoje(),2)');await ev(`SM.semana=smDom('${vazio}');render()`);await click(`.sm-cel[data-drop="${vazio}"]`);
-    assert.equal(await ev("document.querySelector('.sm-hoje1')"),null);await ev("SM.sel=null;SM.semana=null;go('tarefas')");
+    assert.equal(await ev("document.querySelector('.sm-hoje1')"),null);await ev("SM.sel=null;SM.diaEditor=null;SM.semana=null;go('tarefas')");
   });
   await t.test('11a–f: passos, vários dias com teclado, hora, subtarefa e rascunho',async()=>{
     await ev("qaAbre();qaTxt('Aceite fictício')");await click('#qa_in',true);
@@ -123,11 +123,11 @@ test('Calendário, Tarefas e Notas 1.28: aceite no Chrome, desktop e celular', {
   });
   await t.test('2, 7: grid responsivo e arraste real pela alça',async()=>{
     await ev("smPoe([{id:'grid-extra',dia:smHoje(),texto:'Segundo estudo',area:'estudo',feito:false}]);SM.fila");
-    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-gs')).gridTemplateColumns.split(' ').length>=2"),true);
+    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-itens-tipo')).columnCount==='2'"),true);
     await call('Emulation.setDeviceMetricsOverride',{width:800,height:900,deviceScaleFactor:1,mobile:false});
-    const grades=await ev("[...document.querySelectorAll('.sm-hoje1 .sm-gs,.sm-sd .sm-gs')].map(e=>({display:getComputedStyle(e).display,gap:getComputedStyle(e).gap,largura:e.clientWidth,colunas:getComputedStyle(e).gridTemplateColumns.split(' ').map(Number.parseFloat).filter(w=>w>0)}))");
+    const grades=await ev("[...document.querySelectorAll('.sm-hoje1 .sm-gs,.sm-sd .sm-gs')].map(e=>({display:getComputedStyle(e).display,gap:getComputedStyle(e).rowGap,largura:e.clientWidth,colunas:getComputedStyle(e).gridTemplateColumns.split(' ').map(Number.parseFloat).filter(w=>w>0)}))");
     assert.equal(grades.length,2);
-    for(const g of grades){assert.equal(g.display,'grid');assert.equal(g.gap,'14px');assert.ok(g.colunas.every(w=>w>=240));assert.ok(Math.abs(g.colunas.reduce((a,b)=>a+b,0)+(g.colunas.length-1)*14-g.largura)<2)}
+    for(const g of grades){assert.equal(g.display,'grid');assert.equal(g.gap,'10px');assert.ok(g.colunas.every(w=>w>=240));assert.ok(Math.abs(g.colunas.reduce((a,b)=>a+b,0)+(g.colunas.length-1)*14-g.largura)<2)}
     await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
     assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-gs')).gridTemplateColumns.split(' ').length"),1);
     assert.equal(await ev("document.querySelector('.sm-hoje1').scrollWidth<=document.querySelector('.sm-hoje1').clientWidth"),true);
@@ -138,6 +138,35 @@ test('Calendário, Tarefas e Notas 1.28: aceite no Chrome, desktop e celular', {
     await ev("document.querySelector('.sm-sd').scrollIntoView({block:'center'})");const alvo=await ev("(()=>{const b=document.querySelector('.sm-sd').getBoundingClientRect();return{x:b.x+20,y:b.y+20}})()");
     await call('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,...alvo});await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...alvo});await ev('SM.fila');
     assert.equal(await ev("smTar('grid-extra').dia"),'sem');
+  });
+  await t.test('1.30: texto selecionável, troca de tipo pela alça e grupos com espaçamento compacto',async()=>{
+    await ev("go('tarefas');smPoe([{id:'drag-tipo',dia:smHoje(),texto:'Texto selecionável para arrastar só pela alça',area:'estudo'},{id:'alto',dia:smHoje(),texto:'Linha 1\\nLinha 2\\nLinha 3\\nLinha 4',area:'estudo'},{id:'curto',dia:smHoje(),texto:'Curta',area:'estudo'}]);SM.fila");
+    const pontos=await ev(`(()=>{const e=document.querySelector('[data-tid="drag-tipo"] .sm-texto');e.scrollIntoView({block:'center'});const b=e.getBoundingClientRect();return {x:b.x+2,y:b.y+8}})()`);
+    await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...pontos});
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:pontos.x+90,y:pontos.y});
+    assert.equal(await ev('SMD===null'),true,'texto não inicia arrasto');
+    await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,x:pontos.x+90,y:pontos.y});
+    assert.ok((await ev('getSelection().toString()')).length>0,'mouse seleciona texto');
+    await ev('getSelection().removeAllRanges()');
+    const p=await ev(`(()=>{const e=document.querySelector('[data-tid="drag-tipo"] .sm-arrastar');e.scrollIntoView({block:'center'});const b=e.getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2}})()`);
+    await call('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:p.x+12,y:p.y});
+    assert.equal(await ev('SMD.ativo'),true);
+    const alvo=await ev(`(()=>{const e=document.querySelector('.sm-hoje1 .sm-grp[data-area="ferramenta"] .sm-lbl');e.scrollIntoView({block:'center'});const b=e.getBoundingClientRect();return {x:b.x+8,y:b.y+b.height/2}})()`);
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,...alvo});
+    await call('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...alvo});await ev('SM.fila');
+    assert.equal(await ev("smTar('drag-tipo').area"),'ferramenta');
+    assert.equal(await ev("!!document.querySelector('.sm-hoje1 .sm-grp[data-area=\"ferramenta\"] [data-tid=\"drag-tipo\"]')"),true);
+    assert.equal(await ev("document.querySelector('.sm-tarefas h2')?.textContent==='Tarefas'"),false);
+    assert.equal(await ev("!!(document.querySelector('.sm-planejar').compareDocumentPosition(document.querySelector('[data-tid=\"drag-tipo\"]')) & Node.DOCUMENT_POSITION_PRECEDING)"),true);
+    // Em cada coluna, a altura da outra coluna nunca aumenta o intervalo vertical.
+    assert.equal(await ev(`(()=>{const rows=[...document.querySelectorAll('.sm-hoje1 .sm-grp[data-area="estudo"] .sm-row')].map(e=>e.getBoundingClientRect());return rows.every((b,i)=>!i||Math.abs(b.x-rows[i-1].x)>2||Math.abs(b.y-rows[i-1].bottom-6)<2)})()`),true);
+    for(const tema of ['light','dark']){
+      await ev(`document.documentElement.dataset.theme='${tema}'`);
+      assert.equal(await ev("getComputedStyle(document.querySelector('[data-tid=\"drag-tipo\"]')).getPropertyValue('--sm-fundo').includes('10%')"),true);
+      assert.notEqual(await ev("getComputedStyle(document.querySelector('[data-tid=\"drag-tipo\"]')).backgroundColor"),await ev("getComputedStyle(document.querySelector('.sm-hoje1')).backgroundColor"));
+    }
+    await ev("delete document.documentElement.dataset.theme");
   });
   await t.test('revisão: detalhes separados de HTML, entidades e tags literais têm round-trip idempotente',async()=>{
     const casos=[
