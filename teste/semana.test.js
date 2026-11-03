@@ -37,12 +37,14 @@ for (const acao of ['tarefa', 'voz', 'ri']) for (const pendente of [false, true]
   });
 }
 
-test('Semana mantém calendário e tarefas juntos, sem sub-aba nem cartões removidos', () => {
-  const trecho = fonte.slice(fonte.indexOf('function vSemana(){'), fonte.indexOf('function smCardHoje()'));
-  assert.ok(trecho.includes('${smSemData()}'));
+test('Calendário e Tarefas têm telas distintas, com tarefas sem data na tela de tarefas', () => {
+  const trecho = fonte.slice(fonte.indexOf('function vSemana(){'), fonte.indexOf('function vTarefas()'));
+  const tarefas = fonte.slice(fonte.indexOf('function vTarefas(){'), fonte.indexOf('function smCardHoje()'));
+  assert.ok(tarefas.includes('${smSemData()}'));
   assert.ok(trecho.includes('${smCalendario()}'));
-  assert.ok(trecho.includes('${smHojeGrande()}'));
-  assert.ok(!trecho.includes('sm-seg'));
+  assert.ok(tarefas.includes('${smHojeGrande()}'));
+  assert.ok(!trecho.includes('smSemData()'));
+  assert.ok(!tarefas.includes('smCalendario()'));
   assert.ok(!fonte.includes("localStorage.getItem('sm_aba')"));
   assert.ok(!fonte.includes("localStorage.setItem('sm_aba'"));
   assert.ok(!trecho.includes('Anotações'));

@@ -9,6 +9,7 @@
 // A revisão de domingo (tarefa agendada do Claude) preenche a agenda das próximas semanas pelo Google Agenda e põe os itens da semana nova.
 const SM={d:null,sha:null,ok:false,erro:'',ed:null,add:{},dr:{},ab:new Set(),sel:null,sem:null,mes:null,plan:false,semAdd:null,conf:null,fila:Promise.resolve(),auto:new Set(),fr:[]};
 const SM_ARQ='semana/plano.json',SM_VELHO='semana/atual.json';
+try{SM.ab=new Set(JSON.parse(localStorage.getItem('sm_abertas')||'[]'))}catch(e){}
 try{const c=JSON.parse(localStorage.getItem('sm_cache2')||'null');if(c&&c.d&&c.d.v===2){SM.d=c.d;SM.sha=c.sha;SM.ok=true}}catch(e){}
 const smDec=s=>decodeURIComponent(escape(atob(String(s).replace(/\n/g,''))));
 const smId=()=>'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -31,10 +32,11 @@ function smConverte(v){   // semana/atual.json (v1) -> plano v2
 }
 async function smPuxar(){
   smAgendaPuxar();
+  if(SM.d&&typeof ntSync==='function'&&ntTemPendentes()&&!await ntSync())return;
   try{
     const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/${SM_ARQ}`);
     SM.ok=true;SM.erro='';
-    if(f.sha!==SM.sha){SM.d=JSON.parse(smDec(f.content));SM.sha=f.sha;smGuardaCache();smAuto();smRender();smNativoTarefas()}
+    if(f.sha!==SM.sha){SM.d=JSON.parse(smDec(f.content));if(typeof ntAplica==='function')ntAplica(SM.d,ntPendentes());SM.sha=f.sha;smGuardaCache();smAuto();smRender();smNativoTarefas()}
   }catch(e){
     SM.ok=true;
     if(e.status===404){
@@ -44,17 +46,20 @@ async function smPuxar(){
     smRender();
   }
 }
-function smRender(){if(tela==='semana'||tela==='hoje')render()}
+function smRender(){if(['semana','tarefas','notas','hoje'].includes(tela)&&!(tela==='notas'&&document.activeElement?.closest?.('.nt')))render()}
 // toda mudança é uma função idempotente: aplica na hora e de novo na gravação (se outro aparelho mudou o arquivo, relê e reaplica)
-function smMudar(fn,msg){
+function smMudar(fn,msg,aoSalvar){
   if(SM.ed)smRascEdSalva(SM.ed.id);
-  if(!SM.d)return Promise.resolve(false);fn(SM.d);smGuardaCache();render();smNativoTarefas();
+  if(!SM.d)return Promise.resolve(false);fn(SM.d);smGuardaCache();smRender();smNativoTarefas();
   const tarefa=async()=>{
     for(let t=0;t<6;t++){
       try{
         fn(SM.d);
+        if(typeof ntAplica==='function')ntAplica(SM.d,ntPendentes());
         const body={message:'semana: '+(msg||'atualização'),content:BCBR.b64(JSON.stringify(SM.d,null,1)),branch:'main'};if(SM.sha)body.sha=SM.sha;
+        const salvo=aoSalvar?JSON.parse(smDec(body.content)):null;
         const r=await BCBR.api(`/repos/${BCBR.REPO}/contents/${SM_ARQ}`,{method:'PUT',body:JSON.stringify(body)});
+        if(aoSalvar)aoSalvar(salvo);
         SM.sha=r.content.sha;SM.erro='';smGuardaCache();smNativoTarefas();return true;
       }catch(e){
         if(e.status===409||e.status===422){try{const f=await BCBR.api(`/repos/${BCBR.REPO}/contents/${SM_ARQ}`);SM.d=JSON.parse(smDec(f.content));SM.sha=f.sha}catch(e2){}continue}
@@ -164,7 +169,7 @@ function smDiaClique(iso){
   // Preserva os botões do calendário entre os dois cliques do dblclick.
   document.querySelectorAll('.sm-cel.sel,.sm-li.sel').forEach(el=>el.classList.remove('sel'));
   document.querySelectorAll(`[data-drop="${iso}"].sm-cel,[data-drop="${iso}"].sm-li`).forEach(el=>el.classList.add('sel'));
-  const atual=document.querySelector('.sm-hoje1'),html=smHojeGrande();
+  const atual=document.querySelector('.sm-hoje1'),html=tela==='tarefas'?smHojeGrande():'';
   if(atual){if(html)atual.outerHTML=html;else atual.remove()}else if(html)document.querySelector('.sm-cal')?.insertAdjacentHTML('afterend',html);
   SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel='hoje';smkPinta();
 }
@@ -355,16 +360,16 @@ function smRichCola(e){e.preventDefault();document.execCommand('insertText',fals
 function smTexto(t){return `<span class="sm-texto">${t.textoHtml?smSanitiza(t.textoHtml):esc(tituloTarefa(t.texto))}</span>`}
 function smItem(t){
   const g=t.grupo?SM.d.tarefas.filter(x=>x.grupo===t.grupo):[t],m=smMeta(t),q=m&&t.dia!=='proxima'&&t.dia!=='sem'?smQ(t.dia):null;
-  const ab=SM.ab.has(t.id),tg=t.subtarefas?.length?`<button type="button" class="sm-tg" onclick="smTg('${t.id}')" aria-expanded="${!!ab}" aria-label="Subtarefas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>`:'';
+  const ab=SM.ab.has(t.id),filhos=!!(t.sub||t.det||t.detHtml||t.subtarefas?.length),tg=filhos?`<button type="button" class="sm-tg" onclick="event.stopPropagation();smTg('${t.id}')" ondblclick="event.stopPropagation()" aria-expanded="${!!ab}" aria-label="Expandir ou recolher detalhes">${ab?'▾':'▸'}</button>`:'';
   return `<div class="sm-row ${t.feito?'ok':''}" style="--sm-pastel:${qaCor(t.area||'estudo')};--sm-cor:${smCorTexto(t.area||'estudo')}" data-tid="${t.id}" ondblclick="if(!event.target.closest('button,input,a,label,form')){event.stopPropagation();smEdita('${t.id}')}" ><div class="sm-it"><input type="checkbox" aria-label="Concluir tarefa" ${t.feito?'checked':''} onchange="smCheck('${t.id}',this.checked)">${tg}<span class="sm-tx">${smTexto(t)}${g.length>1?` <span class="sm-tag">${g.filter(x=>x.feito).length}/${g.length} dias</span>`:''}${q&&q.n?` <span class="sm-tag ${q.n>=m?'g':''}">banco ${q.n}/${m}</span>`:''}${t.auto?' <span class="sm-tag g">automático</span>':''}</span></div><span class="sm-arrastar" title="Arrastar tarefa" aria-label="Arrastar tarefa">⠿</span>
-   ${t.det||t.detHtml?`<div class="sm-det">${smRichVista(t.det,t.detHtml)}</div>`:''}${smMetadados(t)}${ab&&t.subtarefas?.length?`<div class="sm-conteudo">${smSubHtml(t)}</div>`:''}${t.anexos?.length?smAnexosHtml(t):''}</div>`;
+   ${smMetadados(t)}${ab&&filhos?`<div class="sm-conteudo">${t.sub?`<div class="sm-subtema">${esc(t.sub)}</div>`:''}${t.det||t.detHtml?`<div class="sm-det">${smRichVista(t.det,t.detHtml)}</div>`:''}${t.subtarefas?.length?smSubHtml(t):''}</div>`:''}${t.anexos?.length?smAnexosHtml(t):''}</div>`;
 }
 function smGrupos(its){
   const g=smAgrupa(its);if(!g.length)return'';
-  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}"><span class="sm-lbl">${esc(smTipoDe(x.a).nome)}${x.sub?` <i>› ${esc(x.sub)}</i>`:''}</span>${x.l.map(smItem).join('')}</div>`).join('')}</div>`;
+  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}"><span class="sm-lbl">${esc(smTipoDe(x.a).nome)}</span>${x.l.map(smItem).join('')}</div>`).join('')}</div>`;
 }
 function smAddDet(dia){SM.addDet=SM.addDet||{};SM.addDet[dia]=!SM.addDet[dia];render();const i=document.getElementById(SM.addDet[dia]?'sm_det_'+dia:'sm_add_'+dia);i&&i.focus()}
-function smTg(id){SM.ab.has(id)?SM.ab.delete(id):SM.ab.add(id);render()}
+function smTg(id){SM.ab.has(id)?SM.ab.delete(id):SM.ab.add(id);try{localStorage.setItem('sm_abertas',JSON.stringify([...SM.ab]))}catch(e){}render()}
 function smAddLinha(){return ''} // Adição pelo botão flutuante ou duplo clique no dia.
 function smTipoSeg(iso){const x=smDia(iso),t=smTipo(iso);
   return `<div class="sm-seg">${['estudo','sobreaviso','descanso'].map(k=>`<button type="button" aria-pressed="${t===k}" onclick="smTipoMuda('${iso}','${k}')">${smTipoNome[k]}</button>`).join('')}</div>${x.tipo?`<button class="sm-tagb" onclick="smTipoMuda('${iso}','auto')" title="Volta ao automático (fim de semana = descanso, HSI = sobreaviso)">automático</button>`:''}`}
@@ -392,7 +397,7 @@ function smPainelDia(iso){
    <div class="row sm-campos"><input placeholder="Tema do dia (ex.: RM Joelho)" value="${esc(x.tema||'')}" onchange="smCampo('${iso}','tema',this.value)" aria-label="Tema do dia"><input placeholder="Foco específico (ex.: USG tireoide TI-RADS)" value="${esc(x.foco||'')}" onchange="smCampo('${iso}','foco',this.value)" aria-label="Foco do dia"><input placeholder="Feriado" value="${esc(smFeriado(iso))}" onchange="smCampo('${iso}','feriado',this.value)" aria-label="Feriado"></div>
    <div class="row"><span class="sm-lbl">Noite</span><div class="sm-seg">${[['BR','BR plantão'],['HSI','HSI sobreaviso'],['','Nada']].map(([k,n])=>`<button type="button" aria-pressed="${smNoite(iso)===k}" onclick="smCampo('${iso}','noite','${k}')">${n}</button>`).join('')}</div>${x.noite!=null?`<button class="sm-tagb" onclick="smCampo('${iso}','noite','auto')" title="Volta a seguir a agenda">pela agenda</button>`:''}</div>
    ${smEvEditor(iso)}
-   ${smGrupos(its)||'<p class="mut" style="margin:0">Nenhum item neste dia.</p>'}${smAddLinha(iso)}</div>`;
+   ${tela==='tarefas'?smGrupos(its):''}</div>`;
 }
 function smPainelSemana(seg){
   const ds=smSemana(seg),hj=smHoje(),meta=ds.reduce((a,x)=>a+smMetaDe(x),0),feitas=ds.reduce((a,x)=>a+smQ(x).n,0),add=SM.semAdd;
@@ -458,7 +463,7 @@ function smCalCab(mes,y,m){
   return `<div class="sm-calh"><button class="b s sm-ghost" onclick="smCalVai(-1)" aria-label="${sem?'Semana anterior':'Mês anterior'}">‹</button><h3>${titulo}</h3><button class="sm-est ${est?'':'vazio'}" onclick="smEstagioEdita('${mes}')" title="Estágio do mês (toque para mudar)">${est?esc(est):'+ estágio'}</button><button class="b s sm-ghost" onclick="smCalVai(1)" aria-label="${sem?'Próxima semana':'Próximo mês'}">›</button>${(sem?seg!==smDom(hj):mes!==hj.slice(0,7))?`<button class="b s sm-ghost" onclick="SM.mes=null;SM.semana=null;render()">Hoje</button>`:''}<span style="flex:1"></span>
    <div class="sm-seg"><button type="button" aria-pressed="${vis==='mes'}" onclick="smVis('mes')">Mês</button><button type="button" aria-pressed="${sem}" onclick="smVis('semana')">Semana</button><button type="button" aria-label="Lista da semana atual" aria-pressed="${vis==='lista'}" onclick="smVis('lista')">≡ Lista</button></div>
    ${sem?`<button class="b s sm-ghost" onclick="smSem('${seg}')">editar semana</button>`:''}
-   <button class="b s ${SM.plan?'':'sm-ghost'}" onclick="SM.plan=!SM.plan;SM.conf=null;render()">✎ Planejar mês</button></div>`;
+   </div>`;
 }
 function smVis(v){SM.vis=v;if(v==='lista'){SM.semana=smDom(smHoje());SM.mes=smHoje().slice(0,7)}try{localStorage.setItem('sm_vis',v)}catch(e){}render()}
 function smCalVai(k){if(SM.vis==='lista')return;if(SM.vis!=='semana'){smMesVai(k);return}SM.semana=smMais(SM.semana||smDom(smHoje()),k*7);render()}
@@ -466,8 +471,8 @@ SM.vis='semana';
 function smCalendario(){
   const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smDom(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smDom(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
   const corpo=SM.vis==='lista'?smLista(mes,smDom(hj),smMais(smDom(hj),6),p,r):smGrade(mes,ini,fim,p,r,sem);
-  return `<div class="card sm-cal">${smCalCab(mes,y,m)}${SM.plan?smPainelMes():''}${corpo}
-   <p class="mut sm-dica">Clique num dia para ver as tarefas · duplo clique para adicionar · <button class="sm-tagb" onclick="smSem('${sem?seg:smDom(hj)}')">editar semana${sem?'':' atual'}</button> · toque no estágio ao lado do mês para mudar.</p>${!sem&&SM.vis!=='lista'&&SM.sem&&(SM.sem<ini||SM.sem>fim)?smPainelSemana(SM.sem):''}</div>`;
+  return `<div class="card sm-cal">${smCalCab(mes,y,m)}${corpo}
+   <p class="mut sm-dica">Clique para selecionar um dia · veja os itens na aba Tarefas · duplo clique para adicionar · toque no estágio ao lado do mês para mudar.</p></div>`;
 }
 function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.calCursor=dia;QA.calAberto=true;QA.diasAberto=false;QA.quandoManual=true;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
@@ -481,15 +486,15 @@ function smGrade(mes,ini,fim,p,r,sem=false){
         <span class="top"><span class="n">${smDt(x).getDate()}</span>${smNt(smNoite(x))}${x===p?'<span class="sm-pv2">PROVA</span>':''}</span>
         ${smEvs(x)}${fe?`<span class="sm-fe">${esc(fe)}</span>`:''}${di.tema?`<span class="sm-tm">${esc(di.tema)}</span>`:''}${di.foco?`<span class="sm-fo">+ ${esc(di.foco)}</span>`:''}${rs?`<span class="sm-rs">${esc(rs)}</span>`:''}
         <span class="sm-bt">${smSelo(x)}${smDots(x)}</span></button>`}).join('')}</div>`;
-    if(SM.sem===s)h+=smPainelSemana(s);
+    if(SM.sem===s&&tela==='tarefas')h+=smPainelSemana(s);
   }
   return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
 }
 function smLista(mes,ini,fim,p,r){
   const hj=smHoje(),esta=smDom(hj);let h='';
   for(let s=ini;s<=fim;s=smMais(s,7)){
-    h+=`<div class="sm-lh"><b>Semana ${smNumSem(s)}${s===esta?' · esta':''}</b><button class="sm-tagb ${SM.sem===s?'on2':''}" onclick="smSem('${s}')">editar semana</button></div>`;
-    if(SM.sem===s)h+=smPainelSemana(s);
+    h+=`<div class="sm-lh"><b>Semana ${smNumSem(s)}${s===esta?' · esta':''}</b></div>`;
+    if(SM.sem===s&&tela==='tarefas')h+=smPainelSemana(s);
     smSemana(s).forEach(x=>{
       const t=smTipo(x),di=smDia(x),fe=smFeriado(x),rs=smAgResto(di.agenda),dw=smDt(x).getDay();
       const vazio=!di.tema&&!fe?(t==='sobreaviso'?'<span class="mut">sobreaviso · sem estudo</span>':t==='descanso'?'<span class="mut">descanso</span>':''):'';
@@ -498,7 +503,7 @@ function smLista(mes,ini,fim,p,r){
         <span class="lc"><span class="lt">${smNt(smNoite(x))}${x===p?'<span class="sm-pv2">PROVA</span>':''}${fe?`<span class="sm-fe">${esc(fe)}</span>`:''}${smEvs(x)}${di.tema?`<span class="sm-tm">${esc(di.tema)}</span>`:''}${vazio}</span>
         ${di.foco?`<span class="sm-fo">+ ${esc(di.foco)}</span>`:''}${rs?`<span class="sm-rs">${esc(rs)}</span>`:''}
         <span class="lb">${smSelo(x,true)}${smDots(x)}</span></span></button>`;
-      h+=smGrupos(smVisiveis(x));
+      // As tarefas ficam exclusivamente na aba Tarefas.
     });
   }
   return `<div class="sm-lista">${h}</div>`;
@@ -512,16 +517,21 @@ function smFracosCard(){
 }
 function vSemana(){
   if(!SM.ok)return `<div class="card"><p class="mut">Carregando o calendário…</p></div>`;
+  if(!SM.d)return `<div class="card"><p class="mut">Calendário indisponível offline neste aparelho.</p></div>`;
+  return `<div class="sm" aria-label="Calendário">${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}${SM.avisosAgenda?.length?`<details class="sm-avisos"><summary>Avisos da escala</summary>${SM.avisosAgenda.map(a=>`<p>${esc(a)}</p>`).join('')}</details>`:''}${smCalendario()}${SM.diaEditor?smPainelDia(SM.diaEditor):''}</div>`;
+}
+function vTarefas(){
+  if(!SM.ok)return `<div class="card"><p class="mut">Carregando o calendário…</p></div>`;
   if(!SM.d)return `<div class="card"><p class="mut">Calendário ainda vazio.</p></div>`;
   setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=tarefasAtrasadas(SM.d.tarefas,hj);
-  return `<div class="sm" aria-label="Calendário">
+  const outros=[...new Set(SM.d.tarefas.map(t=>t.dia))].filter(d=>dataTarefaValida(d)&&d>hj).sort();
+  return `<div class="sm" aria-label="Tarefas"><div class="row"><h2>Tarefas</h2><button class="b s sm-ghost" onclick="smSem('${smDom(hj)}')">Planejar semana</button><button class="b s sm-ghost" onclick="SM.plan=!SM.plan;SM.conf=null;render()">Planejar mês</button></div>
    ${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}
+   ${SM.plan?smPainelMes():''}${SM.sem?smPainelSemana(SM.sem):''}
    ${atr.length?`<div class="card sm-atrasadas"><div class="row"><span class="kick">Atrasadas · ${atr.length}</span><button class="b s sm-ghost" onclick="smRola()">Passar tudo para hoje</button></div><div class="sm-atrasadas-lista">${atr.map(t=>`<div><small>${smRotL(t.dia)}</small>${smItem(t)}</div>`).join('')}</div></div>`:''}
-   ${SM.avisosAgenda?.length?`<details class="sm-avisos"><summary>Avisos da escala · ${SM.avisosAgenda.length}</summary>${SM.avisosAgenda.map(a=>`<p>${esc(a)}</p>`).join('')}</details>`:''}
-   ${smCalendario()}
-   ${SM.diaEditor?smPainelDia(SM.diaEditor):''}
    ${smHojeGrande()}
    ${smSemData()}
+   ${outros.filter(d=>d!==smDiaAtual()).map(d=>`<div class="card" data-drop="${d}"><h3>${smRotL(d)}</h3>${smGrupos(smVisiveis(d))}${smFeitasBotao(d)}</div>`).join('')}
    ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
    ${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}
   </div>`;
@@ -531,7 +541,7 @@ function smCardHoje(){
   if(!SM.d)return'';setTimeout(smAuto,0);const hj=smHoje(),todos=smItensDe(hj),its=smVisiveis(hj);if(!todos.length)return'';
   return `<div class="card sm-ch"><div class="row" style="justify-content:space-between"><span class="kick">Hoje no calendário · ${todos.filter(t=>t.feito).length}/${todos.length}</span>${smFeitasBotao(hj)}<button class="b s sm-ghost" onclick="go('semana')">Ver calendário</button></div>${smGrupos(its)}${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}</div>`;
 }
-const smCarga=smPuxar();
+const smCarga=Promise.resolve().then(smPuxar);
 setInterval(()=>{if(document.visibilityState==='visible')smPuxar()},90000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){smPuxar();smAuto()}});
 // anel da meta de hoje + dias até a prova + ritmo (estavam no cartão de hoje da aba Semana; agora no "Meta até a prova" da aba Hoje)
@@ -783,12 +793,12 @@ function qaTecla(e){
   }
 }
 window.addEventListener('keydown',e=>{
-  if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(tela==='hoje'||tela==='semana')){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
+  if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(['hoje','semana','tarefas','notas'].includes(tela))){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
   e.stopImmediatePropagation();
   qaTecla(e);
 },true);
 // botão flutuante "+" (celular e mouse) nas abas Hoje e Semana — chamado a cada render
-function qaBotao(){let b=document.getElementById('qa_fab');const ver=tela==='hoje'||tela==='semana';
+function qaBotao(){let b=document.getElementById('qa_fab');const ver=['hoje','semana','tarefas'].includes(tela);
   if(!b){b=document.createElement('button');b.id='qa_fab';b.className='qa-fab';b.title='Nova tarefa (Alt+A)';b.setAttribute('aria-label','Nova tarefa (Alt+A)');b.textContent='+';b.onclick=qaAbre;document.body.appendChild(b)}
   b.style.display=ver?'':'none'}
 
@@ -815,35 +825,40 @@ const SMK={on:false,i:-1,id:null,cel:'hoje'};
 function smkIni(){SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel='hoje'}
 const smkItens=dia=>smVisiveis(dia);
 const smkNh=()=>smkItens(smDiaAtual()).length;
+const smkLinhas=()=>[...document.querySelectorAll('#app .sm-row[data-tid]')].filter(r=>r.getClientRects().length);
 function smkSelecionada(id){if(!SMK.on)return false;if(SMK.id)return SMK.id===id;const x=smkLista()[SMK.i];return !!x&&x.id===id}
 function smkSeleciona(id){const i=smkLista().findIndex(t=>t.id===id);SMK.on=true;SMK.cel=null;if(i>=0){SMK.i=i;SMK.id=null}else{SMK.i=-1;SMK.id=id}smkPinta()}
-function smkLista(){return [...smkItens(smDiaAtual()),...smkItens('sem')]}
-function smkPinta(){if(tela!=='semana')return;const c=document.querySelector('#app .sm-hoje1'),d=document.querySelector('#app .sm-sd');
-  const rh=c?[...c.querySelectorAll('.sm-grp .sm-row')]:[],rs=d?[...d.querySelectorAll('.sm-grp .sm-row')]:[],rows=[...rh,...rs];
+function smkLista(){
+  if(tela!=='tarefas')return [...smkItens(smDiaAtual()),...smkItens('sem')];
+  return [...new Set(smkLinhas().map(r=>r.dataset.tid))].map(smTar).filter(Boolean);
+}
+function smkPinta(){if(tela!=='tarefas')return;const c=document.querySelector('#app .sm-hoje1'),d=document.querySelector('#app .sm-sd');
+  const rh=c?[...c.querySelectorAll('.sm-grp .sm-row')]:[],linhas=smkLinhas(),rows=smkLista().map(t=>linhas.find(r=>r.dataset.tid===t.id));
   const naSd=SMK.i<0?SMK.cel==='sd':SMK.i>=rh.length,cel=SMK.on&&!SMK.id;
   if(c)c.classList.toggle('kbsel',cel&&!naSd);if(d)d.classList.toggle('kbsel',cel&&naSd);
   document.querySelectorAll('#app .sm-row.kbsel').forEach(r=>r.classList.remove('kbsel'));
   rows.forEach((r,i)=>{if(cel&&i===SMK.i)r.classList.add('kbsel')});
-  if(SMK.on&&SMK.id)document.querySelectorAll('#app .sm-row[data-tid]').forEach(r=>{if(r.dataset.tid===SMK.id)r.classList.add('kbsel')});
+  if(SMK.on&&SMK.id)linhas.forEach(r=>{if(r.dataset.tid===SMK.id)r.classList.add('kbsel')});
   const r=SMK.id?document.querySelector('#app .sm-row.kbsel'):rows[SMK.i];if(SMK.on&&r)r.scrollIntoView({block:'nearest'})}
 window.addEventListener('keydown',e=>{
-  if(tela!=='semana'||!SMK.on||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(tela!=='tarefas'||!SMK.on||e.ctrlKey||e.metaKey||e.altKey)return;
   if(typeof QA!=='undefined'&&QA.on)return;
   const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
+  if(t?.closest?.('button,a,label'))return;
   const z=document.getElementById('zoom');if(z&&!z.hidden)return;
   const L=smkLista(),n=L.length,k=e.key;
   if(k==='ArrowDown'||k==='ArrowUp'){if(!n)return;e.preventDefault();const de=SMK.id?-1:SMK.i;
     SMK.i=SMK.cel==='sd'&&de<0&&k==='ArrowDown'?Math.min(n-1,smkNh()):k==='ArrowDown'?Math.min(n-1,de+1):Math.max(0,de-1);SMK.id=null;SMK.cel=null;smkPinta();return}
   if(k==='Escape'){SMK.on=false;SMK.id=null;smkPinta();return}
-  const x=SMK.id?smTar(SMK.id):L[SMK.i];if(!x)return;
+  const x=SMK.id?L.find(t=>t.id===SMK.id):L[SMK.i];if(!x)return;
   if(k==='Enter'){e.preventDefault();smCheck(x.id,!x.feito);return}
   if(keyIs(e,'smdel')){e.preventDefault();
     smMudar(d=>{d.tarefas=d.tarefas.filter(y=>y.id!==x.id)},'excluiu item');if(SMK.id){SMK.id=null;SMK.on=false;smkPinta()}else SMK.i=Math.min(SMK.i,n-2);toast('Item apagado')}
 });
 // clique fora do cartão de hoje e da célula "Sem data" solta a seleção do teclado
-document.addEventListener('pointerdown',e=>{if(tela==='semana'&&SMK.on&&!e.target.closest('.sm-hoje1,.sm-sd,.sm-row[data-tid]')){SMK.on=false;SMK.id=null;smkPinta()}},true);
+document.addEventListener('pointerdown',e=>{if(tela==='tarefas'&&SMK.on&&!e.target.closest('.sm-hoje1,.sm-sd,.sm-row[data-tid]')){SMK.on=false;SMK.id=null;smkPinta()}},true);
 // clique numa tarefa (fora do texto, do check e dos botões) seleciona; clique no vazio de Hoje/Tarefas seleciona a célula
-document.addEventListener('click',e=>{if(tela!=='semana')return;const t=e.target;if(!t.closest||t.closest('input,select,textarea,button,a,label,.sm-add,.sm-det,[contenteditable]'))return;
+document.addEventListener('click',e=>{if(tela!=='tarefas')return;const t=e.target;if(!t.closest||t.closest('input,select,textarea,button,a,label,.sm-add,.sm-det,[contenteditable]'))return;
   const r=t.closest('.sm-row[data-tid]');if(r){if(!smkSelecionada(r.dataset.tid))smkSeleciona(r.dataset.tid);return}
   const cel=t.closest('.sm-hoje1,.sm-sd');if(cel){SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel=cel.classList.contains('sm-sd')?'sd':'hoje';smkPinta()}});
 
@@ -901,7 +916,7 @@ function smdComeca(){
     const q=document.getElementById('sm_quadro');if(q){const b=q.getBoundingClientRect();if(d.cy>=b.top&&d.cy<=b.bottom){if(d.cx<b.left+38)q.scrollLeft-=8;else if(d.cx>b.right-38)q.scrollLeft+=8}}smdPos()},16);
 }
 document.addEventListener('pointerdown',e=>{
-  if(SMD||tela!=='semana'||(e.pointerType==='mouse'&&e.button!==0))return;
+  if(SMD||tela!=='tarefas'||(e.pointerType==='mouse'&&e.button!==0))return;
   const r=e.target.closest&&e.target.closest('.sm-row[data-tid]');if(!r||e.target.closest('button,input,textarea,select')||(e.target.isContentEditable&&e.target===document.activeElement))return;
   SMD={r,id:r.dataset.tid,x0:e.clientX,y0:e.clientY,cx:e.clientX,cy:e.clientY,pid:e.pointerId,mouse:e.pointerType==='mouse',ativo:false};if(!SMD.mouse)SMD.timer=setTimeout(smdComeca,SMD_HOLD);
 },true);

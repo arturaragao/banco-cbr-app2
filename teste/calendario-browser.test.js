@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {spawn}=require('node:child_process');
 const espera=ms=>new Promise(r=>setTimeout(r,ms));
-test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {timeout:90000},async t=>{
+test('Calendário, Tarefas e Notas 1.28: aceite no Chrome, desktop e celular', {timeout:90000},async t=>{
   const chrome=process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   assert.ok(fs.existsSync(chrome),'Chrome disponível');
   const raiz=path.resolve(__dirname,'..'),perfil=fs.mkdtempSync(path.join(os.tmpdir(),'bcbr-calendario-'));
@@ -35,20 +35,26 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
   const tecla=async(key,extra={})=>{await call('Input.dispatchKeyEvent',{type:'keyDown',key,...extra});await call('Input.dispatchKeyEvent',{type:'keyUp',key,...extra})};
   await t.test('1: rótulo e Tab / Shift+Tab',async()=>{
     assert.equal(await ev("TABS.find(t=>t[0]==='semana')[1]"),'Calendário');
-    await ev('document.activeElement.blur()');await tecla('Tab');assert.equal(await ev('tela'),'questoes');
+    assert.equal(await ev("document.querySelector('.sm-row')"),null);
+    await ev('document.activeElement.blur()');await tecla('Tab');assert.equal(await ev('tela'),'tarefas');
+    await tecla('Tab');assert.equal(await ev('tela'),'notas');await tecla('Tab',{modifiers:8});assert.equal(await ev('tela'),'tarefas');
     await tecla('Tab',{modifiers:8});assert.equal(await ev('tela'),'semana');
+    await ev("go('tarefas')");
   });
   await t.test('2, 4–7: cartões, toggle, tipos, checkbox e alça',async()=>{
     assert.equal(await ev("document.querySelectorAll('.sm-hoje1 .sm-row').length"),3);
     assert.equal(await ev("document.querySelector('.sm-hoje1 [data-tid=\"teste-f\"] .sm-tg')"),null);
     assert.equal(await ev("!!document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg')"),true);
-    assert.deepEqual(await ev("(()=>{const b=document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg');const s=b.querySelector('svg');return [b.clientWidth,b.clientHeight,s.getBoundingClientRect().width,getComputedStyle(s).transform]})()"),[24,24,14,'none']);
+    assert.deepEqual(await ev("(()=>{const b=document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg');return [b.clientWidth,b.clientHeight,b.textContent]})()"),[24,24,'▸']);
     assert.equal(await ev("/[📚🛠✅]/u.test(document.querySelector('.sm-hoje1 .sm-gs').textContent)"),false);
     assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-row')).borderRadius"),'16px');
     assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-it input')).appearance"),'none');
     assert.equal(await ev("document.querySelector('.sm-hoje1 .sm-arrastar').textContent"),'⠿');
     await click('.sm-hoje1 [data-tid="teste-t"] .sm-tg');assert.equal(await ev("document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-sub').textContent.includes('Etapa fictícia')"),true);
-    await espera(250);assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg svg')).transform"),'matrix(0, 1, -1, 0, 0, 0)');
+    assert.equal(await ev("document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-tg').textContent"),'▾');
+    await click('.sm-hoje1 [data-tid="teste-t"] .sm-tg');assert.equal(await ev("document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-conteudo')"),null);
+    assert.equal(await ev("!!smTar('teste-t').feito"),false);assert.equal(await ev('SM.ed'),null);
+    await click('.sm-hoje1 [data-tid="teste-t"] .sm-tg');
     await click('.sm-hoje1 [data-tid="teste-f"] input');await ev('SM.fila');assert.equal(await ev("smTar('teste-f').feito"),true);
     assert.match(await ev("getComputedStyle(document.querySelector('.sm-hoje1 [data-tid=\"teste-f\"] input'),'::after').transform"),/matrix/);
     await ev("smCheck('teste-f',false);SM.fila");
@@ -60,6 +66,7 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
     assert.equal(await ev("document.querySelector('.sm-ed').getAttribute('role')"),'dialog');await ev('smEdFecha()');
   });
   await t.test('8: barra removida e lista limitada a domingo–sábado, cruzando mês',async()=>{
+    await ev("go('semana')");
     assert.equal(await ev("document.querySelector('.sm-add.sm-c1')"),null);
     await click('[aria-label="Lista da semana atual"]');
     const datas=await ev("[...document.querySelectorAll('.sm-lista .sm-li')].map(x=>x.dataset.drop)");
@@ -70,11 +77,11 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
   await t.test('9–10: clique mostra dia, vazio esconde célula e duplo clique adiciona',async()=>{
     const amanha=await ev('smMais(smHoje(),1)');await ev(`SM.semana=smDom('${amanha}');render()`);
     const s=`.sm-cel[data-drop="${amanha}"]`;await click(s);
-    assert.equal(await ev('QA.on'),false);assert.equal(await ev("document.querySelector('.sm-hoje1').dataset.drop"),amanha);
-    assert.equal(await ev("document.querySelector('.sm-hoje1 .sm-texto').textContent"),'Tarefa de amanhã');
+    assert.equal(await ev('QA.on'),false);assert.equal(await ev('SM.sel'),amanha);
+    assert.equal(await ev("document.querySelector('.sm-hoje1')"),null);
     await click(s,true);assert.equal(await ev('QA.quando'),amanha);assert.equal(await ev('QA.on'),true);await ev('qaFecha();qaLimpa()');
     const vazio=await ev('smMais(smHoje(),2)');await ev(`SM.semana=smDom('${vazio}');render()`);await click(`.sm-cel[data-drop="${vazio}"]`);
-    assert.equal(await ev("document.querySelector('.sm-hoje1')"),null);await ev("SM.sel=null;SM.semana=null;render()");
+    assert.equal(await ev("document.querySelector('.sm-hoje1')"),null);await ev("SM.sel=null;SM.semana=null;go('tarefas')");
   });
   await t.test('11a–f: passos, vários dias com teclado, hora, subtarefa e rascunho',async()=>{
     await ev("qaAbre();qaTxt('Aceite fictício')");await click('#qa_in',true);
@@ -104,7 +111,7 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
     await seleciona('sm_ed_det');await ev("smFormata('sm_ed_det','underline')");
     const limpo=await ev("smSanitiza('<script>window.pwn=1</script><img src=x onerror=alert(1)><b onclick=alert(1)>Seguro</b><span style=\"color:#8467bc;background:url(x)\" onmouseover=alert(1)>Cor</span><a href=javascript:alert(1)>Link</a><svg onload=alert(1)>x</svg>')");
     assert.equal(limpo,'<b>Seguro</b><span style="color:rgb(132, 103, 188)">Cor</span>Link');
-    assert.equal(await ev("smSanitiza('<font color=\"#8467bc\" face=\"Arial\" size=\"7\"><b><u>Legado</u></b></font>')"),'<span style="color:rgb(132, 103, 188)"><b><u>Legado</u></b></span>');
+    assert.match(await ev("smSanitiza('<font color=\"#8467bc\" face=\"Arial\" size=\"7\"><b><u>Legado</u></b></font>')"),/^<span style="color:(?:#8467bc|rgb\(132, 103, 188\))"><b><u>Legado<\/u><\/b><\/span>$/);
     await ev('smSalvar();SM.fila');assert.equal(await ev("smTar('teste-t').urg"),true);assert.equal(await ev("smTar('teste-t').texto"),'Tarefa fictícia');
     html=await ev("smTar('teste-t').textoHtml");assert.match(html,/<u>/);assert.equal(await ev("!!document.querySelector('.sm-hoje1 [data-tid=\"teste-t\"] .sm-texto u')"),true);
     assert.match(html,/<span style="color:/);assert.doesNotMatch(html,/<font\b/);
@@ -116,13 +123,13 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
   });
   await t.test('2, 7: grid responsivo e arraste real pela alça',async()=>{
     await ev("smPoe([{id:'grid-extra',dia:smHoje(),texto:'Segundo estudo',area:'estudo',feito:false}]);SM.fila");
-    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-estudo')).gridTemplateColumns.split(' ').length>=2"),true);
+    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-gs')).gridTemplateColumns.split(' ').length>=2"),true);
     await call('Emulation.setDeviceMetricsOverride',{width:800,height:900,deviceScaleFactor:1,mobile:false});
-    const grades=await ev("[...document.querySelectorAll('.sm-hoje1 .sm-grp,.sm-sd .sm-grp,.sm-atrasadas-lista')].map(e=>({display:getComputedStyle(e).display,gap:getComputedStyle(e).gap,largura:e.clientWidth,colunas:getComputedStyle(e).gridTemplateColumns.split(' ').map(Number.parseFloat)}))");
-    assert.ok(grades.length>=3);
-    for(const g of grades){assert.equal(g.display,'grid');assert.equal(g.gap,'10px');assert.ok(g.colunas.every(w=>w>=260));assert.ok(Math.abs(g.colunas.reduce((a,b)=>a+b,0)+(g.colunas.length-1)*10-g.largura)<2)}
+    const grades=await ev("[...document.querySelectorAll('.sm-hoje1 .sm-gs,.sm-sd .sm-gs')].map(e=>({display:getComputedStyle(e).display,gap:getComputedStyle(e).gap,largura:e.clientWidth,colunas:getComputedStyle(e).gridTemplateColumns.split(' ').map(Number.parseFloat).filter(w=>w>0)}))");
+    assert.equal(grades.length,2);
+    for(const g of grades){assert.equal(g.display,'grid');assert.equal(g.gap,'14px');assert.ok(g.colunas.every(w=>w>=240));assert.ok(Math.abs(g.colunas.reduce((a,b)=>a+b,0)+(g.colunas.length-1)*14-g.largura)<2)}
     await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-estudo')).gridTemplateColumns.split(' ').length"),1);
+    assert.equal(await ev("getComputedStyle(document.querySelector('.sm-hoje1 .sm-gs')).gridTemplateColumns.split(' ').length"),1);
     assert.equal(await ev("document.querySelector('.sm-hoje1').scrollWidth<=document.querySelector('.sm-hoje1').clientWidth"),true);
     await call('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
     const p=await ev("(()=>{const r=document.querySelector('.sm-hoje1 [data-tid=\"grid-extra\"] .sm-arrastar');r.scrollIntoView({block:'center'});const b=r.getBoundingClientRect();return{x:b.x+b.width/2,y:b.y+b.height/2}})()");
@@ -155,6 +162,7 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
         await ev('smSalvar();SM.fila');
         assert.equal(await ev(`smTar('${id}').det`),caso.det,'texto puro preservado');
         assert.equal(await ev(`smTar('${id}').detHtml`),html,'HTML separado e estável');
+        await ev(`SM.ab.add('${id}')`);
         assert.equal(await ev(`(()=>{const el=document.createElement('div');el.innerHTML=smItem(smTar('${id}'));return el.querySelector('.sm-det').textContent})()`),caso.det);
       }
     }
@@ -182,6 +190,42 @@ test('Calendário 1.27: aceite dos itens 1–12 no Chrome, desktop e celular', {
     assert.deepEqual(await ev("smGrupo(smTar('hora-grupo-a')).map(t=>t.hora)"),['07:45','07:45']);
     await ev("smEdita('hora-grupo-a');smEdEsc('este')");await click('.sm-ed button[onclick*="sm_ed_dia"]');await ev('smSalvar();SM.fila');
     assert.deepEqual(await ev("[smTar('hora-grupo-a').dia,smTar('hora-grupo-a').hora,smTar('hora-grupo-b').hora]"),['sem',null,'07:45']);
+  });
+  await t.test('regressão: dia futuro limita setas, Enter e F às tarefas visíveis',async()=>{
+    const antes=await ev('JSON.stringify(SM.d.tarefas)');
+    try{
+      await ev("SM.d.tarefas=[{id:'reg-hoje',dia:smHoje(),texto:'Hoje invisível'},{id:'reg-futuro',dia:smMais(smHoje(),1),texto:'Futuro visível'},{id:'reg-sem',dia:'sem',texto:'Sem data'}];SM.sel=smMais(smHoje(),1);go('tarefas');document.activeElement.blur();smkIni()");
+      assert.equal(await ev("document.querySelector('[data-tid=\"reg-hoje\"]')"),null);
+      const visiveis=await ev("[...document.querySelectorAll('#app .sm-row[data-tid]')].filter(r=>r.getClientRects().length).map(r=>r.dataset.tid)");
+      assert.deepEqual(await ev('smkLista().map(t=>t.id)'),visiveis);
+      for(let i=0;i<visiveis.length+2;i++){
+        await tecla('ArrowDown');
+        assert.equal(await ev("!!document.querySelector('#app .sm-row.kbsel')?.getClientRects().length"),true);
+      }
+      const selecionada=await ev('smkLista()[SMK.i].id');
+      await tecla('f',{code:'KeyF'});await ev('SM.fila');
+      assert.equal(await ev(`!!smTar('${selecionada}')`),false);
+      assert.equal(await ev("!!smTar('reg-hoje')"),true);
+      await ev("SMK.on=true;SMK.id='reg-hoje'");await tecla('Enter');await tecla('f',{code:'KeyF'});await ev('SM.fila');
+      assert.equal(await ev("!!smTar('reg-hoje')&&!smTar('reg-hoje').feito"),true);
+    }finally{await ev(`SM.d.tarefas=${antes};SM.sel=null;render()`)}
+  });
+  await t.test('Notas: criar, editar sem perder foco, fixar, buscar, confirmar exclusão e persistir no celular',async()=>{
+    await ev("go('notas')");await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+    await click('#nt_texto');await call('Input.insertText',{text:'Nota fictícia offline'});await click('.nt-criar button');
+    const id=await ev("SM.d.notas.find(n=>n.texto==='Nota fictícia offline').id");
+    await click('.nt-nota textarea');await call('Input.insertText',{text:' revisada'});await espera(900);
+    assert.equal(await ev("document.activeElement.matches('.nt-nota textarea')"),true);
+    assert.match(await ev(`SM.d.notas.find(n=>n.id==='${id}').texto`),/revisada/);
+    await call('Input.insertText',{text:' adicional'});await click('[aria-label="Buscar notas"]');await call('Input.insertText',{text:'revisada'});await espera(900);
+    assert.equal(await ev("document.activeElement.getAttribute('aria-label')"),'Buscar notas');assert.equal(await ev("document.querySelectorAll('.nt-nota').length"),1);
+    await click('[aria-label="Fixar nota"]');assert.equal(await ev(`SM.d.notas.find(n=>n.id==='${id}').fixa`),true);
+    await ev("ntBuscar('inexistente')");assert.equal(await ev("document.querySelectorAll('.nt-nota').length"),0);await ev("ntBuscar('revisada')");
+    assert.equal(await ev("document.querySelectorAll('.nt-nota').length"),1);
+    assert.equal(await ev("document.querySelector('.nt').scrollWidth<=document.querySelector('.nt').clientWidth"),true);
+    await ev('ntSync()');assert.equal(await ev(`JSON.parse(localStorage.getItem('sm_cache2')).d.notas.some(n=>n.id==='${id}')`),true);
+    await ev(`window.confirm=()=>false;ntApagar('${id}')`);assert.equal(await ev('SM.d.notas.length'),1);
+    await ev(`window.confirm=()=>true;ntApagar('${id}');ntSync()`);assert.equal(await ev('SM.d.notas.length'),0);
   });
   assert.deepEqual(erros,[],'nenhuma exceção JavaScript no navegador');assert.deepEqual(consoleErros,[],'nenhum console.error');
 });

@@ -371,8 +371,8 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 .sm-atrasadas-lista>div{min-width:0;width:100%}
 .sm-hoje1 .sm-grp,.sm-sd .sm-grp{gap:10px}
 .sm-grp>.sm-lbl{grid-column:1/-1;margin:0}
-.sm-row[data-tid]{display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:6px;margin:0;padding:12px;border:1px solid color-mix(in srgb,var(--sm-cor) 24%,var(--bd));border-radius:16px;background:color-mix(in srgb,var(--sm-pastel) 24%,var(--card));color:var(--tx);box-sizing:border-box;min-width:0;transition:background .18s,border-color .18s}
-.sm-row[data-tid]:hover{background:color-mix(in srgb,var(--sm-pastel) 40%,var(--card));border-color:color-mix(in srgb,var(--sm-cor) 45%,var(--bd))}
+.sm-row[data-tid]{--sm-fundo:color-mix(in srgb,var(--sm-pastel) 24%,var(--card));display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:6px;margin:0;padding:12px;border:1px solid color-mix(in srgb,#5687be 16%,var(--sm-fundo));border-radius:16px;background:var(--sm-fundo);color:var(--tx);box-sizing:border-box;min-width:0;transition:background .18s,border-color .18s}
+.sm-row[data-tid]:hover{background:color-mix(in srgb,var(--sm-pastel) 40%,var(--card));border-color:color-mix(in srgb,#5687be 24%,var(--sm-fundo))}
 .sm-row .sm-it,.sm-hoje1 .sm-it,.sm-sd .sm-it{padding:0;gap:9px}
 .sm-row .sm-texto{cursor:default;font-weight:500;white-space:pre-wrap}
 .sm-row .sm-det,.sm-row .sm-metadados,.sm-row .sm-conteudo,.sm-row>.sm-anexos{grid-column:1/-1;margin:0;padding:0;border:0;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
@@ -392,6 +392,10 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 #qa_subs{display:flex;flex-direction:column;gap:8px;padding-left:12px}
 @media(max-width:519px){.sm-gs{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.sm-row[data-tid],.sm-row .sm-it input[type="checkbox"],.sm-row .sm-it input[type="checkbox"]:after{transition:none}}
+.sm-row .sm-conteudo{margin-left:calc(63px + 1.5em);grid-column:1/-1}
+.sm-row .sm-conteudo .sm-det{padding:0;margin:6px 0;white-space:pre-wrap}
+.sm-tg{font-size:1rem;padding:0;line-height:24px}
+.sm-subtema{font-size:.85rem;color:var(--pri-tx)}
 @media(max-width:700px){
  .sm-extras{grid-template-columns:repeat(2,minmax(0,1fr))}
  .sm-ed{top:3vh;max-height:94vh}

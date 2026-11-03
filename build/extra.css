@@ -1,4 +1,6 @@
 .versao{font-size:.62rem;font-weight:500;opacity:.6;margin-left:6px;letter-spacing:.02em;vertical-align:middle}
+.pr-tags{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:.78rem}
+.pr-tags .pr-tag{background:transparent;color:var(--mut);border:1px solid var(--bd);font-weight:400;font-size:.75rem}
 .blist{border:1px solid var(--bd);border-radius:12px;overflow:hidden}
 .bq{border-bottom:1px solid var(--bd)}.bq:last-child{border-bottom:0}
 .bq>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:10px 12px}

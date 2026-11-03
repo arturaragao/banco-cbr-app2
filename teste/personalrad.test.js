@@ -254,7 +254,7 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
     let sess={i:0,ids:['q1'],resp:{},cut:{},nvOpen:true};
     q.alts={A:'Certa',B:'Errada marcada',C:'Outra errada'};q.gab='A';q.cl=['Tema Claude'];q.coment={};
     q.pr_stats.alternativas={A:{percentual:60},B:{percentual:30},C:{percentual:10}};
-    q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['NÃO EXIBIR']};`);
+    q.tags=['Claude'];q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['NÃO EXIBIR']};`);
   executar(c,trecho(script,'function tituloQ(q','const TES='));
   executar(c,trecho(script,'function nvBloco(){','const DIFV='));
   executar(c,`const QID={q1:q};DIF.d.nome='Difícil';`);
@@ -281,6 +281,70 @@ for(const [nome,script] of [['fonte',fonte],['app gerado',gerado]])test(`${nome}
   assert.doesNotMatch(depois,/NÃO EXIBIR/);
   executar(c,'sess.sim=true');
   assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
+  executar(c,`sess.resp={};sess.sim=false;q.tags=[];q.pr_tags={specialty:['Radiologia'],session:['Mama','mama'],tag:['PR']}`);
+  const fallback=executar(c,'vQuiz()');
+  assert.match(fallback,/PersonalRad/);assert.match(fallback,/class="tag pr-tag">Mama/);
+  assert.doesNotMatch(fallback,/Classificação:|class="dif |acerto dos alunos|pr-percentual|Tags Claude|gabarito|alt ok|<b>PR<\/b>/);
+  assert.match(fallback,/class="tag pr-tag">PR/);
+  executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
+  assert.match(executar(c,'vQuiz()'),/PersonalRad/);
+  executar(c,'sess.sim=true');
+  const simulado=executar(c,'vQuiz()');assert.match(simulado,/PersonalRad/);
+  assert.doesNotMatch(simulado,/class="dif |acerto dos alunos|pr-percentual|gabarito|alt ok/);
+});
+
+test('fallback PersonalRad achata valores, deduplica e escapa; ponte preserva tags vazias e cl',()=>{
+  const c=contexto();
+  executar(c,trecho(fonte,'const esc=','// ===== texto formatado'));
+  executar(c,trecho(shim,'const limpa =','// fundo=true:'));
+  c.entrada=[{id:'q',alts:{A:'A'},tags:[],cl:['Tema existente'],
+    pr_tags:{specialty:['Radiologia',' radiologia '],session:['Mama',' MÁMA '],tag:['<b>PR</b>',null,'']}}];
+  executar(c,'let q=adaptar(entrada)[0]');
+  assert.equal(executar(c,'q.tags.length'),0);
+  assert.equal(executar(c,'q.cl[0]'),'Tema existente');
+  assert.equal(executar(c,'JSON.stringify(q.pr_tags)'),JSON.stringify(c.entrada[0].pr_tags));
+  assert.equal(executar(c,'JSON.stringify(prTags(q))'),JSON.stringify(['Mama','<b>PR</b>']));
+  const h=executar(c,'prTagsBloco(q)');
+  assert.match(h,/PersonalRad/);assert.match(h,/&lt;b&gt;PR&lt;\/b&gt;/);
+  assert.doesNotMatch(h,/Radiologia|<b>PR<\/b>/);
+  executar(c,"q.tags=['Claude']");assert.equal(executar(c,'prTagsBloco(q)'),'');
+  executar(c,'q.tags=[];q.pr_tags={}');assert.equal(executar(c,'prTagsBloco(q)'),'');
+});
+
+test('Banco fechado e aberto mostra fallback PR e conserva tags Claude',()=>{
+  const c=contexto();preparar(c);
+  executar(c,`const esc=String,norm=s=>String(s||''),isMeta=()=>false,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[];
+    const qDificuldade=()=>'',qEnunciado=()=>'',qAlternativas=()=>'',galeria=()=>'',cursoBloco=()=>'',
+      claudeMdBloco=()=>'',pontoDe=()=>'';
+    q.tags=[];q.cl=[];q.imgs=[];q.imgsCom=[];q.coment={};q.pr_stats=null;
+    q.pr_tags={specialty:['Radiologia'],session:['Mama'],tag:['PR']};`);
+  executar(c,trecho(banco,'let bq=','function comentAlt('));
+  executar(c,trecho(banco,'function bStatus(','function prAcertoBloco('));
+  executar(c,trecho(banco,'function bCorpo(q){','async function bBaixar'));
+  executar(c,trecho(banco,'function vBanco(){','// ===== comentário novo'));
+  assert.match(executar(c,'vBanco()'),/PersonalRad/);
+  assert.match(executar(c,'bCorpo(q)'),/class="tag pr-tag">Mama/);
+  executar(c,"q.tags=['Claude']");
+  const h=executar(c,'vBanco()');assert.match(h,/class="tag">Claude/);assert.doesNotMatch(h,/PersonalRad/);
+});
+
+test('pr_tags chega pela carga, atualização por SHA e cache offline usando o adaptador real',async()=>{
+  const cache=new Map();let sha='q1';
+  const documentos={q1:[{id:'q',alts:{A:'A'},tags:[],pr_tags:{session:['Mama']}}],
+    q2:[{id:'q',alts:{A:'A'},tags:[],pr_tags:{session:['Tórax'],specialty:['Radiologia']}}]};
+  const c=vm.createContext({window:{},REPO:'teste/ficticio',
+    api:async()=>[{name:'questoes.json',sha}],raw:async s=>JSON.stringify(documentos[s]),
+    kvGet:async k=>cache.get(k),kvSet:async(k,v)=>cache.set(k,v)});
+  executar(c,trecho(shim,'const limpa =','  // ---------- progresso:'));
+  assert.equal(await c.carregarDados(),true);
+  assert.equal(c.window.QUESTOES[0].pr_tags.session[0],'Mama');
+  assert.equal(c.window.QUESTOES[0].tags.length,0);
+  sha='q2';assert.equal(await c.carregarDados(true),true);
+  assert.equal(c.window.QUESTOES[0].pr_tags.session[0],'Mama');
+  c.window={};c.api=async()=>{throw Error('offline')};
+  assert.equal(await c.dadosDoCache(),true);
+  assert.equal(c.window.QUESTOES[0].pr_tags.session[0],'Tórax');
+  assert.equal(c.window.QUESTOES[0].pr_tags.specialty[0],'Radiologia');
 });
 
 test('pesos do site são aplicados uma vez também no sorteio de revisões',()=>{

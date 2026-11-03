@@ -11,7 +11,7 @@ const ctx=vm.createContext({assert,console});
 vm.runInContext(trecho('const DATA_PROVA=', 'let Q='),ctx);
 const questoes=fs.readFileSync(require('node:path').join(__dirname,'../build/questoes.js'),'utf8');
 const abre=questoes.slice(questoes.indexOf('function qAbre(){'),questoes.indexOf('function qTroca('));
-assert.equal(trecho('function qAbre(){','function qTroca('),abre);
+assert.equal(trecho('function qAbre(){','function qTroca(').replace(/\r\n/g,'\n'),abre.replace(/\r\n/g,'\n'));
 vm.runInContext(`
 let dia='2026-10-26',cfg={diario:3,ri:null},all=[],log=[],sess=null,salvas=0,montagens=0,prova=true;
 let Q=[],QID={},tela='quiz';

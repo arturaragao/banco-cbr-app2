@@ -1,0 +1,11 @@
+.nt{display:flex;flex-direction:column;gap:16px;max-width:1200px;margin:auto}
+.nt-criar,.nt-nota{display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid color-mix(in srgb,#5687be 16%,var(--card));border-radius:16px;background:color-mix(in srgb,#dceafa 22%,var(--card));min-width:0}
+.nt input,.nt textarea{width:100%;box-sizing:border-box;font:inherit;color:var(--tx);min-width:0}
+.nt textarea{resize:vertical;white-space:pre-wrap;line-height:1.5}
+.nt-criar .b{align-self:flex-end}
+.nt-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;align-items:start}
+.nt-nota:nth-child(3n+2){background:color-mix(in srgb,#e9dff6 20%,var(--card))}
+.nt-nota:nth-child(3n){background:color-mix(in srgb,#ddefe4 20%,var(--card))}
+.nt-nota .row{justify-content:space-between}
+.nt-nota input{font-weight:600}
+@media(max-width:600px){.nt-criar,.nt-nota{padding:12px}.nt textarea{font-size:16px}}

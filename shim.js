@@ -8,9 +8,42 @@
   const LS = { tk: "bcbr_gh_token", gm: "bcbr_gemini_key", gmModelo: "bcbr_gemini_modelo" };
   const tok = () => localStorage.getItem(LS.tk) || "";
   window.BCBR = { REPO };
+  let configAberta = false, carregamentoPendente = false, recusada = "", aguardando401 = "";
+  const aba = Math.random().toString(36).slice(2);
+  // Recupera a cópia já usada pelo SW nas versões anteriores, sem apagar nenhuma chave.
+  async function recuperarChave() {
+    if (tok()) return;
+    try {
+      const c = await caches.open("bcbr-cfg"), r = await c.match("./__token");
+      const antiga = r && (await r.text()).trim();
+      if (antiga && !tok()) localStorage.setItem(LS.tk, antiga);
+    } catch (e) {}
+  }
+  async function credencialRecusada(chave) {
+    if (!chave || chave !== tok() || recusada === chave) return;
+    aguardando401 = chave;
+    if (document.visibilityState !== "visible") return;
+    const mostrar = () => {
+      if (chave !== tok() || recusada === chave) return;
+      const k = "bcbr_auth_aviso";
+      let aviso; try { aviso = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) {}
+      if (aviso && aviso.aba !== aba && Date.now() - aviso.em < 60000) return;
+      localStorage.setItem(k, JSON.stringify({ aba, em: Date.now() }));
+      recusada = chave; aguardando401 = "";
+      telaConfig("O GitHub respondeu 401: a credencial foi recusada. Salve uma chave válida.");
+    };
+    if (navigator.locks) await navigator.locks.request("bcbr-login", mostrar); else mostrar();
+  }
+  document.addEventListener("visibilitychange", () => { if (aguardando401 && document.visibilityState === "visible") credencialRecusada(aguardando401); });
+  window.addEventListener("storage", (e) => {
+    if (e.key !== LS.tk || !e.newValue) return;
+    recusada = ""; aguardando401 = ""; passarChaveSW();
+    if (configAberta || carregamentoPendente) location.reload();
+  });
 
   // ---------- tela de configuração (1x por aparelho) ----------
   function telaConfig(msg) {
+    configAberta = true;
     document.getElementById("app").innerHTML = `<div class="card" style="max-width:560px;margin:24px auto">
       <h2>Banco CBR — configurar este aparelho</h2>
       <p class="mut">Uma vez por aparelho. As chaves ficam só aqui.</p>
@@ -23,22 +56,23 @@
     document.getElementById("cf_ok").onclick = async () => {
       localStorage.setItem(LS.tk, document.getElementById("cf_tk").value.trim());
       localStorage.setItem(LS.gm, document.getElementById("cf_gm").value.trim());
+      localStorage.removeItem("bcbr_auth_aviso");
       await passarChaveSW(); location.reload();
     };
   }
   window.BCBR.config = telaConfig;
 
   async function api(path, opt = {}) {
+    const chave = tok();
     const r = await fetch(API + path, {
       ...opt, cache: "no-store",
-      headers: { Authorization: "Bearer " + tok(), Accept: opt.accept || "application/vnd.github+json", ...(opt.body ? { "Content-Type": "application/json" } : {}) },
+      headers: { Authorization: "Bearer " + chave, Accept: opt.accept === "raw" ? "application/vnd.github.raw" : opt.accept || "application/vnd.github+json", ...(opt.body ? { "Content-Type": "application/json" } : {}) },
     });
-    if (r.status === 401 || r.status === 403 && /credential|token/i.test(await r.clone().text())) throw Object.assign(new Error("chave"), { chave: true });
+    if (r.status === 401) { await credencialRecusada(chave); throw Object.assign(new Error("chave"), { chave: true, status: 401 }); }
     if (!r.ok) throw Object.assign(new Error("GitHub " + r.status), { status: r.status, resp: await r.text().catch(() => "") });
     return opt.accept === "raw" ? r : r.json();
   }
-  const raw = (sha) => fetch(`${API}/repos/${REPO}/git/blobs/${sha}`, { headers: { Authorization: "Bearer " + tok(), Accept: "application/vnd.github.raw" } })
-    .then((r) => { if (!r.ok) throw new Error("GitHub " + r.status); return r.text(); });
+  const raw = (sha) => api(`/repos/${REPO}/git/blobs/${sha}`, { accept: "raw" }).then(r => r.text());
   const b64 = (s) => btoa(unescape(encodeURIComponent(s)));
   Object.assign(window.BCBR, { api, raw, b64 });   // usados pela aba Semana (build/semana.js)
 
@@ -48,6 +82,7 @@
   const kvSet = (k, v) => idb.then((d) => new Promise((ok) => { const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = ok; t.onerror = ok; })).catch(() => {});
 
   async function passarChaveSW() {
+    if (!tok()) return;
     try { const c = await caches.open("bcbr-cfg"); await c.put("./__token", new Response(tok())); } catch (e) {}
   }
 
@@ -58,7 +93,7 @@
       id: u.id, n: u.n, grupo: null, enunciado: limpa(u.enunciado),
       alts: Object.fromEntries(Object.entries(u.alts).map(([k, v]) => [k, limpa(v)])), gab: u.gab || null,
       coment: (u.claude && u.claude.coment) || {}, ponto: (u.claude && u.claude.ponto) || "",
-      tags: u.tags && u.tags.length ? u.tags : (u.cl || []).slice(),
+      tags: Array.isArray(u.tags) ? u.tags : [],
       imgs: (u.imgs || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       imgsCom: (u.imgsCom || []).filter((f) => !f.startsWith("images/")).map((f) => "gh:" + f),
       acerto: u.acerto ?? null, ar: u.ar || undefined, cl: u.cl || [], dif: u.dif || null,
@@ -187,7 +222,7 @@
     if (imgCache.has(nome)) return imgCache.get(nome);
     const p = (async () => {
       try { const c = await caches.open("bcbr-img"); const h = await c.match("./img/" + encodeURIComponent(nome)); if (h) return URL.createObjectURL(await h.blob()); } catch (e) {}
-      const r = await fetch(`${API}/repos/${REPO}/contents/imagens/${encodeURIComponent(nome)}`, { headers: { Authorization: "Bearer " + tok(), Accept: "application/vnd.github.raw" } });
+      const r = await api(`/repos/${REPO}/contents/imagens/${encodeURIComponent(nome)}`, { accept: "raw" });
       if (!r.ok) throw new Error("img " + r.status);
       const b = await r.blob();
       try { const c = await caches.open("bcbr-img"); await c.put("./img/" + encodeURIComponent(nome), new Response(b.slice(0), { headers: { "Content-Type": b.type || "image/jpeg" } })); } catch (e) {}
@@ -264,6 +299,7 @@
 
   // ---------- início ----------
   async function iniciar() {
+    await recuperarChave();
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").then(passarChaveSW).catch(() => {});   // não espera
     if (!tok()) return telaConfig();
     document.getElementById("app").innerHTML = `<div class="card"><p class="mut">Carregando o banco…</p></div>`;
@@ -274,9 +310,13 @@
     if (cache) { abrirApp(); checarDados(); return; }
     try { await carregarDados(); ok = true; }
     catch (e) {
-      if (e.chave) return telaConfig("A chave do GitHub foi recusada. Confira e cole de novo.");
+      if (e.chave) { carregamentoPendente = true; return; }
       ok = await dadosDoCache();   // sem internet: usa o que já está no aparelho
-      if (!ok) return telaConfig("Não consegui baixar o banco (" + e.message + "). Confira a internet e a chave.");
+      if (!ok) {
+        document.getElementById("app").innerHTML = '<div class="card"><p>Não foi possível baixar o banco. Verifique a conexão e tente novamente.</p><button class="b" id="bcbr_tentar">Tentar novamente</button></div>';
+        document.getElementById("bcbr_tentar").onclick = iniciar;
+        return;
+      }
     }
     abrirApp();
   }

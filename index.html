@@ -1,4 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#0f172a"><meta name="apple-mobile-web-app-capable" content="yes"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.versao{font-size:.62rem;font-weight:500;opacity:.6;margin-left:6px;letter-spacing:.02em;vertical-align:middle}
+.pr-tags{display:inline-flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:.78rem}
+.pr-tags .pr-tag{background:transparent;color:var(--mut);border:1px solid var(--bd);font-weight:400;font-size:.75rem}
 .blist{border:1px solid var(--bd);border-radius:12px;overflow:hidden}
 .bq{border-bottom:1px solid var(--bd)}.bq:last-child{border-bottom:0}
 .bq>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:10px 12px}
@@ -466,8 +468,8 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 .sm-atrasadas-lista>div{min-width:0;width:100%}
 .sm-hoje1 .sm-grp,.sm-sd .sm-grp{gap:10px}
 .sm-grp>.sm-lbl{grid-column:1/-1;margin:0}
-.sm-row[data-tid]{display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:6px;margin:0;padding:12px;border:1px solid color-mix(in srgb,var(--sm-cor) 24%,var(--bd));border-radius:16px;background:color-mix(in srgb,var(--sm-pastel) 24%,var(--card));color:var(--tx);box-sizing:border-box;min-width:0;transition:background .18s,border-color .18s}
-.sm-row[data-tid]:hover{background:color-mix(in srgb,var(--sm-pastel) 40%,var(--card));border-color:color-mix(in srgb,var(--sm-cor) 45%,var(--bd))}
+.sm-row[data-tid]{--sm-fundo:color-mix(in srgb,var(--sm-pastel) 24%,var(--card));display:grid;grid-template-columns:minmax(0,1fr) 20px;gap:6px;margin:0;padding:12px;border:1px solid color-mix(in srgb,#5687be 16%,var(--sm-fundo));border-radius:16px;background:var(--sm-fundo);color:var(--tx);box-sizing:border-box;min-width:0;transition:background .18s,border-color .18s}
+.sm-row[data-tid]:hover{background:color-mix(in srgb,var(--sm-pastel) 40%,var(--card));border-color:color-mix(in srgb,#5687be 24%,var(--sm-fundo))}
 .sm-row .sm-it,.sm-hoje1 .sm-it,.sm-sd .sm-it{padding:0;gap:9px}
 .sm-row .sm-texto{cursor:default;font-weight:500;white-space:pre-wrap}
 .sm-row .sm-det,.sm-row .sm-metadados,.sm-row .sm-conteudo,.sm-row>.sm-anexos{grid-column:1/-1;margin:0;padding:0;border:0;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
@@ -487,6 +489,10 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 #qa_subs{display:flex;flex-direction:column;gap:8px;padding-left:12px}
 @media(max-width:519px){.sm-gs{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.sm-row[data-tid],.sm-row .sm-it input[type="checkbox"],.sm-row .sm-it input[type="checkbox"]:after{transition:none}}
+.sm-row .sm-conteudo{margin-left:calc(63px + 1.5em);grid-column:1/-1}
+.sm-row .sm-conteudo .sm-det{padding:0;margin:6px 0;white-space:pre-wrap}
+.sm-tg{font-size:1rem;padding:0;line-height:24px}
+.sm-subtema{font-size:.85rem;color:var(--pri-tx)}
 @media(max-width:700px){
  .sm-extras{grid-template-columns:repeat(2,minmax(0,1fr))}
  .sm-ed{top:3vh;max-height:94vh}
@@ -503,6 +509,17 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 body.ly-on{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .card.ly-drag{position:relative;z-index:25;transform-origin:center;box-shadow:0 14px 34px rgba(0,0,0,.35);opacity:.96;pointer-events:none;transition:box-shadow .15s;outline:2px solid var(--band)}
 .ly-mk{position:fixed;z-index:26;background:var(--band);border-radius:4px;pointer-events:none;box-shadow:0 0 0 2px var(--bg)}
+.nt{display:flex;flex-direction:column;gap:16px;max-width:1200px;margin:auto}
+.nt-criar,.nt-nota{display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid color-mix(in srgb,#5687be 16%,var(--card));border-radius:16px;background:color-mix(in srgb,#dceafa 22%,var(--card));min-width:0}
+.nt input,.nt textarea{width:100%;box-sizing:border-box;font:inherit;color:var(--tx);min-width:0}
+.nt textarea{resize:vertical;white-space:pre-wrap;line-height:1.5}
+.nt-criar .b{align-self:flex-end}
+.nt-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;align-items:start}
+.nt-nota:nth-child(3n+2){background:color-mix(in srgb,#e9dff6 20%,var(--card))}
+.nt-nota:nth-child(3n){background:color-mix(in srgb,#ddefe4 20%,var(--card))}
+.nt-nota .row{justify-content:space-between}
+.nt-nota input{font-weight:600}
+@media(max-width:600px){.nt-criar,.nt-nota{padding:12px}.nt textarea{font-size:16px}}
 </style></head><body>
 <title>Banco CBR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -726,12 +743,12 @@ kbd{background:rgba(255,255,255,.2);border-radius:5px;padding:0 6px;font:600 .72
 .marcos{display:flex;flex-wrap:wrap;gap:8px}.marco{font:600 .82rem var(--fb);border:1px dashed var(--bd);border-radius:99px;padding:5px 12px;color:var(--mut)}.marco.on{border:1px solid color-mix(in srgb,var(--warn) 60%,var(--bd));color:var(--tx);background:color-mix(in srgb,var(--warn) 14%,var(--card))}.marco.on{}
 .pnw{border:1px dashed color-mix(in srgb,var(--pri) 45%,var(--bd));border-radius:16px;padding:8px;margin-bottom:14px}.pnw .card{margin-bottom:0}.pnbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 6px 8px}.pnbar span{display:flex;gap:6px}.pnbar button{padding:5px 12px;font-size:.82rem}.pnc{pointer-events:none;opacity:.85;max-height:150px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 </style>
-<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.27.0</small></div>
+<header><div class="hb"><div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 13l3-4 3 5 2-3 2 2"/></svg>Banco CBR<small class="versao">v1.28.0</small></div>
 <div class="hr"><span id="sync" class="local"><i></i><span>Só neste aparelho</span></span><button class="tg" id="tg" onclick="ciclaTema()"></button></div></div>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <div id="toast"></div>
 <div id="zoom" hidden><div id="zbar"><button onclick="zStep(-1)" aria-label="Imagem anterior">‹</button><span id="zinfo"></span><button onclick="zStep(1)" aria-label="Próxima imagem">›</button><button onclick="zScale(1/1.4)" aria-label="Diminuir">−</button><button onclick="zScale(1.4)" aria-label="Aumentar">+</button><button onclick="zFit()">Ajustar</button><button onclick="zClose()">Fechar</button></div><div id="zst"><img id="zimg" alt="" draggable="false"></div></div>
 
-<script>window.BCBR_VERSAO="1.27.0"</script><script src="shim.js?v=1.27.0"></script>
+<script>window.BCBR_VERSAO="1.28.0"</script><script src="shim.js?v=1.28.0"></script>
 </body></html>
