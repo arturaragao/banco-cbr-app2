@@ -400,3 +400,15 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
  .sm-extras{grid-template-columns:repeat(2,minmax(0,1fr))}
  .sm-ed{top:3vh;max-height:94vh}
 }
+/* 1.29.0 — aba Tarefas: tarefas em 2 colunas, células compactas, editor com ações no topo */
+.sm-tarefas .sm-gs{grid-template-columns:minmax(0,1fr);row-gap:10px}
+.sm-tarefas .sm-grp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px;align-items:start}
+.sm-tarefas .sm-row[data-tid]{--sm-fundo:color-mix(in srgb,var(--sm-pastel) 9%,var(--card));padding:6px 8px;border-radius:10px;gap:4px}
+.sm-tarefas .sm-row[data-tid]:hover{background:color-mix(in srgb,var(--sm-pastel) 18%,var(--card))}
+.sm-tarefas .sm-row .sm-it{gap:4px}
+.sm-tarefas .sm-tg{width:18px;height:22px;line-height:22px}
+.sm-tarefas .sm-row .sm-det{padding-left:24px}
+.sm-tarefas .sm-row .sm-conteudo{margin-left:46px}
+.sm-row.smd-linha{box-shadow:inset 0 3px 0 var(--pri)}
+.sm-ed-topo{flex-wrap:wrap;gap:6px}.sm-ed-topo h3{margin:0}
+@media(max-width:600px){.sm-tarefas .sm-grp{grid-template-columns:minmax(0,1fr)}}

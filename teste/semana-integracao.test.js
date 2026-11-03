@@ -70,7 +70,7 @@ test('clique no dia muda célula e lista do teclado; dia vazio não cria célula
   a.c.smDiaClique('2026-10-27');assert.equal(vm.runInContext('SM.sel',a.c),'2026-10-27');assert.equal(vm.runInContext('QA.on',a.c),false);
   assert.match(a.c.smHojeGrande(),/data-drop="2026-10-27"/);assert.match(a.c.smHojeGrande(),/Amanhã/);assert.equal(vm.runInContext('smkLista()[0].id',a.c),'outro');
   a.c.smDiaClique('2026-10-28');assert.equal(a.c.smHojeGrande(),'');
-  const grade=a.c.smCalendario();assert.match(grade,/onclick="smDiaClique\('/);assert.match(grade,/ondblclick="qaAbreDia\('/);
+  const grade=a.c.smCalendario();assert.match(grade,/onclick="smDiaClique\('/);assert.match(grade,/ondblclick="smSel\('/);   // 1.29.0: duplo clique abre o painel do dia; "+ tarefa" no painel chama qaAbreDia
   a.c.qaAbreDia('2026-10-29');assert.equal(vm.runInContext('QA.on',a.c),true);assert.equal(vm.runInContext('QA.quando',a.c),'2026-10-29');assert.equal(vm.runInContext('qaModoQuando()',a.c),'data');
 });
 

@@ -1,4 +1,4 @@
-// Banco CBR app 1.28.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.29.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -552,15 +552,14 @@ function smEditor(t){
   const rd=smRascEd(t.id)||{};
   const g=smGrupo(t),lig=g.length>1,todos=!lig||SM.ed.esc==='todos',prox=t.dia==='proxima'||t.dia==='sem',sem=smSemana(prox?smHoje():t.dia),outras=g.filter(x=>!sem.includes(x.dia)).length;
   return `<div class="sm-ed" role="dialog" aria-modal="true" aria-label="Editar tarefa">
-   <div class="row"><h3>Editar tarefa</h3><select id="sm_ed_area" aria-label="Tipo" onchange="smRascEdSalva('${t.id}')">${smOpcoes(rd.area??(t.sub?(t.area||'estudo')+'|'+t.sub:(t.area||'estudo')))}</select></div>
+   <div class="row sm-ed-topo"><h3>Editar tarefa</h3><select id="sm_ed_area" aria-label="Tipo" onchange="smRascEdSalva('${t.id}')">${smOpcoes(rd.area??(t.sub?(t.area||'estudo')+'|'+t.sub:(t.area||'estudo')))}</select><span style="flex:1"></span>${SM.ed.conf?`<span class="sm-conf">${SM.ed.conf==='todos'?`Excluir dos ${g.length} dias?`:'Excluir este item?'}</span><button class="b s sm-ghost" onclick="smEdConf(false)">Não</button><button class="b s sm-del" onclick="smExcluir()">Excluir</button>`:`<button class="b s sm-danger" onclick="smEdConf('este')">${lig?'Excluir só deste dia':'Excluir'}</button>${lig?`<button class="b s sm-danger" onclick="smEdConf('todos')">De todos</button>`:''}<button class="b s sm-ghost" onclick="smEdFecha()" title="Esc ou clique fora">Cancelar</button><button class="b s" onclick="smSalvar()" title="Ctrl+Enter">Salvar</button>`}</div>
    ${smRichCampo('sm_ed_txt','Texto',rd.texto??t.texto,rd.textoHtml??t.textoHtml,t.id)}
    ${smRichCampo('sm_ed_det','Detalhes',rd.det??t.det??'',rd.det!=null?rd.detHtml:t.detHtml,t.id)}
-   ${smExtrasHtml(t,rd)}
    ${!lig||SM.ed.esc==='este'?`<div class="row"><span class="sm-lbl">Data</span><input type="date" id="sm_ed_dia" class="sm-date" value="${rd.dia!=null?rd.dia:/^\d{4}-/.test(t.dia)?t.dia:''}" aria-label="Data" onchange="smRascEdSalva('${t.id}');render()"><button type="button" class="sm-tagb" onclick="document.getElementById('sm_ed_dia').value='';smRascEdSalva('${t.id}');render()">sem data</button>${t.dia==='proxima'?'<span class="mut">(hoje: sem dia, semana nova)</span>':''}</div>`:''}
+   ${smExtrasHtml(t,rd)}
    ${lig?`<div class="row"><span class="sm-lbl">Aplicar em</span><div class="sm-seg"><button type="button" aria-pressed="${SM.ed.esc==='este'}" onclick="smEdEsc('este')">Só neste dia</button><button type="button" aria-pressed="${SM.ed.esc==='todos'}" onclick="smEdEsc('todos')">Todos os ${g.length} dias</button></div></div>`:''}
    ${todos&&!prox?`<span class="sm-lbl">Dias desta semana${outras?` <span class="mut">(+${outras} em outras semanas, ficam como estão)</span>`:''}</span>${smChips(SM.ed.dias,x=>`smEdChip('${x}')`,sem)}`:''}
-   ${SM.ed.conf?`<div class="row"><span class="sm-conf">${SM.ed.conf==='todos'?`Excluir dos ${g.length} dias?`:'Excluir este item?'}</span><span style="flex:1"></span><button class="b s sm-ghost" onclick="smEdConf(false)">Não</button><button class="b s sm-del" onclick="smExcluir()">Excluir</button></div>`
-   :`<div class="row"><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button><button class="b s sm-danger" onclick="smEdConf('este')">${lig?'Excluir só deste dia':'Excluir'}</button>${lig?`<button class="b s sm-danger" onclick="smEdConf('todos')">De todos</button>`:''}<span style="flex:1"></span><button class="b s sm-ghost" onclick="smEdFecha()">Cancelar</button><button class="b s" onclick="smSalvar()">Salvar</button></div>`}
+   <div class="row"><button class="b s sm-ghost" onclick="smAdiar('${t.id}')">Passar para o próximo dia de estudo</button></div>
   </div>`;
 }
 // texto/det são texto puro (inclusive tags literais); textoHtml/detHtml guardam só HTML sanitizado.
@@ -623,7 +622,7 @@ function smSemData(){
 }
 function smPainelDia(iso){
   const x=smDia(iso),its=smItensDe(iso),q=smQ(iso),m=smMetaDe(iso);
-  return `<div class="sm-pan" data-drop="${iso}"><div class="row" style="justify-content:space-between"><b>${smRotL(iso)}</b><span class="mut">${q.n} questões${m?` · meta ${m}`:''}</span><button class="sm-edb" onclick="smSel(null)" aria-label="Fechar">×</button></div>
+  return `<div class="sm-pan" data-drop="${iso}"><div class="row" style="justify-content:space-between"><b>${smRotL(iso)}</b><span class="mut">${q.n} questões${m?` · meta ${m}`:''}</span><button class="b s sm-ghost" onclick="qaAbreDia('${iso}')">+ tarefa</button><button class="sm-edb" onclick="smSel(null)" aria-label="Fechar">×</button></div>
    <div class="row"><input placeholder="Agenda do dia (ex.: Plantão Ecomax 18–0h)" value="${esc(x.agenda||'')}" onchange="smAgenda('${iso}',this.value)" style="flex:1 1 220px;min-width:0" aria-label="Agenda do dia">${smTipoSeg(iso)}</div>
    <div class="row sm-campos"><input placeholder="Tema do dia (ex.: RM Joelho)" value="${esc(x.tema||'')}" onchange="smCampo('${iso}','tema',this.value)" aria-label="Tema do dia"><input placeholder="Foco específico (ex.: USG tireoide TI-RADS)" value="${esc(x.foco||'')}" onchange="smCampo('${iso}','foco',this.value)" aria-label="Foco do dia"><input placeholder="Feriado" value="${esc(smFeriado(iso))}" onchange="smCampo('${iso}','feriado',this.value)" aria-label="Feriado"></div>
    <div class="row"><span class="sm-lbl">Noite</span><div class="sm-seg">${[['BR','BR plantão'],['HSI','HSI sobreaviso'],['','Nada']].map(([k,n])=>`<button type="button" aria-pressed="${smNoite(iso)===k}" onclick="smCampo('${iso}','noite','${k}')">${n}</button>`).join('')}</div>${x.noite!=null?`<button class="sm-tagb" onclick="smCampo('${iso}','noite','auto')" title="Volta a seguir a agenda">pela agenda</button>`:''}</div>
@@ -703,7 +702,7 @@ function smCalendario(){
   const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smDom(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smDom(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
   const corpo=SM.vis==='lista'?smLista(mes,smDom(hj),smMais(smDom(hj),6),p,r):smGrade(mes,ini,fim,p,r,sem);
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${corpo}
-   <p class="mut sm-dica">Clique para selecionar um dia · veja os itens na aba Tarefas · duplo clique para adicionar · toque no estágio ao lado do mês para mudar.</p></div>`;
+   <p class="mut sm-dica">Clique para selecionar um dia · veja os itens na aba Tarefas · duplo clique abre o dia (eventos, plantão, sobreaviso) · toque no estágio ao lado do mês para mudar.</p></div>`;
 }
 function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.calCursor=dia;QA.calAberto=true;QA.diasAberto=false;QA.quandoManual=true;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
@@ -711,9 +710,9 @@ function smGrade(mes,ini,fim,p,r,sem=false){
   for(let s=ini;s<=fim;s=smMais(s,7)){
     const ds=smSemana(s);
     h+=`<div class="sm-lin">${ds.map(x=>{
-      if(!sem&&x.slice(0,7)!==mes)return `<button class="sm-cel fora" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="qaAbreDia('${x}')"><span class="top"><span class="n">${smDt(x).getDate()}</span></span></button>`;
+      if(!sem&&x.slice(0,7)!==mes)return `<button class="sm-cel fora" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="smSel('${x}')"><span class="top"><span class="n">${smDt(x).getDate()}</span></span></button>`;
       const t=smTipo(x),di=smDia(x),fe=smFeriado(x),rs=smAgResto(di.agenda);
-      return `<button lang="pt-BR" class="sm-cel ${x===hj?'hoje':''} ${t!=='estudo'?'off':''} ${SM.sel===x?'sel':''} ${fe?'fer':''} ${r&&x>=r&&p&&x<p?'rf':''}" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="qaAbreDia('${x}')" title="${esc(di.agenda||'')}">
+      return `<button lang="pt-BR" class="sm-cel ${x===hj?'hoje':''} ${t!=='estudo'?'off':''} ${SM.sel===x?'sel':''} ${fe?'fer':''} ${r&&x>=r&&p&&x<p?'rf':''}" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="smSel('${x}')" title="${esc(di.agenda||'')}">
         <span class="top"><span class="n">${smDt(x).getDate()}</span>${smNt(smNoite(x))}${x===p?'<span class="sm-pv2">PROVA</span>':''}</span>
         ${smEvs(x)}${fe?`<span class="sm-fe">${esc(fe)}</span>`:''}${di.tema?`<span class="sm-tm">${esc(di.tema)}</span>`:''}${di.foco?`<span class="sm-fo">+ ${esc(di.foco)}</span>`:''}${rs?`<span class="sm-rs">${esc(rs)}</span>`:''}
         <span class="sm-bt">${smSelo(x)}${smDots(x)}</span></button>`}).join('')}</div>`;
@@ -729,7 +728,7 @@ function smLista(mes,ini,fim,p,r){
     smSemana(s).forEach(x=>{
       const t=smTipo(x),di=smDia(x),fe=smFeriado(x),rs=smAgResto(di.agenda),dw=smDt(x).getDay();
       const vazio=!di.tema&&!fe?(t==='sobreaviso'?'<span class="mut">sobreaviso · sem estudo</span>':t==='descanso'?'<span class="mut">descanso</span>':''):'';
-      h+=`<button class="sm-li ${x===hj?'hoje':''} ${t!=='estudo'?'off':''} ${SM.sel===x?'sel':''} ${r&&x>=r&&p&&x<p?'rf':''}" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="qaAbreDia('${x}')">
+      h+=`<button class="sm-li ${x===hj?'hoje':''} ${t!=='estudo'?'off':''} ${SM.sel===x?'sel':''} ${r&&x>=r&&p&&x<p?'rf':''}" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="smSel('${x}')">
         <span class="ld"><b class="${fe?'fer':''}">${smDt(x).getDate()}</b><small>${smDOW[dw]}</small></span>
         <span class="lc"><span class="lt">${smNt(smNoite(x))}${x===p?'<span class="sm-pv2">PROVA</span>':''}${fe?`<span class="sm-fe">${esc(fe)}</span>`:''}${smEvs(x)}${di.tema?`<span class="sm-tm">${esc(di.tema)}</span>`:''}${vazio}</span>
         ${di.foco?`<span class="sm-fo">+ ${esc(di.foco)}</span>`:''}${rs?`<span class="sm-rs">${esc(rs)}</span>`:''}
@@ -756,7 +755,7 @@ function vTarefas(){
   if(!SM.d)return `<div class="card"><p class="mut">Calendário ainda vazio.</p></div>`;
   setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=tarefasAtrasadas(SM.d.tarefas,hj);
   const outros=[...new Set(SM.d.tarefas.map(t=>t.dia))].filter(d=>dataTarefaValida(d)&&d>hj).sort();
-  return `<div class="sm" aria-label="Tarefas"><div class="row"><h2>Tarefas</h2><button class="b s sm-ghost" onclick="smSem('${smDom(hj)}')">Planejar semana</button><button class="b s sm-ghost" onclick="SM.plan=!SM.plan;SM.conf=null;render()">Planejar mês</button></div>
+  return `<div class="sm sm-tarefas" aria-label="Tarefas"><div class="row"><h2>Tarefas</h2><button class="b s sm-ghost" onclick="smSem('${smDom(hj)}')">Planejar semana</button><button class="b s sm-ghost" onclick="SM.plan=!SM.plan;SM.conf=null;render()">Planejar mês</button></div>
    ${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}
    ${SM.plan?smPainelMes():''}${SM.sem?smPainelSemana(SM.sem):''}
    ${atr.length?`<div class="card sm-atrasadas"><div class="row"><span class="kick">Atrasadas · ${atr.length}</span><button class="b s sm-ghost" onclick="smRola()">Passar tudo para hoje</button></div><div class="sm-atrasadas-lista">${atr.map(t=>`<div><small>${smRotL(t.dia)}</small>${smItem(t)}</div>`).join('')}</div></div>`:''}
@@ -1131,11 +1130,13 @@ function smdFim(cancela){
   const d=SMD;if(!d)return;clearTimeout(d.timer);clearInterval(d.auto);SMD=null;
   document.body.classList.remove('smd-on');document.querySelectorAll('.smd-alvo').forEach(e=>e.classList.remove('smd-alvo'));
   if(!d.ativo)return;d.g&&d.g.remove();smdEngole=1;setTimeout(()=>{smdEngole=0},80);
-  if(!cancela){const z=smdAlvo(d.cx,d.cy);if(z)smMover(d.id,z.dataset.drop);if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}}
+  document.querySelectorAll('.smd-linha').forEach(e=>e.classList.remove('smd-linha'));
+  if(!cancela){const z=smdAlvo(d.cx,d.cy),tr=smdLinha(d);if(tr)smReordena(d.id,tr);else if(z)smMover(d.id,z.dataset.drop);if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}}
 }
 function smdPos(){
   const d=SMD;if(!d||!d.ativo)return;d.g.style.transform=`translate(${d.cx-d.dx}px,${d.cy-d.dy}px)`;
   const z=smdAlvo(d.cx,d.cy);if(z!==d.z){d.z&&d.z.classList.remove('smd-alvo');z&&z.classList.add('smd-alvo');d.z=z}
+  const tr=smdLinha(d);document.querySelectorAll('.smd-linha').forEach(e=>{if(e.dataset.tid!==tr)e.classList.remove('smd-linha')});if(tr)document.querySelectorAll(`#app .sm-row[data-tid="${tr}"]`).forEach(e=>e.classList.add('smd-linha'));
 }
 function smdComeca(){
   const d=SMD;if(!d)return;const r=document.querySelector(`.sm-row[data-tid="${d.id}"]`)||d.r,b=r.getBoundingClientRect();d.ativo=true;
@@ -1163,6 +1164,28 @@ document.addEventListener('touchmove',e=>{if(SMD&&SMD.ativo)e.preventDefault()},
 document.addEventListener('selectstart',e=>{if(SMD&&(!e.target.isContentEditable||SMD.ativo))e.preventDefault()});
 document.addEventListener('contextmenu',e=>{if(SMD)e.preventDefault()});
 document.addEventListener('click',e=>{if(smdEngole){smdEngole=0;e.stopPropagation();e.preventDefault()}},true);
+
+// ===== ORDEM DAS TAREFAS (pedido do Artur, 03/11/2026) =====
+// Alt+↑/↓ na tarefa selecionada, ou arrastar sobre outra tarefa do mesmo dia. A prioridade continua vindo antes da ordem.
+function smdLinha(d){const el=document.elementFromPoint(d.cx,d.cy),r=el&&el.closest&&el.closest('.sm-row[data-tid]');if(!r||r.dataset.tid===d.id)return null;const a=smTar(d.id),b=smTar(r.dataset.tid);return a&&b&&a.dia===b.dia?b.id:null}
+function smReordena(id,ref,k){
+  const t=smTar(id);if(!t)return false;const l=smItensDe(t.dia),i=l.findIndex(x=>x.id===id),j=ref?l.findIndex(x=>x.id===ref):i+k;
+  if(i<0||j<0||j>=l.length||i===j)return false;
+  const nova=l.filter(x=>x.id!==id);nova.splice(j,0,t);const ordem=new Map(nova.map((x,n)=>[x.id,(n+1)*10])),dia=t.dia;
+  smMudar(d=>{d.tarefas.forEach(x=>{if(x.dia===dia&&ordem.has(x.id))x.ordem=ordem.get(x.id)})},'reordenou item');return true;
+}
+window.addEventListener('keydown',e=>{
+  if(tela!=='tarefas'||!SMK.on||SM.ed||!e.altKey||e.ctrlKey||e.metaKey||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
+  if(typeof QA!=='undefined'&&QA.on)return;const t=e.target;if(t&&(/INPUT|SELECT|TEXTAREA/.test(t.tagName)||t.isContentEditable))return;
+  const x=SMK.id?smTar(SMK.id):smkLista()[SMK.i];if(!x)return;e.preventDefault();e.stopImmediatePropagation();
+  if(smReordena(x.id,null,e.key==='ArrowDown'?1:-1))setTimeout(()=>smkSeleciona(x.id),0);
+},true);
+// Editor de tarefa: clique fora cancela, Ctrl+Enter salva (pedido do Artur, 03/11/2026)
+let smEdEngole=false;
+document.addEventListener('pointerdown',e=>{const ed=document.querySelector('.sm-ed');if(!SM.ed||!ed||ed.contains(e.target))return;
+  e.preventDefault();e.stopPropagation();smEdEngole=true;setTimeout(()=>{smEdEngole=false},600);smEdFecha()},true);
+document.addEventListener('click',e=>{if(smEdEngole){smEdEngole=false;e.preventDefault();e.stopPropagation()}},true);
+document.addEventListener('keydown',e=>{if(SM.ed&&document.querySelector('.sm-ed')&&e.ctrlKey&&!e.altKey&&e.key==='Enter'){e.preventDefault();e.stopPropagation();smSalvar()}},true);
 
 // Atalhos do ícone (?acao=tarefa | voz | ri). Nova tarefa abre NA HORA (usa o calendário guardado no aparelho; não espera o GitHub
 // nem as questões); se o calendário nunca foi carregado, o texto fica de rascunho e grava quando chegar. RI do dia espera os dados.
@@ -1272,7 +1295,7 @@ function smExtrasLer(){
   const valor=id=>document.getElementById(id)?.value||'',tipo=valor('sm_ed_rep'),dia=document.getElementById('sm_ed_dia'),temData=dia?dataTarefaValida(dia.value):smEdTemData(smTar(SM.ed?.id));
   return {prioridade:valor('sm_ed_prioridade')||null,hora:temData?(valor('sm_ed_hora')||null):null,lembrete:valor('sm_ed_lembrete')===''?null:+valor('sm_ed_lembrete'),
     repetir:tipo?{tipo,...(tipo==='semanal'?{dias:[...document.querySelectorAll('[name="sm_rep_dia"]:checked')].map(e=>+e.value)}:{})}:null,
-    etiquetas:[...new Set(valor('sm_ed_etiquetas').split(/[\s,]+/).map(s=>s.replace(/^#/, '').trim()).filter(Boolean))]};
+    ...(document.getElementById('sm_ed_etiquetas')?{etiquetas:[...new Set(valor('sm_ed_etiquetas').split(/[\s,]+/).map(s=>s.replace(/^#/, '').trim()).filter(Boolean))]}:{})};   // sem campo Etiquetas no editor (1.29.0): mantém as que já existem
 }
 function smExtrasHtml(t,rd){
   const x={...t,...rd},rep=x.repetir||{},dias=rep.dias||[smDt(dataTarefaValida(t.dia)?t.dia:smHoje()).getDay()];
@@ -1282,7 +1305,6 @@ function smExtrasHtml(t,rd){
     <label>Lembrete<select id="sm_ed_lembrete" onchange="${muda}">${[['','Nenhum'],['0','Na hora'],['15','15 min antes'],['60','1 h antes']].map(([v,n])=>`<option value="${v}" ${v===String(x.lembrete??'')?'selected':''}>${n}</option>`).join('')}</select></label>
     <label>Repetir<select id="sm_ed_rep" onchange="${muda};render()">${[['','Não repetir'],['diaria','Todo dia'],['uteis','Dias úteis'],['semanal','Toda semana'],['mensal','Todo mês']].map(([v,n])=>`<option value="${v}" ${v===(rep.tipo||'')?'selected':''}>${n}</option>`).join('')}</select></label></div>
     <div class="sm-rep-dias" ${rep.tipo==='semanal'?'':'hidden'}>${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" name="sm_rep_dia" value="${d}" ${dias.includes(d)?'checked':''} onchange="${muda}">${smDOW[d]}</label>`).join('')}</div>
-    <label>Etiquetas<input id="sm_ed_etiquetas" value="${esc((x.etiquetas||[]).join(' '))}" placeholder="#pacs" oninput="${muda}"></label>
     ${smSubHtml(t)}${smAnexosHtml(t)}<label>Anexar foto ou arquivo (até 3 MB)<input type="file" aria-label="Anexar foto ou arquivo" onchange="smAnexa('${t.id}',this)"></label>`;
 }
 function smSubHtml(t){
