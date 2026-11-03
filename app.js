@@ -1,4 +1,4 @@
-// Banco CBR app 1.31.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.31.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1483,7 +1483,18 @@ window.addEventListener('online',()=>{ntSync().then(()=>smPuxar())});
 window.addEventListener('storage',e=>{if(e.key?.startsWith(NT_PREFIX)){if(SM.d)ntAplica(SM.d,ntPendentes());smRender()}});
 
 
-// Metadados PersonalRad: nunca entram nas tags/classificação ou na interface do app.
+// Tags PersonalRad: bloco separado após responder; nunca entram na classificação ou nas contagens.
+function prTagsBloco(q){
+  const tags=[],vistos=new Set();
+  function visitar(v){
+    if(typeof v==='string'){
+      const t=v.trim(),k=prNorm(t);
+      if(k&&!vistos.has(k)){vistos.add(k);tags.push(t)}
+    }else if(v&&typeof v==='object')Object.values(v).forEach(visitar);
+  }
+  visitar(q.pr_tags);
+  return tags.length?`<div class="pr-tags"><span class="mut">PersonalRad:</span> ${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(' ')}</div>`:'';
+}
 function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
 function prStats(q){
   const s={...(q.pr_stats||{})},texto=prLinhas(q).join('\n');
@@ -2431,14 +2442,14 @@ function vQuiz(){
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
   <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?qDificuldade(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
-  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${q.tags.length&&fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
+  ${fb?`${q.tags.length||q.cl?.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação do banco/Codex: ${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}</div>${q.tags.length?`<div class="tagstop">${tgHtml('q')}</div>`:''}`:''}${prTagsBloco(q)}`:''}
   ${qEnunciado(q,imgs)}${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
   ${fb?`<div style="margin-top:10px"><b style="color:var(--${r.ok?'ok':'bad'})">${r.ok?'Acertou':'Errou · gabarito '+q.gab}</b> <span class="mut">(${r.conf})</span>
    ${bannerResp(q,r)}${blocoFeedback(q,r,`${cursoBloco(q)}${claudeMdBloco(q)}${pontoBloco(q)}${iaBloco(q)}`)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
-  </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
+  </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${fb?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
 
   <button class="b s" onclick="qEdita('${q.id}')">✎ Editar questão</button></div></div>${painelNav()}</div>`;
 }

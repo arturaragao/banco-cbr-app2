@@ -254,7 +254,7 @@ for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com
     let sess={i:0,ids:['q1'],resp:{},cut:{},nvOpen:true};
     q.alts={A:'Certa',B:'Errada marcada',C:'Outra errada'};q.gab='A';q.cl=['Tema Claude'];q.coment={};
     q.pr_stats.alternativas={A:{percentual:60},B:{percentual:30},C:{percentual:10}};
-    q.tags=['Claude'];q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['NÃO EXIBIR']};`);
+    q.tags=['Claude'];q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['Tema PR'],subtheme:['Subtema PR'],specific:['Específico PR']};`);
   executar(c,trecho(script,'function tituloQ(q','const TES='));
   executar(c,trecho(script,'function nvBloco(){','const DIFV='));
   executar(c,`const QID={q1:q};DIF.d.nome='Difícil';`);
@@ -264,8 +264,8 @@ for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com
   }
   executar(c,trecho(script,'function vQuiz(){','function reclass('));
   const antes=executar(c,'vQuiz()');
-  assert.doesNotMatch(antes,/Classificação:|Tema Claude/);
-  assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|NÃO EXIBIR|Tags Claude|por dificuldade|Difícil/);
+  assert.doesNotMatch(antes,/Classificação|Tema Claude|Neuro|PersonalRad|Tema PR|Subtema PR|Específico PR|q_area/);
+  assert.doesNotMatch(antes,/class="dif |acerto dos alunos|possível erro na questão|pr-percentual|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.sel='B'`);
   assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
@@ -273,27 +273,31 @@ for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com
   assert.match(depois,/class="dif d"/);
   assert.match(depois,nome==='app gerado'?/class="dif d"/:/acerto dos alunos 20%/);
   assert.match(depois,/possível erro na questão/);
-  assert.match(depois,/Classificação: Neuro › Tema Claude/);
+  assert.match(depois,/Classificação do banco\/Codex: Neuro › Tema Claude/);
+  assert.match(depois,/PersonalRad:<\/span>/);
+  for(const texto of ['Tema PR','Subtema PR','Específico PR'])assert.ok(depois.includes(texto),texto);
   for(const texto of ['Tags Claude','Tema Claude','Neuro','por dificuldade','Difícil'])assert.ok(depois.includes(texto),texto);
   assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
   assert.match(depois,/class="alt bad [^"]*"[^]*?Errada marcada[^]*?30%/);
   assert.match(depois,/class="alt  [^"]*"[^]*?Outra errada[^]*?10%/);
-  assert.doesNotMatch(depois,/NÃO EXIBIR/);
   executar(c,'sess.sim=true');
-  assert.doesNotMatch(executar(c,'vQuiz()'),/class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
+  assert.doesNotMatch(executar(c,'vQuiz()'),/Classificação|PersonalRad|Tema PR|Neuro|class="dif |acerto dos alunos|pr-percentual|Tags Claude|por dificuldade|Difícil/);
   executar(c,`sess.resp={};sess.sim=false;q.tags=[];q.pr_tags={specialty:['Radiologia'],session:['Mama','mama'],tag:['PR']}`);
   const antesSemTags=executar(c,'vQuiz()');
   for(const valor of ['Radiologia','Mama','PR'])assert.doesNotMatch(antesSemTags,new RegExp(valor));
   executar(c,`sess.resp.q1={esc:'B',ok:false,conf:'certeza'}`);
   const depoisSemTags=executar(c,'vQuiz()');
-  for(const valor of ['Radiologia','Mama','PR'])assert.doesNotMatch(depoisSemTags,new RegExp(valor));
+  for(const valor of ['Radiologia','Mama','PR'])assert.match(depoisSemTags,new RegExp(valor));
+  assert.match(depoisSemTags,/Classificação do banco\/Codex: Neuro › Tema Claude/);
+  executar(c,'q.cl=[]');
+  assert.doesNotMatch(executar(c,'vQuiz()'),/Classificação do banco\/Codex/);
   executar(c,'sess.sim=true');
   const simulado=executar(c,'vQuiz()');
   for(const valor of ['Radiologia','Mama','PR'])assert.doesNotMatch(simulado,new RegExp(valor));
   assert.doesNotMatch(simulado,/class="dif |acerto dos alunos|pr-percentual|gabarito|alt ok/);
 });
 
-test('pr_tags é preservado nos dados, mas não no HTML; ponte preserva tags vazias e cl',()=>{
+test('pr_tags preserva todos os níveis, escapa HTML e não altera tags/cl na ponte',()=>{
   const c=contexto();
   executar(c,trecho(fonte,'const esc=','// ===== texto formatado'));
   executar(c,trecho(shim,'const limpa =','// fundo=true:'));
@@ -304,6 +308,46 @@ test('pr_tags é preservado nos dados, mas não no HTML; ponte preserva tags vaz
   assert.equal(executar(c,'q.cl[0]'),'Tema existente');
   assert.equal(executar(c,'JSON.stringify(q.pr_tags)'),JSON.stringify(c.entrada[0].pr_tags));
   assert.match(executar(c,'JSON.stringify(q)'),/Radiologia|Mama|PR/);
+  const html=executar(c,'prTagsBloco(q)');
+  assert.match(html,/PersonalRad:/);
+  assert.match(html,/Radiologia/);assert.match(html,/Mama/);
+  assert.match(html,/&lt;b&gt;PR&lt;\/b&gt;/);assert.doesNotMatch(html,/<b>PR<\/b>/);
+  assert.equal((html.match(/class="tag"/g)||[]).length,3);
+  executar(c,"q.pr_tags={theme:{subtheme:{specific:['Profundo']}}}");
+  assert.match(executar(c,'prTagsBloco(q)'),/Profundo/);
+  executar(c,'q.pr_tags={}');assert.equal(executar(c,'prTagsBloco(q)'),'');
+});
+
+test('painel, contagens, incidência e pesos RI ignoram pr_tags inclusive sem tags/cl',()=>{
+  const c=vm.createContext({window:{},console});
+  executar(c,`const norm=s=>String(s).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase(),esc=String;
+    let over={},cfg={nomes:{}},Q=[],log=[];const QID={},DAY=86400000;
+    const pct=(a,b)=>b?Math.round(a/b*100):0,barra=()=>'',modoProva=()=>false;`);
+  executar(c,trecho(gerado,'// ===== áreas do edital','// ===== dificuldade'));
+  executar(c,trecho(fonte,'const DIF=','let metoU='));
+  executar(c,pr);
+  executar(c,trecho(gerado,'function statsPor(','const acertoSuav='));
+  executar(c,trecho(gerado,'function temas(){','function questoesTemaOrig('));
+  executar(c,trecho(gerado,'function vSub(id){','function evolucao(){'));
+  executar(c,trecho(banco,'let _pv=null','function pacoteVolume('));
+  executar(c,`Q=[{id:'a',ar:'neuro',tags:['CodexTag'],cl:['CodexTema','CodexSub','CodexEspecífico'],gab:'A',_d:'m'},
+    {id:'b',ar:'tor',tags:[],cl:[],gab:'A',_d:'m'}];
+    Q.forEach(q=>{q._a=areaDe(q);classTags(q);QID[q.id]=q});log=[{q:'a',ok:false,t:1}];
+    globalThis.TAXONOMIA_PR={termos:[{type:'theme',nome:'Tema PR',questoes:1e9}]};
+    Date.now=()=>1800000000000;
+    function retrato(){return JSON.stringify({stats:statsPor(q=>q._a),temas:temas().map(t=>({...t,qs:t.qs.map(q=>q.id)})),
+      painel:vSub('neuro')+vSub('tor'),incidencia:vIncidencia(),
+      contagens:_pvBase(),pesos:Q.map(pesoVolume),chaves:Q.map(q=>[_pvBase().kT(q),_pvBase().kS(q)])})}`);
+  const antes=executar(c,'retrato()');
+  assert.match(antes,/CodexTema/);assert.match(antes,/CodexSub/);
+  assert.equal(executar(c,'_pvBase().iA.m.neuro'),1);
+  assert.equal(executar(c,'_pvBase().iA.m.tor'),1);
+  assert.equal(executar(c,'_pvBase().iT.m["neuro|CodexTema"]'),1);
+  assert.equal(executar(c,'_pvBase().kT(Q[1])'),null);
+  executar(c,`Q.forEach(q=>{q.pr_tags={specialty:['Mama'],theme:['Tema PR'],subtheme:['Subtema PR'],specific:['Específico PR']};
+    q._a=areaDe(q);classTags(q)});_pvN=-1;_prInc=null`);
+  assert.equal(executar(c,'retrato()'),antes);
+  assert.doesNotMatch(executar(c,"vSub('neuro')+vSub('tor')+vIncidencia()"),/Tema PR|Subtema PR|Específico PR|PersonalRad/);
 });
 
 test('Banco fechado e aberto não mostra pr_tags e conserva tags Claude',()=>{

@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.31.1"
+VERSAO = "1.31.2"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -53,8 +53,6 @@ js = js[:i0] + "  const alts=qAlternativas(q,{r,fb,sel,cut});\n" + js[i1:]
 troca('<div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}',
       '${qEnunciado(q,imgs)}${alts}')
 troca("${fb?difTag(q)+prAcertoBloco(q):''}", "${fb?qDificuldade(q):''}")
-# Metadados PersonalRad permanecem nos dados para área, mas nunca são exibidos.
-troca("${!q.tags.length?`<div class=\"tagstop\">${prTagsBloco(q)}</div>`:fb?`<div class=\"tagstop\">${tgHtml('q')}</div>`:''}", "${q.tags.length&&fb?`<div class=\"tagstop\">${tgHtml('q')}</div>`:''}")
 js = js.replace("${pesosUI()}", "${layoutUI()}${pesosUI()}", 1)
 # modo pré-prova: as funções originais viram *Orig e as novas (build/banco.js) decidem
 troca("function revisaoDoDia(n=cfg.diario,exclui=new Set()){", "function revisaoDoDiaOrig(n=cfg.diario,exclui=new Set()){")

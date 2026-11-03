@@ -1,4 +1,15 @@
-// Metadados PersonalRad: nunca entram nas tags/classificação ou na interface do app.
+// Tags PersonalRad: bloco separado após responder; nunca entram na classificação ou nas contagens.
+function prTagsBloco(q){
+  const tags=[],vistos=new Set();
+  function visitar(v){
+    if(typeof v==='string'){
+      const t=v.trim(),k=prNorm(t);
+      if(k&&!vistos.has(k)){vistos.add(k);tags.push(t)}
+    }else if(v&&typeof v==='object')Object.values(v).forEach(visitar);
+  }
+  visitar(q.pr_tags);
+  return tags.length?`<div class="pr-tags"><span class="mut">PersonalRad:</span> ${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(' ')}</div>`:'';
+}
 function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
 function prStats(q){
   const s={...(q.pr_stats||{})},texto=prLinhas(q).join('\n');

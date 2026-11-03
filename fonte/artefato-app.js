@@ -885,14 +885,14 @@ function vQuiz(){
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
   <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${posDe(q)%1000}${q.n!=null?' · Q'+q.n+'/'+q.grupo:''}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?difTag(q)+prAcertoBloco(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
-  ${fb&&q.cl&&q.cl.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação: ${esc([AREA_BY[q._a].nome,...q.cl].join(' › '))}</div>`:''}${!q.tags.length?`<div class="tagstop">${prTagsBloco(q)}</div>`:fb?`<div class="tagstop">${tgHtml('q')}</div>`:''}
+  ${fb?`${q.tags.length||q.cl?.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação do banco/Codex: ${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}</div>${q.tags.length?`<div class="tagstop">${tgHtml('q')}</div>`:''}`:''}${prTagsBloco(q)}`:''}
   <div class="enun" style="margin-top:10px">${esc(q.enunciado)}</div><div class="imgs">${imgs}</div>${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
   ${fb?`<div style="margin-top:10px"><b style="color:var(--${r.ok?'ok':'bad'})">${r.ok?'Acertou':'Errou · gabarito '+q.gab}</b> <span class="mut">(${r.conf})</span>
    ${pontoBloco(q)}${iaBloco(q)}<div class="imgs">${imgsC}</div>
    <div class="row"><button class="b" onclick="proxima()">${last?'Finalizar':'Próxima ('+keyLab('next')+')'}</button><button class="b s" onclick="editar()">Editar resposta (${keyLab('edit')})</button></div></div>`:''}
-  </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${!sess.sim?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
+  </div><div class="row">${sess.modo==='estudo'&&!sess.sim?`<button class="b s" onclick="salvaEst();go('estudar')">Salvar e sair</button>`:''}<button class="b s" onclick="terminar()">Encerrar</button>${fb?`<select id="q_area" onchange="reclass('${q.id}',this.value)"><option value="">Corrigir área…</option>${AREAS.map(a=>`<option value="${a.id}">${a.nome}</option>`).join('')}</select>`:''}
 
   <button class="b s" onclick="qEdita('${q.id}')">✎ Editar questão</button></div></div>${painelNav()}</div>`;
 }
