@@ -1,4 +1,4 @@
-// Banco CBR app 1.29.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.30.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -584,7 +584,11 @@ function smFormata(id,cmd){
   const area=smParseTS(document.getElementById('sm_ed_area').value).area;
   document.execCommand(cmd,false,cmd==='foreColor'?smCorTexto(area):null);if(SM.ed)smRascEdSalva(SM.ed.id);
 }
-const smCorTexto=area=>({ferramenta:'#368261',tarefas:'#8467bc',estudo:'#5687be'})[area]||'#8467bc';
+function smCorTexto(area){
+  const fixas={ferramenta:'#368261',tarefas:'#8467bc',estudo:'#5687be'};
+  const i=smTipos().filter(t=>!fixas[t.id]).findIndex(t=>t.id===area);
+  return fixas[area]||['#af724d','#b26080','#a68c35'][Math.max(0,i)%3];
+}
 function smRichTecla(e,el){if(e.ctrlKey&&!e.altKey&&(['b','u'].includes(e.key.toLowerCase())||(e.shiftKey&&e.key.toLowerCase()==='h'))){e.preventDefault();e.stopPropagation();smFormata(el.id,e.key.toLowerCase()==='b'?'bold':e.key.toLowerCase()==='u'?'underline':'foreColor')}else if(e.key==='Escape'){e.preventDefault();smEdFecha()}}
 function smRichCola(e){e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'))}
 function smTexto(t){return `<span class="sm-texto">${t.textoHtml?smSanitiza(t.textoHtml):esc(tituloTarefa(t.texto))}</span>`}
@@ -596,7 +600,7 @@ function smItem(t){
 }
 function smGrupos(its){
   const g=smAgrupa(its);if(!g.length)return'';
-  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}"><span class="sm-lbl">${esc(smTipoDe(x.a).nome)}</span>${x.l.map(smItem).join('')}</div>`).join('')}</div>`;
+  return `<div class="sm-gs">${g.map(x=>`<div class="sm-grp sm-${esc(x.a)}" data-drop="${esc(x.l[0].dia)}" data-area="${esc(x.a)}" data-sub="${esc(x.sub)}"><span class="sm-lbl">${esc(smTipoDe(x.a).nome)}</span><div class="sm-itens-tipo">${x.l.map(smItem).join('')}</div></div>`).join('')}</div>`;
 }
 function smAddDet(dia){SM.addDet=SM.addDet||{};SM.addDet[dia]=!SM.addDet[dia];render();const i=document.getElementById(SM.addDet[dia]?'sm_det_'+dia:'sm_add_'+dia);i&&i.focus()}
 function smTg(id){SM.ab.has(id)?SM.ab.delete(id):SM.ab.add(id);try{localStorage.setItem('sm_abertas',JSON.stringify([...SM.ab]))}catch(e){}render()}
@@ -755,14 +759,15 @@ function vTarefas(){
   if(!SM.d)return `<div class="card"><p class="mut">Calendário ainda vazio.</p></div>`;
   setTimeout(smAuto,0);const hj=smHoje(),sem=SM.d.tarefas.filter(t=>t.dia==='proxima'),atr=tarefasAtrasadas(SM.d.tarefas,hj);
   const outros=[...new Set(SM.d.tarefas.map(t=>t.dia))].filter(d=>dataTarefaValida(d)&&d>hj).sort();
-  return `<div class="sm sm-tarefas" aria-label="Tarefas"><div class="row"><h2>Tarefas</h2><button class="b s sm-ghost" onclick="smSem('${smDom(hj)}')">Planejar semana</button><button class="b s sm-ghost" onclick="SM.plan=!SM.plan;SM.conf=null;render()">Planejar mês</button></div>
+  return `<div class="sm sm-tarefas" aria-label="Tarefas">
    ${SM.erro?`<p class="sm-err">${esc(SM.erro)}</p>`:''}
-   ${SM.plan?smPainelMes():''}${SM.sem?smPainelSemana(SM.sem):''}
    ${atr.length?`<div class="card sm-atrasadas"><div class="row"><span class="kick">Atrasadas · ${atr.length}</span><button class="b s sm-ghost" onclick="smRola()">Passar tudo para hoje</button></div><div class="sm-atrasadas-lista">${atr.map(t=>`<div><small>${smRotL(t.dia)}</small>${smItem(t)}</div>`).join('')}</div></div>`:''}
    ${smHojeGrande()}
    ${smSemData()}
    ${outros.filter(d=>d!==smDiaAtual()).map(d=>`<div class="card" data-drop="${d}"><h3>${smRotL(d)}</h3>${smGrupos(smVisiveis(d))}${smFeitasBotao(d)}</div>`).join('')}
    ${sem.length?`<div class="card"><span class="kick">Sem dia</span><p class="mut">A revisão de domingo encaixa estes itens.</p>${sem.map(smItem).join('')}</div>`:''}
+   <div class="row sm-planejar"><button class="b s sm-ghost" onclick="smSem('${smDom(hj)}')">Planejar semana</button><button class="b s sm-ghost" onclick="SM.plan=!SM.plan;SM.conf=null;render()">Planejar mês</button></div>
+   ${SM.plan?smPainelMes():''}${SM.sem?smPainelSemana(SM.sem):''}
    ${SM.ed&&smTar(SM.ed.id)?smEditor(smTar(SM.ed.id)):''}
   </div>`;
 }
@@ -1125,13 +1130,30 @@ function smMover(id,dia){
     x.dia=dia;x.ordem=100+d.tarefas.filter(y=>y.dia===dia).length},'moveu item');
   toast(dia==='sem'?'Foi para Tarefas (sem data)':dia===smHoje()?'Foi para hoje':'Foi para '+smRotL(dia));
 }
+// Soltar no grupo muda só esta tarefa, pela mesma fila/retentativa da edição.
+function smSolta(id,alvo,ref){
+  const t=smTar(id);if(!t||!alvo?.drop)return false;
+  const dia=alvo.drop,area=alvo.area,sub=alvo.sub||'';
+  if(area!=null&&((t.area||'estudo')!==area||(t.sub||'')!==sub)){
+    smMudar(d=>{const x=d.tarefas.find(y=>y.id===id);if(!x)return;
+      x.area=area;if(sub)x.sub=sub;else delete x.sub;
+      // Preserva os outros campos, inclusive recorrência, notas e anexos.
+      x.dia=dia;
+      const l=ordenarTarefas(d.tarefas.filter(y=>y.id!==id&&y.dia===dia&&(y.area||'estudo')===area&&(y.sub||'')===sub));
+      const i=ref?l.findIndex(y=>y.id===ref):-1;l.splice(i<0?l.length:i,0,x);
+      l.forEach((y,n)=>{y.ordem=(n+1)*10});
+    },'editou tipo do item');return true;
+  }
+  if(t.dia===dia)return ref?smReordena(id,ref):false;
+  smMover(id,dia);return true;
+}
 function smdAlvo(x,y){const el=document.elementFromPoint(x,y);return el&&el.closest&&el.closest('[data-drop]')}
 function smdFim(cancela){
   const d=SMD;if(!d)return;clearTimeout(d.timer);clearInterval(d.auto);SMD=null;
   document.body.classList.remove('smd-on');document.querySelectorAll('.smd-alvo').forEach(e=>e.classList.remove('smd-alvo'));
   if(!d.ativo)return;d.g&&d.g.remove();smdEngole=1;setTimeout(()=>{smdEngole=0},80);
   document.querySelectorAll('.smd-linha').forEach(e=>e.classList.remove('smd-linha'));
-  if(!cancela){const z=smdAlvo(d.cx,d.cy),tr=smdLinha(d);if(tr)smReordena(d.id,tr);else if(z)smMover(d.id,z.dataset.drop);if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}}
+  if(!cancela){const z=smdAlvo(d.cx,d.cy),tr=smdLinha(d);if(z)smSolta(d.id,z.dataset,tr);if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}}
 }
 function smdPos(){
   const d=SMD;if(!d||!d.ativo)return;d.g.style.transform=`translate(${d.cx-d.dx}px,${d.cy-d.dy}px)`;
@@ -1149,7 +1171,7 @@ function smdComeca(){
 }
 document.addEventListener('pointerdown',e=>{
   if(SMD||tela!=='tarefas'||(e.pointerType==='mouse'&&e.button!==0))return;
-  const r=e.target.closest&&e.target.closest('.sm-row[data-tid]');if(!r||e.target.closest('button,input,textarea,select')||(e.target.isContentEditable&&e.target===document.activeElement))return;
+  const alca=e.target.closest&&e.target.closest('.sm-arrastar'),r=alca&&alca.closest('.sm-row[data-tid]');if(!r)return;
   SMD={r,id:r.dataset.tid,x0:e.clientX,y0:e.clientY,cx:e.clientX,cy:e.clientY,pid:e.pointerId,mouse:e.pointerType==='mouse',ativo:false};if(!SMD.mouse)SMD.timer=setTimeout(smdComeca,SMD_HOLD);
 },true);
 document.addEventListener('pointermove',e=>{
@@ -1167,9 +1189,9 @@ document.addEventListener('click',e=>{if(smdEngole){smdEngole=0;e.stopPropagatio
 
 // ===== ORDEM DAS TAREFAS (pedido do Artur, 03/11/2026) =====
 // Alt+↑/↓ na tarefa selecionada, ou arrastar sobre outra tarefa do mesmo dia. A prioridade continua vindo antes da ordem.
-function smdLinha(d){const el=document.elementFromPoint(d.cx,d.cy),r=el&&el.closest&&el.closest('.sm-row[data-tid]');if(!r||r.dataset.tid===d.id)return null;const a=smTar(d.id),b=smTar(r.dataset.tid);return a&&b&&a.dia===b.dia?b.id:null}
+function smdLinha(d){const el=document.elementFromPoint(d.cx,d.cy),r=el&&el.closest&&el.closest('.sm-row[data-tid]');if(!r||r.dataset.tid===d.id)return null;const a=smTar(d.id),b=smTar(r.dataset.tid);return a&&b?b.id:null}
 function smReordena(id,ref,k){
-  const t=smTar(id);if(!t)return false;const l=smItensDe(t.dia),i=l.findIndex(x=>x.id===id),j=ref?l.findIndex(x=>x.id===ref):i+k;
+  const t=smTar(id);if(!t)return false;const l=smItensDe(t.dia).filter(x=>(x.area||'estudo')===(t.area||'estudo')&&(x.sub||'')===(t.sub||'')),i=l.findIndex(x=>x.id===id),j=ref?l.findIndex(x=>x.id===ref):i+k;
   if(i<0||j<0||j>=l.length||i===j)return false;
   const nova=l.filter(x=>x.id!==id);nova.splice(j,0,t);const ordem=new Map(nova.map((x,n)=>[x.id,(n+1)*10])),dia=t.dia;
   smMudar(d=>{d.tarefas.forEach(x=>{if(x.dia===dia&&ordem.has(x.id))x.ordem=ordem.get(x.id)})},'reordenou item');return true;

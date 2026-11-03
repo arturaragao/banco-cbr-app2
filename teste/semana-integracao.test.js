@@ -644,3 +644,36 @@ test('notas: nova edição usa versão mais recente e envio sem aplicar a opera�
   assert.equal(a.salvos.at(-1).notas[0].texto,'Edição atual');
   assert.equal(vm.runInContext('ntPendentes().length',a.c),0);
 });
+
+test('arrastar para outro tipo/subtema salva pela fila normal e reaplica em conflito sem perder campos',async()=>{
+  const original={id:'a',dia:'sem',area:'estudo',sub:'Antigo',texto:'Mover',det:'Nota',textoHtml:'<b>Mover</b>',etiquetas:['legada'],subtarefas:[{id:'s',texto:'Etapa',feito:true}],anexos:[{nome:'arquivo'}],repetir:{tipo:'diaria'},grupo:'g',ordem:10};
+  const a=await app([original,{id:'b',dia:'sem',area:'ferramenta',texto:'Destino',ordem:10},{...original,id:'ligada',dia:'2026-10-27'}]);
+  a.estado.conflito=true;
+  assert.equal(a.c.smSolta('a',{drop:'sem',area:'ferramenta',sub:''},'b'),true);assert.equal(await a.fila(),true);
+  const salvo=a.salvos.at(-1),movida=salvo.tarefas.find(t=>t.id==='a');
+  const esperado={...original,area:'ferramenta',ordem:10};delete esperado.sub;assert.deepEqual(movida,esperado);
+  assert.ok(movida.ordem<salvo.tarefas.find(t=>t.id==='b').ordem);
+  assert.equal(salvo.tarefas.filter(t=>t.id==='a').length,1);assert.ok(salvo.tarefas.some(t=>t.id==='outro'));
+  assert.equal(salvo.tarefas.find(t=>t.id==='ligada').area,'estudo');
+  assert.equal(a.c.smSolta('a',{drop:'sem',area:'tarefas',sub:'Casamento'}),true);await a.fila();
+  assert.equal(a.salvos.at(-1).tarefas.find(t=>t.id==='a').sub,'Casamento');
+});
+
+test('reordenação e Alt+setas continuam dentro do tipo/subtema; soltar no grupo atual não altera nada',async()=>{
+  const a=await app([{id:'a',dia:'sem',area:'estudo',ordem:10},{id:'x',dia:'sem',area:'tarefas',ordem:15},{id:'b',dia:'sem',area:'estudo',ordem:20}]);
+  assert.equal(a.c.smSolta('a',{drop:'sem',area:'estudo',sub:''},'b'),true);await a.fila();
+  assert.ok(a.lista().find(t=>t.id==='a').ordem>a.lista().find(t=>t.id==='b').ordem);
+  assert.equal(a.lista().find(t=>t.id==='x').ordem,15);
+  a.c.tela='tarefas';vm.runInContext("SMK.on=true;SMK.id='a'",a.c);
+  const alt=a.teclas.find(fn=>fn.toString().includes('smReordena(x.id'));assert.ok(alt);
+  let preveniu=false;alt({key:'ArrowUp',altKey:true,target:{tagName:'BODY'},preventDefault(){preveniu=true},stopImmediatePropagation(){}});await a.fila();assert.equal(preveniu,true);
+  assert.ok(a.lista().find(t=>t.id==='a').ordem<a.lista().find(t=>t.id==='b').ordem);
+  const n=a.salvos.length;assert.equal(a.c.smSolta('a',{drop:'sem',area:'estudo',sub:''}),false);assert.equal(a.salvos.length,n);
+});
+
+test('Tarefas: grupos identificam destino e planejamento vem depois das tarefas',async()=>{
+  const a=await app([{id:'ultima',dia:'2026-10-27',texto:'Última tarefa',area:'ferramenta'}]);
+  const html=a.c.vTarefas();assert.doesNotMatch(html,/<h2>Tarefas<\/h2>/);
+  assert.ok(html.indexOf('Planejar semana')>html.indexOf('data-tid="ultima"'));
+  assert.match(html,/data-drop="2026-10-27" data-area="ferramenta" data-sub=""/);
+});
