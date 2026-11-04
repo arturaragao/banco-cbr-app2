@@ -1,4 +1,4 @@
-// Banco CBR app 1.31.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.31.3 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -403,6 +403,11 @@ function smDiaClique(iso){
   const atual=document.querySelector('.sm-hoje1'),html=tela==='tarefas'?smHojeGrande():'';
   if(atual){if(html)atual.outerHTML=html;else atual.remove()}else if(html)document.querySelector('.sm-cal')?.insertAdjacentHTML('afterend',html);
   SMK.on=true;SMK.i=-1;SMK.id=null;SMK.cel='hoje';smkPinta();
+  if(tela==='semana'){
+    SM.diaEditor=iso;
+    const painel=document.querySelector('.sm > .sm-pan'),html=smPainelDia(iso);
+    if(painel)painel.outerHTML=html;else document.querySelector('.sm-cal')?.insertAdjacentHTML('afterend',html);
+  }
 }
 function smSem(seg){SM.sem=SM.sem===seg?null:seg;SM.semAdd=null;SM.conf=null;render()}
 function smMesVai(k){const[y,m]=(SM.mes||smHoje().slice(0,7)).split('-').map(Number),x=new Date(y,m-1+k,1,12);SM.mes=dKey(+x).slice(0,7);render()}
@@ -631,7 +636,7 @@ function smPainelDia(iso){
    <div class="row sm-campos"><input placeholder="Tema do dia (ex.: RM Joelho)" value="${esc(x.tema||'')}" onchange="smCampo('${iso}','tema',this.value)" aria-label="Tema do dia"><input placeholder="Foco específico (ex.: USG tireoide TI-RADS)" value="${esc(x.foco||'')}" onchange="smCampo('${iso}','foco',this.value)" aria-label="Foco do dia"><input placeholder="Feriado" value="${esc(smFeriado(iso))}" onchange="smCampo('${iso}','feriado',this.value)" aria-label="Feriado"></div>
    <div class="row"><span class="sm-lbl">Noite</span><div class="sm-seg">${[['BR','BR plantão'],['HSI','HSI sobreaviso'],['','Nada']].map(([k,n])=>`<button type="button" aria-pressed="${smNoite(iso)===k}" onclick="smCampo('${iso}','noite','${k}')">${n}</button>`).join('')}</div>${x.noite!=null?`<button class="sm-tagb" onclick="smCampo('${iso}','noite','auto')" title="Volta a seguir a agenda">pela agenda</button>`:''}</div>
    ${smEvEditor(iso)}
-   ${tela==='tarefas'?smGrupos(its):''}</div>`;
+   ${tela==='semana'?smCalMeta(iso):''}${smGrupos(its)}</div>`;
 }
 function smPainelSemana(seg){
   const ds=smSemana(seg),hj=smHoje(),meta=ds.reduce((a,x)=>a+smMetaDe(x),0),feitas=ds.reduce((a,x)=>a+smQ(x).n,0),add=SM.semAdd;
@@ -706,20 +711,23 @@ function smCalendario(){
   const hj=smHoje(),sem=SM.vis==='semana',seg=SM.semana||smDom(hj),mes=sem?seg.slice(0,7):SM.mes||hj.slice(0,7),[y,m]=mes.split('-').map(Number),ini=sem?seg:smDom(dKey(+new Date(y,m-1,1,12))),fim=sem?smMais(seg,6):dKey(+new Date(y,m,0,12)),p=smProvaIso(),r=smRetaIni();
   const corpo=SM.vis==='lista'?smLista(mes,smDom(hj),smMais(smDom(hj),6),p,r):smGrade(mes,ini,fim,p,r,sem);
   return `<div class="card sm-cal">${smCalCab(mes,y,m)}${corpo}
-   <p class="mut sm-dica">Clique para selecionar um dia · veja os itens na aba Tarefas · duplo clique abre o dia (eventos, plantão, sobreaviso) · toque no estágio ao lado do mês para mudar.</p></div>`;
+   <p class="mut sm-dica">Clique no dia para ver ou criar tarefas · toque no estágio ao lado do mês para mudar.</p></div>`;
 }
+// Itens derivados do plano e das respostas: a meta fixa nunca é gravada como tarefa.
+function smCalMeta(iso){const feita=smQ(iso).n>=50;return `<span class="sm-cal-meta" data-feito="${feita}">${feita?'✓':'○'} 50 questões</span>`}
+function smCalItens(iso){return smCalMeta(iso)+smItensDe(iso).map(t=>`<span class="sm-cal-tarefa" data-tid="${esc(t.id)}" data-feito="${!!t.feito}">${t.feito?'✓':'○'} ${esc(t.texto)}</span>`).join('')}
 function qaAbreDia(dia){qaAbre();QA.quando=dia;QA.calCursor=dia;QA.calAberto=true;QA.diasAberto=false;QA.quandoManual=true;QA.dias=[];qaRascSalva();qaPinta()}
 function smGrade(mes,ini,fim,p,r,sem=false){
   const hj=smHoje();let h='';
   for(let s=ini;s<=fim;s=smMais(s,7)){
     const ds=smSemana(s);
     h+=`<div class="sm-lin">${ds.map(x=>{
-      if(!sem&&x.slice(0,7)!==mes)return `<button class="sm-cel fora" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="smSel('${x}')"><span class="top"><span class="n">${smDt(x).getDate()}</span></span></button>`;
+      if(!sem&&x.slice(0,7)!==mes)return `<button class="sm-cel fora" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="smSel('${x}')"><span class="top"><span class="n">${smDt(x).getDate()}</span></span>${smCalItens(x)}</button>`;
       const t=smTipo(x),di=smDia(x),fe=smFeriado(x),rs=smAgResto(di.agenda);
       return `<button lang="pt-BR" class="sm-cel ${x===hj?'hoje':''} ${t!=='estudo'?'off':''} ${SM.sel===x?'sel':''} ${fe?'fer':''} ${r&&x>=r&&p&&x<p?'rf':''}" data-drop="${x}" onclick="smDiaClique('${x}')" ondblclick="smSel('${x}')" title="${esc(di.agenda||'')}">
         <span class="top"><span class="n">${smDt(x).getDate()}</span>${smNt(smNoite(x))}${x===p?'<span class="sm-pv2">PROVA</span>':''}</span>
         ${smEvs(x)}${fe?`<span class="sm-fe">${esc(fe)}</span>`:''}${di.tema?`<span class="sm-tm">${esc(di.tema)}</span>`:''}${di.foco?`<span class="sm-fo">+ ${esc(di.foco)}</span>`:''}${rs?`<span class="sm-rs">${esc(rs)}</span>`:''}
-        <span class="sm-bt">${smSelo(x)}${smDots(x)}</span></button>`}).join('')}</div>`;
+        ${smCalItens(x)}<span class="sm-bt">${smSelo(x)}${smDots(x)}</span></button>`}).join('')}</div>`;
     if(SM.sem===s&&tela==='tarefas')h+=smPainelSemana(s);
   }
   return `<div class="sm-grid ${sem?'sm-vsem':''}"><div class="sm-lin cab">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<span>${d}</span>`).join('')}</div>${h}</div>`;
@@ -736,8 +744,7 @@ function smLista(mes,ini,fim,p,r){
         <span class="ld"><b class="${fe?'fer':''}">${smDt(x).getDate()}</b><small>${smDOW[dw]}</small></span>
         <span class="lc"><span class="lt">${smNt(smNoite(x))}${x===p?'<span class="sm-pv2">PROVA</span>':''}${fe?`<span class="sm-fe">${esc(fe)}</span>`:''}${smEvs(x)}${di.tema?`<span class="sm-tm">${esc(di.tema)}</span>`:''}${vazio}</span>
         ${di.foco?`<span class="sm-fo">+ ${esc(di.foco)}</span>`:''}${rs?`<span class="sm-rs">${esc(rs)}</span>`:''}
-        <span class="lb">${smSelo(x,true)}${smDots(x)}</span></span></button>`;
-      // As tarefas ficam exclusivamente na aba Tarefas.
+        ${smCalItens(x)}<span class="lb">${smSelo(x,true)}${smDots(x)}</span></span></button>`;
     });
   }
   return `<div class="sm-lista">${h}</div>`;

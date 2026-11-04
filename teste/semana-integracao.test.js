@@ -74,10 +74,41 @@ test('clique no dia muda célula e lista do teclado; dia vazio não cria célula
   a.c.qaAbreDia('2026-10-29');assert.equal(vm.runInContext('QA.on',a.c),true);assert.equal(vm.runInContext('QA.quando',a.c),'2026-10-29');assert.equal(vm.runInContext('qaModoQuando()',a.c),'data');
 });
 
+test('Calendário integra tarefas por data e mantém 50 questões derivadas em qualquer dia',async()=>{
+  const a=await app([{id:'agenda',dia:'2026-10-27',texto:'Revisar tórax',area:'tarefas'},{id:'sem',dia:'sem',texto:'Sem data'}]);
+  assert.match(a.c.smCalItens('2026-10-27'),/Revisar tórax/);
+  assert.doesNotMatch(a.c.smCalItens('2026-10-28'),/Revisar tórax|Sem data/);
+  for(const vis of ['mes','semana','lista']){
+    a.c.smVis(vis);const html=a.c.smCalendario();
+    const dias=(html.match(/class="sm-(?:cel|li) /g)||[]).length;
+    assert.ok(dias>=7);assert.equal((html.match(/50 questões/g)||[]).length,dias);
+    assert.match(html,/Revisar tórax/);
+  }
+  a.c.smDiaClique('2026-10-27');assert.equal(vm.runInContext('SM.diaEditor',a.c),'2026-10-27');
+  assert.match(a.c.smPainelDia('2026-10-27'),/Revisar tórax/);
+  assert.match(a.c.smPainelDia('2026-10-28'),/qaAbreDia\('2026-10-28'\)/);
+  a.c.qaAbreDia('2026-10-28');a.c.qaTxt('Revisar abdome');a.c.qaSalvar();await a.fila();
+  assert.match(a.c.smCalItens('2026-10-28'),/Revisar abdome/);
+  await a.c.smCheck('agenda',true);
+  assert.match(a.c.smCalItens('2026-10-27'),/data-feito="true">✓ Revisar tórax/);
+  assert.match(a.c.vTarefas(),/data-tid="agenda"[\s\S]*?checked/);
+  a.c.tela='tarefas';await a.c.smCheck('agenda',false);a.c.tela='semana';
+  assert.match(a.c.smPainelDia('2026-10-27'),/data-tid="agenda"/);
+  assert.doesNotMatch(a.c.smItem(a.lista().find(t=>t.id==='agenda')),/<input[^>]*\schecked(?:\s|>)/);
+  for(const dia of ['2026-10-25','2026-11-01','2026-12-12','2027-01-01']){
+    a.c.log=Array.from({length:49},()=>({t:+new Date(dia+'T12:00:00'),ok:false}));
+    assert.match(a.c.smCalMeta(dia),/data-feito="false">○ 50 questões/);
+    a.c.log.push({t:+new Date(dia+'T12:00:00'),ok:false});
+    assert.match(a.c.smCalMeta(dia),/data-feito="true">✓ 50 questões/);
+    assert.doesNotMatch(a.c.smCalMeta(dia),/onclick|input|data-tid/);
+  }
+  assert.equal(a.lista().length,3);assert.ok(a.salvos.every(d=>d.tarefas.every(t=>t.texto!=='50 questões')));
+});
+
 test('Lista contém só semana atual domingo–sábado, inclusive quando atravessa o mês',async()=>{
   const a=await app([{id:'dentro',dia:'2026-11-01',texto:'Dentro'},{id:'fora',dia:'2026-11-08',texto:'Fora'}]);
   a.c.Date.now=()=>new Date('2026-11-01T12:00').getTime();a.c.smVis('lista');let html=a.c.smCalendario();
-  assert.equal((html.match(/class="sm-li /g)||[]).length,7);assert.match(html,/data-drop="2026-11-01"/);assert.match(html,/data-drop="2026-11-07"/);assert.doesNotMatch(html,/Dentro|Fora|sm-row/);
+  assert.equal((html.match(/class="sm-li /g)||[]).length,7);assert.match(html,/data-drop="2026-11-01"/);assert.match(html,/data-drop="2026-11-07"/);assert.match(html,/Dentro/);assert.doesNotMatch(html,/Fora|sm-row/);
   a.c.Date.now=()=>new Date('2026-10-31T12:00').getTime();html=a.c.smCalendario();assert.match(html,/data-drop="2026-10-25"/);assert.match(html,/data-drop="2026-10-31"/);assert.doesNotMatch(html,/data-drop="2026-11-01"/);
   a.c.Date.now=()=>new Date('2026-11-30T12:00').getTime();html=a.c.smCalendario();assert.match(html,/data-drop="2026-11-29"/);assert.match(html,/data-drop="2026-12-05"/);
 });
@@ -215,7 +246,7 @@ test('calendário usa grade ampliada; Tarefas mantém Hoje, atrasadas e ordenaç
   const html=a.c.vSemana();assert.equal((html.match(/class="sm-cel /g)||[]).length,7);
   assert.ok(html.includes('sm-grid sm-vsem'));assert.ok(!html.includes('sm-colunas'));assert.ok(!html.includes('sm_quadro'));
   assert.ok(html.indexOf('data-drop="2026-10-25"')<html.indexOf('data-drop="2026-10-26"'));
-  assert.ok(html.includes('Evento'));assert.doesNotMatch(html,/Urgente|Baixa|Passar tudo para hoje/);
+  assert.ok(html.includes('Evento'));assert.match(html,/Urgente/);assert.match(html,/Baixa/);assert.doesNotMatch(html,/Passar tudo para hoje/);
   const tarefas=a.c.vTarefas();assert.ok(tarefas.indexOf('Urgente')<tarefas.indexOf('Baixa'));assert.ok(tarefas.includes('Passar tudo para hoje'));assert.doesNotMatch(tarefas,/sm-grid/);
   assert.ok(!html.includes('Temas fracos'));assert.ok(!html.includes('💡'));assert.equal(a.lista()[2].dia,'2020-01-01');
   a.c.smRola();await a.fila();assert.equal(a.lista()[2].dia,'2026-10-26');
@@ -556,7 +587,7 @@ test('Notas ordena por atualização e mantém as fixadas acima das editadas',as
 test('planejamento não reinsere tarefas na aba Calendário, mesmo com semana/mês abertos',async()=>{
   const a=await app([{id:'a',dia:'2026-10-26',texto:'Item isolado'}]);
   vm.runInContext("SM.plan=true;SM.sem='2026-10-25';SM.diaEditor='2026-10-26'",a.c);
-  for(const vis of ['semana','mes','lista']){a.c.smVis(vis);assert.doesNotMatch(a.c.vSemana(),/class="sm-row|sm_mes_txt|Item isolado/)}
+  for(const vis of ['semana','mes','lista']){a.c.smVis(vis);assert.match(a.c.vSemana(),/Item isolado/);assert.doesNotMatch(a.c.vSemana(),/sm_mes_txt/)}
   a.c.tela='tarefas';assert.match(a.c.vTarefas(),/Item isolado/);assert.match(a.c.vTarefas(),/sm_mes_txt/);
 });
 

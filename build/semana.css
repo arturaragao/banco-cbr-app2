@@ -446,3 +446,6 @@ body.smd-on .smd-alvo{outline:2px solid var(--pri)!important;outline-offset:-2px
 @media(max-width:600px){.sm-tarefas .sm-grp{padding:10px 8px 4px}}
 .sm-tarefas .sm-row .sm-it input[type="checkbox"]{flex:0 0 18px;min-width:18px;min-height:18px;aspect-ratio:1;padding:0}
 .sm.sm-tarefas .sm-sd{margin-left:0;margin-right:0}
+/* Resumos dentro do botão do dia; controles completos ficam no painel. */
+.sm-cal-meta,.sm-cal-tarefa{display:block;font-size:11px;overflow-wrap:anywhere}
+.sm-cal-meta[data-feito="true"],.sm-cal-tarefa[data-feito="true"]{text-decoration:line-through;opacity:.65}
