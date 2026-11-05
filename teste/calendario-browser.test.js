@@ -246,12 +246,15 @@ test('Calendário, Tarefas e Notas 1.30: aceite no Chrome, desktop e celular', {
   });
   await t.test('Notas: criar, editar sem perder foco, fixar, buscar, confirmar exclusão e persistir no celular',async()=>{
     await ev("go('notas')");await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
-    await click('#nt_texto');await call('Input.insertText',{text:'Nota fictícia offline'});await click('.nt-criar button');
+    // 1.33.0: botão + abre o painel flutuante; Editar reabre o painel; Ctrl+Enter salva
+    await click('#qa_fab');await click('#nt_texto');await call('Input.insertText',{text:'Nota fictícia offline'});await click('.nt-caixa .b');
+    assert.equal(await ev("!document.getElementById('nt_painel')"),true,'painel fecha ao salvar');
     const id=await ev("SM.d.notas.find(n=>n.texto==='Nota fictícia offline').id");
-    await click('.nt-nota textarea');await call('Input.insertText',{text:' revisada'});await espera(900);
-    assert.equal(await ev("document.activeElement.matches('.nt-nota textarea')"),true);
-    assert.match(await ev(`SM.d.notas.find(n=>n.id==='${id}').texto`),/revisada/);
-    await call('Input.insertText',{text:' adicional'});await click('[aria-label="Buscar notas"]');await call('Input.insertText',{text:'revisada'});await espera(900);
+    await click('[aria-label="Editar nota"]');assert.equal(await ev("document.activeElement.id"),'nt_texto');
+    await call('Input.insertText',{text:' revisada adicional'});await tecla('Enter',{modifiers:2});await espera(300);
+    assert.match(await ev(`SM.d.notas.find(n=>n.id==='${id}').texto`),/revisada adicional/);
+    await click('.nt-tg');assert.equal(await ev("document.querySelector('.nt-nota').classList.contains('fechada')"),true,'toggle fecha');
+    await click('.nt-tg');assert.equal(await ev("document.querySelector('.nt-nota').classList.contains('fechada')"),false,'toggle abre');await click('[aria-label="Buscar notas"]');await call('Input.insertText',{text:'revisada'});await espera(900);
     assert.equal(await ev("document.activeElement.getAttribute('aria-label')"),'Buscar notas');assert.equal(await ev("document.querySelectorAll('.nt-nota').length"),1);
     await click('[aria-label="Fixar nota"]');assert.equal(await ev(`SM.d.notas.find(n=>n.id==='${id}').fixa`),true);
     await ev("ntBuscar('inexistente')");assert.equal(await ev("document.querySelectorAll('.nt-nota').length"),0);await ev("ntBuscar('revisada')");

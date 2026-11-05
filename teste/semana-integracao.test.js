@@ -543,7 +543,7 @@ test('toggle recolhe subtema, nota e subtarefas; estado persiste ao reabrir sem 
 });
 
 test('aba Notas cria, edita no lugar, busca, fixa e apaga nota persistida com confirmação',async()=>{
-  const a=await app();a.c.tela='notas';assert.match(a.c.vNotas(),/Criar nota/);
+  const a=await app();a.c.tela='notas';assert.doesNotMatch(a.c.vNotas(),/Criar nota/);
   a.elementos.set('nt_titulo',{value:''});a.elementos.set('nt_texto',{value:'Anotação rápida'});a.c.ntCriar();await a.c.ntSync();
   const n=a.salvos.at(-1).notas[0];assert.equal(n.texto,'Anotação rápida');assert.equal(n.titulo,'');
   a.c.ntEditar(n.id,'titulo','Título novo');a.c.ntEditar(n.id,'texto','Texto revisto <script>');await a.c.ntSync();

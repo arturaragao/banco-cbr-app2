@@ -53,22 +53,16 @@ function ntSync(){
   }).finally(()=>{NT.sync=null;ntReordenar();if(ntTemPendentes()&&!SM.erro){clearTimeout(NT.timer);NT.timer=setTimeout(ntSync,700)}});
   return NT.sync;
 }
-function ntCriar(){
-  const titulo=document.getElementById('nt_titulo').value.trim(),texto=document.getElementById('nt_texto').value.trim();
-  if(!titulo&&!texto)return;
-  const em=new Date().toISOString(),ordem=Math.min(0,...ntOrdenadas().map(ntChave))-1;   // nova nota entra no topo
-  if(ntMudar({id:smId(),titulo,texto,em,atualizado:em,ordem})){localStorage.removeItem('bcbr_nota_rascunho');render()}
-}
 function ntRascunho(){
   try{return JSON.parse(localStorage.getItem('bcbr_nota_rascunho')||'{}')}catch(e){return {}}
 }
-function ntRascSalva(){localStorage.setItem('bcbr_nota_rascunho',JSON.stringify({titulo:document.getElementById('nt_titulo').value,texto:document.getElementById('nt_texto').value}))}
+function ntRascSalva(){if(NT.ed)return;try{localStorage.setItem('bcbr_nota_rascunho',JSON.stringify({titulo:document.getElementById('nt_titulo').value,texto:document.getElementById('nt_texto').value}))}catch(e){}}
 function ntEditar(id,campo,valor){
   if(!['titulo','texto'].includes(campo))return;
   const n=SM.d?.notas?.find(n=>n.id===id);if(n)ntMudar({id,[campo]:valor,atualizado:new Date().toISOString()});
 }
 function ntFixar(id){const n=SM.d?.notas?.find(n=>n.id===id);if(n){ntMudar({id,fixa:!n.fixa,atualizado:new Date().toISOString()});render()}}
-function ntApagar(id){if(confirm('Apagar esta nota?')){ntMudar({id},true);render()}}
+function ntApagar(id){if(confirm('Apagar esta nota?')){ntMudar({id},true);ntFechaPainel(true);render()}}
 // Ordem manual (pedido do Artur, 05/11/2026): editar não muda a posição; arrastar pela alça reordena.
 // Notas antigas sem `ordem` ficam pela data de criação (mais nova em cima).
 const ntChave=n=>Number.isFinite(n.ordem)?n.ordem:-(Date.parse(n.em||n.atualizado||'')||0);
@@ -87,50 +81,121 @@ function ntMover(id,ref,antes){
   nova.forEach((x,i)=>{const o=(i+1)*10;if(x.ordem!==o){ntMudar({id:x.id,ordem:o,atualizado:agora});mudou=true}});
   if(mudou)ntReordenar();return mudou;
 }
-function ntGrade(){return ntLista().map(n=>`<article class="nt-nota" data-nota="${esc(n.id)}" onfocusout="setTimeout(ntReordenar,0)">
-  <div class="row"><span class="nt-alca" title="Arrastar para mudar a ordem" aria-hidden="true">⠿</span><span class="nt-acoes"><button class="sm-tagb" aria-label="Fixar nota" aria-pressed="${!!n.fixa}" onclick="ntFixar('${esc(n.id)}')">${n.fixa?'● Fixada':'○ Fixar'}</button><button class="sm-tagb" aria-label="Apagar nota" onclick="ntApagar('${esc(n.id)}')">Apagar</button></span></div>
-  <input aria-label="Título da nota" placeholder="Sem título" value="${esc(n.titulo||'')}" oninput="ntEditar('${esc(n.id)}','titulo',this.value)">
-  <textarea aria-label="Texto da nota" rows="2" oninput="ntAltura(this);ntEditar('${esc(n.id)}','texto',this.value)">${esc(n.texto||'')}</textarea>
-  <small class="mut">${esc((n.atualizado||n.em||'').slice(0,10))}</small></article>`).join('')||'<p class="mut">Nenhuma nota encontrada.</p>'}
-// Texto inteiro visível: a caixa cresce com o conteúdo (field-sizing no CSS; aqui o reserva para navegadores sem ele).
-function ntAltura(el){if(!el||globalThis.CSS?.supports?.('field-sizing','content'))return;el.style.height='auto';el.style.height=el.scrollHeight+2+'px'}
-function ntAjusta(){if(typeof document!=='undefined')document.querySelectorAll?.('.nt textarea').forEach(ntAltura)}
-function ntBuscar(valor){NT.busca=valor;document.getElementById('nt_grade').innerHTML=ntGrade();ntAjusta()}
-function ntReordenar(){if(tela==='notas'&&!document.activeElement?.closest?.('.nt-nota')){const g=document.getElementById('nt_grade');if(g){g.innerHTML=ntGrade();ntAjusta()}}}
+// ===== 1.33.0 (pedido do Artur, 05/11/2026): toggle por nota, painel flutuante para criar/editar, arrasto fluido =====
+// Toggle: abre/fecha o texto da nota; estado guardado neste aparelho (padrão: aberta).
+NT.fechadas=(()=>{try{return new Set(JSON.parse(localStorage.getItem('bcbr_nt_fechadas')||'[]'))}catch(e){return new Set()}})();
+function ntTg(id){
+  NT.fechadas.has(id)?NT.fechadas.delete(id):NT.fechadas.add(id);
+  try{localStorage.setItem('bcbr_nt_fechadas',JSON.stringify([...NT.fechadas]))}catch(e){}
+  const a=document.querySelector(`.nt-nota[data-nota="${CSS.escape(id)}"]`);
+  if(a){const f=NT.fechadas.has(id);a.classList.toggle('fechada',f);a.querySelector('.nt-tg')?.setAttribute('aria-expanded',String(!f))}else ntReordenar();
+}
+// Painel flutuante: NT.ed = id da nota em edição (null = nota nova, que usa o rascunho).
+function ntAbre(id=null){
+  ntFechaPainel(true);NT.ed=id;
+  const n=id?SM.d?.notas?.find(x=>x.id===id):null;if(id&&!n)return;
+  const r=n||ntRascunho(),f=document.createElement('div');f.id='nt_painel';f.className='qa-fundo nt-fundo';
+  f.innerHTML=`<div class="qa-caixa nt-caixa" role="dialog" aria-modal="true" aria-label="${n?'Editar nota':'Nova nota'}">
+    <div class="row"><b>${n?'Editar nota':'Nova nota'}</b><span style="flex:1"></span>${n?`<button type="button" class="qa-chip" onclick="ntApagar('${esc(n.id)}')">Excluir</button>`:''}<button type="button" class="qa-chip" onclick="ntFechaPainel()">Cancelar</button><button type="button" class="b" onclick="ntSalvarPainel()">Salvar</button></div>
+    <input id="nt_titulo" class="qa-in" aria-label="Título" placeholder="Título (opcional)" value="${esc(r.titulo||'')}" oninput="ntRascSalva()">
+    <textarea id="nt_texto" class="qa-in" aria-label="Texto da nota" placeholder="Anote uma ideia…" rows="8" oninput="ntRascSalva()">${esc(r.texto||'')}</textarea>
+    <div class="qa-dica">Ctrl+Enter salva · Esc fecha${n?'':' · o rascunho fica guardado'}</div></div>`;
+  f.addEventListener('pointerdown',e=>{if(e.target===f)ntFechaPainel()});
+  document.body.appendChild(f);
+  const t=document.getElementById(n?'nt_texto':'nt_titulo');try{t.focus();if(n)t.setSelectionRange(t.value.length,t.value.length)}catch(e){}
+}
+function ntFechaPainel(silencio){const f=document.getElementById('nt_painel');if(!f)return;if(!silencio)ntRascSalva();f.remove();NT.ed=null}
+function ntSalvarPainel(){
+  const titulo=document.getElementById('nt_titulo')?.value.trim()??'',texto=document.getElementById('nt_texto')?.value??'';
+  if(NT.ed){
+    const n=SM.d?.notas?.find(x=>x.id===NT.ed);
+    if(n&&(n.titulo!==titulo||n.texto!==texto))ntMudar({id:n.id,titulo,texto,atualizado:new Date().toISOString()});
+    ntFechaPainel(true);ntReordenar();return;
+  }
+  ntCriar(titulo,texto.trim());
+}
+function ntCriar(titulo,texto){
+  if(titulo===undefined){titulo=document.getElementById('nt_titulo').value.trim();texto=document.getElementById('nt_texto').value.trim()}
+  if(!titulo&&!texto)return;
+  const em=new Date().toISOString(),ordem=Math.min(0,...ntOrdenadas().map(ntChave))-1;   // nova nota entra no topo
+  if(ntMudar({id:smId(),titulo,texto,em,atualizado:em,ordem})){try{localStorage.removeItem('bcbr_nota_rascunho')}catch(e){}ntFechaPainel(true);render()}
+}
+window.addEventListener('keydown',e=>{
+  if(!document.getElementById('nt_painel'))return;
+  if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();ntFechaPainel()}
+  else if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();e.stopImmediatePropagation();ntSalvarPainel()}
+  else if(e.key==='Tab'||e.altKey)e.stopImmediatePropagation();   // não troca de aba com o painel aberto
+},true);
+
+function ntGrade(){return ntLista().map(n=>{const f=NT.fechadas?.has(n.id);return `<article class="nt-nota${f?' fechada':''}" data-nota="${esc(n.id)}">
+  <div class="nt-topo"><span class="nt-alca" title="Arrastar para mudar a ordem" aria-hidden="true">⠿</span>
+    <button type="button" class="nt-tg" aria-expanded="${!f}" onclick="ntTg('${esc(n.id)}')"><span class="nt-seta">▸</span><b>${esc(n.titulo||'')||'<span class="mut">Sem título</span>'}</b></button>
+    <span class="nt-acoes"><button class="sm-tagb" aria-label="Fixar nota" aria-pressed="${!!n.fixa}" onclick="ntFixar('${esc(n.id)}')">${n.fixa?'● Fixada':'○ Fixar'}</button><button class="sm-tagb" aria-label="Editar nota" onclick="ntAbre('${esc(n.id)}')">Editar</button></span></div>
+  <div class="nt-corpo" title="Clique para editar" onclick="if(!getSelection().toString())ntAbre('${esc(n.id)}')"><div class="nt-txt">${esc(n.texto||'')||'<span class="mut">Sem texto</span>'}</div>
+  <small class="mut">${esc((n.em||n.atualizado||'').slice(0,10))}</small></div></article>`}).join('')||'<p class="mut">Nenhuma nota encontrada.</p>'}
+function ntBuscar(valor){NT.busca=valor;document.getElementById('nt_grade').innerHTML=ntGrade()}
+function ntReordenar(){if(tela==='notas'&&!NTD){const g=document.getElementById('nt_grade');if(g)g.innerHTML=ntGrade()}}
 function vNotas(){
   if(!SM.d)return '<div class="card"><p class="mut">As notas ainda não estão disponíveis neste aparelho. Tente novamente com conexão.</p></div>';
-  const r=ntRascunho();setTimeout(ntAjusta,0);
   return `<div class="nt"><h2>Notas</h2>${SM.erro?'<p class="sm-err">Alterações salvas neste aparelho; sincronização pendente.</p>':''}
-    <form class="nt-criar" onsubmit="event.preventDefault();ntCriar()"><input id="nt_titulo" aria-label="Título opcional" placeholder="Título (opcional)" value="${esc(r.titulo||'')}" oninput="ntRascSalva()"><textarea id="nt_texto" aria-label="Nova nota" placeholder="Anote uma ideia…" rows="3" oninput="ntRascSalva()">${esc(r.texto||'')}</textarea><button class="b" type="submit">Criar nota</button></form>
     <input type="search" aria-label="Buscar notas" placeholder="Buscar notas" value="${esc(NT.busca)}" oninput="ntBuscar(this.value)"><div id="nt_grade" class="nt-grade">${ntGrade()}</div></div>`;
 }
 if(SM.d){ntAplica(SM.d,ntPendentes());smGuardaCache()}
 window.addEventListener('online',()=>{ntSync().then(()=>smPuxar())});
 window.addEventListener('storage',e=>{if(e.key?.startsWith(NT_PREFIX)){if(SM.d)ntAplica(SM.d,ntPendentes());smRender()}});
 
-// Arrastar nota pela alça ⠿ (mouse e toque): solta antes/depois da nota sob o dedo.
+// Arrasto fluido pela alça ⠿ (mouse e toque): um "fantasma" segue o dedo e as outras notas
+// abrem espaço em tempo real, com animação (FLIP). Soltar grava a ordem que está na tela.
 let NTD=null;
-function ntdAlvo(x,y){
-  const el=document.elementFromPoint(x,y),a=el?.closest?.('.nt-nota[data-nota]');if(!a||a.dataset.nota===NTD.id)return null;
-  const b=a.getBoundingClientRect();return {a,antes:y<b.top+b.height/2};
+function ntdFlip(g,muda){
+  const els=[...g.querySelectorAll('.nt-nota')],antes=new Map(els.map(e=>[e,e.getBoundingClientRect()]));muda();
+  for(const e of els){const a=antes.get(e),b=e.getBoundingClientRect(),dx=a.left-b.left,dy=a.top-b.top;if(!dx&&!dy)continue;
+    e.style.transition='none';e.style.transform=`translate(${dx}px,${dy}px)`;e.getBoundingClientRect();
+    e.style.transition='transform .18s cubic-bezier(.2,.8,.2,1)';e.style.transform='';}
 }
-function ntdLimpa(){document.querySelectorAll('.nt-antes,.nt-depois,.nt-arrastando').forEach(e=>e.classList.remove('nt-antes','nt-depois','nt-arrastando'));document.body.classList.remove('nt-on')}
+function ntdMove(){
+  const d=NTD;if(!d)return;d.g.style.transform=`translate(${d.cx-d.dx}px,${d.cy-d.dy}px)`;
+  const el=document.elementFromPoint(d.cx,d.cy),alvo=el?.closest?.('.nt-nota[data-nota]');
+  if(!alvo||alvo===d.a||alvo.style.transform)return;   // ignora a nota que ainda está animando
+  const b=alvo.getBoundingClientRect(),l=[...d.grade.children],ia=l.indexOf(d.a),ib=l.indexOf(alvo);
+  // Mesma linha (2 colunas): decide pelo meio horizontal; senão, pelo meio vertical.
+  const mesmaLinha=Math.abs(d.a.getBoundingClientRect().top-b.top)<8;
+  const depois=mesmaLinha?d.cx>b.left+b.width/2:d.cy>b.top+b.height/2;
+  const ref=depois?alvo.nextSibling:alvo;if(ref===d.a||(depois?ib+1:ib)===ia)return;
+  ntdFlip(d.grade,()=>d.grade.insertBefore(d.a,ref));
+}
 function ntdFim(cancela){
-  const d=NTD;if(!d)return;NTD=null;clearInterval(d.auto);ntdLimpa();
-  if(!cancela&&d.alvo)ntMover(d.id,d.alvo.a.dataset.nota,d.alvo.antes);
+  const d=NTD;if(!d)return;NTD=null;clearInterval(d.auto);d.g.remove();d.a.classList.remove('nt-lugar');document.body.classList.remove('nt-on');
+  if(cancela){ntReordenar();return}
+  const vis=[...d.grade.querySelectorAll('.nt-nota[data-nota]')].map(e=>e.dataset.nota);
+  if(vis.join()!==d.inicio.join())ntOrdem(vis);
+}
+// Grava a nova ordem: as notas visíveis (busca) assumem as posições que já ocupavam na lista completa.
+function ntOrdem(vis){
+  const l=ntOrdenadas(),pos=l.map((n,i)=>vis.includes(n.id)?i:-1).filter(i=>i>=0),mapa=new Map(l.map(n=>[n.id,n]));
+  const nova=[...l];vis.forEach((id,k)=>{nova[pos[k]]=mapa.get(id)});
+  const agora=new Date().toISOString();let mudou=false;
+  nova.forEach((x,i)=>{const o=(i+1)*10;if(x&&x.ordem!==o){ntMudar({id:x.id,ordem:o,atualizado:agora});mudou=true}});
+  ntReordenar();return mudou;
+}
+function ntMover(id,ref,antes){
+  if(!id||!ref||id===ref)return false;
+  const l=ntOrdenadas().map(n=>n.id);if(!l.includes(id)||!l.includes(ref))return false;
+  const nova=l.filter(x=>x!==id);nova.splice(nova.indexOf(ref)+(antes?0:1),0,id);return ntOrdem(nova);
 }
 document.addEventListener('pointerdown',e=>{
   if(NTD||tela!=='notas'||(e.pointerType==='mouse'&&e.button!==0))return;
   const h=e.target.closest?.('.nt-alca'),a=h&&h.closest('.nt-nota[data-nota]');if(!a)return;
-  e.preventDefault();NTD={id:a.dataset.nota,pid:e.pointerId,cy:e.clientY,alvo:null};
-  a.classList.add('nt-arrastando');document.body.classList.add('nt-on');try{h.setPointerCapture(e.pointerId)}catch(_){}
-  NTD.auto=setInterval(()=>{if(!NTD)return;if(NTD.cy<70)scrollBy(0,-14);else if(NTD.cy>innerHeight-70)scrollBy(0,14)},16);
+  e.preventDefault();const b=a.getBoundingClientRect(),grade=a.parentElement;
+  const g=a.cloneNode(true);g.classList.add('nt-fantasma');g.style.cssText=`width:${b.width}px;height:${b.height}px`;document.body.appendChild(g);
+  NTD={a,g,grade,pid:e.pointerId,cx:e.clientX,cy:e.clientY,dx:e.clientX-b.left,dy:e.clientY-b.top,inicio:[...grade.querySelectorAll('.nt-nota[data-nota]')].map(x=>x.dataset.nota)};
+  a.classList.add('nt-lugar');document.body.classList.add('nt-on');try{h.setPointerCapture(e.pointerId)}catch(_){}
+  if(navigator.vibrate)try{navigator.vibrate(15)}catch(_){}
+  NTD.auto=setInterval(()=>{const d=NTD;if(!d)return;if(d.cy<80)scrollBy(0,-12);else if(d.cy>innerHeight-80)scrollBy(0,12);else return;ntdMove()},16);
+  ntdMove();
 },true);
-document.addEventListener('pointermove',e=>{
-  const d=NTD;if(!d||e.pointerId!==d.pid)return;e.preventDefault();d.cy=e.clientY;
-  const alvo=ntdAlvo(e.clientX,e.clientY);document.querySelectorAll('.nt-antes,.nt-depois').forEach(x=>x.classList.remove('nt-antes','nt-depois'));
-  d.alvo=alvo;if(alvo)alvo.a.classList.add(alvo.antes?'nt-antes':'nt-depois');
-},{passive:false});
+document.addEventListener('pointermove',e=>{const d=NTD;if(!d||e.pointerId!==d.pid)return;e.preventDefault();d.cx=e.clientX;d.cy=e.clientY;ntdMove()},{passive:false});
 document.addEventListener('pointerup',e=>{if(NTD&&e.pointerId===NTD.pid)ntdFim(false)});
 document.addEventListener('pointercancel',e=>{if(NTD&&e.pointerId===NTD.pid)ntdFim(true)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&NTD)ntdFim(true)});
+document.addEventListener('touchmove',e=>{if(NTD)e.preventDefault()},{passive:false});

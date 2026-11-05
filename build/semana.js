@@ -804,13 +804,14 @@ function qaTecla(e){
   }
 }
 window.addEventListener('keydown',e=>{
-  if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(['hoje','semana','tarefas','notas'].includes(tela))){e.preventDefault();e.stopImmediatePropagation();qaAbre()}return}
+  if(!QA.on){if(e.altKey&&!e.ctrlKey&&(e.code==='Key'+KEY('qa').toUpperCase()||e.code==='Digit'+KEY('qa'))&&(['hoje','semana','tarefas','notas'].includes(tela))){e.preventDefault();e.stopImmediatePropagation();tela==='notas'&&typeof ntAbre==='function'?ntAbre():qaAbre()}return}
   e.stopImmediatePropagation();
   qaTecla(e);
 },true);
 // botão flutuante "+" (celular e mouse) nas abas Hoje e Semana — chamado a cada render
-function qaBotao(){let b=document.getElementById('qa_fab');const ver=['hoje','semana','tarefas'].includes(tela);
-  if(!b){b=document.createElement('button');b.id='qa_fab';b.className='qa-fab';b.title='Nova tarefa (Alt+A)';b.setAttribute('aria-label','Nova tarefa (Alt+A)');b.textContent='+';b.onclick=qaAbre;document.body.appendChild(b)}
+function qaBotao(){let b=document.getElementById('qa_fab');const ver=['hoje','semana','tarefas','notas'].includes(tela);
+  if(!b){b=document.createElement('button');b.id='qa_fab';b.className='qa-fab';b.textContent='+';b.onclick=()=>tela==='notas'&&typeof ntAbre==='function'?ntAbre():qaAbre();document.body.appendChild(b)}
+  const nome=tela==='notas'?'Nova nota (Alt+A)':'Nova tarefa (Alt+A)';b.title=nome;b.setAttribute('aria-label',nome);   // na aba Notas o + cria nota (05/11/2026)
   b.style.display=ver?'':'none'}
 
 // Tab = próxima aba (à direita), Shift+Tab = anterior (à esquerda), em volta. Pedido do Artur, 22/10/2026.
