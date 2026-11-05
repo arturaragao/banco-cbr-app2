@@ -577,11 +577,16 @@ test('edição longa offline compacta a fila sem perder título, texto ou criaç
   b.estado.falhar=false;await b.c.smPuxar();assert.equal(b.salvos.at(-1).notas[0].texto,'Texto 99');assert.equal(b.salvos.at(-1).notas[0].titulo,'Título preservado');
 });
 
-test('Notas ordena por atualização e mantém as fixadas acima das editadas',async()=>{
-  const a=await app();vm.runInContext("SM.d.notas=[{id:'a',texto:'Anterior',atualizado:'2026-10-25'},{id:'b',texto:'Mais antiga',atualizado:'2026-10-24'}]",a.c);
+test('Notas: editar não muda a ordem, nova entra no topo, arrastar reordena e fixadas ficam acima',async()=>{
+  const a=await app();vm.runInContext("SM.d.notas=[{id:'a',texto:'Recente',em:'2026-10-25'},{id:'b',texto:'Antiga',em:'2026-10-24'}]",a.c);
   assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['a','b']);a.c.ntEditar('b','texto','Atualizada');
-  assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['b','a']);a.c.ntFixar('a');
-  assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['a','b']);
+  assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['a','b'],'edição não reordena');
+  a.elementos.set('nt_titulo',{value:''});a.elementos.set('nt_texto',{value:'Nova'});a.c.ntCriar();
+  const ids=copia(a.c.ntLista()).map(n=>n.id);assert.equal(ids.length,3);assert.deepEqual(ids.slice(1),['a','b'],'nova no topo');
+  assert.equal(a.c.ntMover('b',ids[0],true),true);assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['b',ids[0],'a']);
+  a.c.ntEditar('b','titulo','Editada');assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['b',ids[0],'a']);
+  a.c.ntFixar('a');assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['a','b',ids[0]]);
+  await a.c.ntSync();assert.deepEqual(a.salvos.at(-1).notas.filter(n=>!n.fixa).sort((x,y)=>x.ordem-y.ordem).map(n=>n.id),['b',ids[0]],'ordem persistida');
 });
 
 test('planejamento não reinsere tarefas na aba Calendário, mesmo com semana/mês abertos',async()=>{
