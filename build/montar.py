@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.35.0"
+VERSAO = "1.35.1"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -80,6 +80,9 @@ js = js[:ini] + open(f"{R}/build/banco.js", encoding="utf8").read() + "\n\n" + j
 # Painel: célula "Foco até a prova (CBR)" em primeiro (build/foco.js), mesmo com pnOrd salvo e sem respostas (1.35.0)
 troca("const PN_BOXES=[['resumo',", "const PN_BOXES=[['foco','Foco até a prova (CBR)',()=>vFoco()],['resumo',")
 troca("return [...sv,...ids.filter(i=>!sv.includes(i))]};", "return (r=>sv.includes('foco')?r:['foco',...r.filter(i=>i!=='foco')])([...sv,...ids.filter(i=>!sv.includes(i))])};")
+
+# 1.35.1: área seg ganha nome mais amplo (bioestatística, informática e IA entram nela; o id continua seg)
+troca("{id:'seg',nome:'Segurança do paciente',kw:['seguranca']}", "{id:'seg',nome:'Segurança, qualidade e estatística',kw:['seguranca','estatistica','informatica']}")
 troca("if(!log.length)return `<div class=\"card\">Responda algumas questões para o painel aparecer.</div>`+vIncidencia();", "if(!log.length)return vFoco()+`<div class=\"card\">Responda algumas questões para o painel aparecer.</div>`+vIncidencia();")
 # aba Semana (substitui o artefato "Minha Semana", 21/10/2026)
 troca("let sess=null,tela='hoje',sub=null;", "let sess=null,tela='tarefas',sub=null;")

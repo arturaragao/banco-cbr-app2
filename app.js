@@ -1,4 +1,4 @@
-// Banco CBR app 1.35.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.35.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1902,7 +1902,7 @@ const AREAS=[
  {id:'cp',nome:'Cabeça e pescoço',kw:['cabeca e pescoco','tireoide','laringe','paratireo','salivar']},
  {id:'neuro',nome:'Neurorradiologia',kw:['neuro','encefal','cranio','sistema nervoso','coluna','medula','hipofis','sela turcica']},
  {id:'fis',nome:'Física e proteção radiológica',kw:['fisica','protecao','radioprotecao','dosimetria']},
- {id:'seg',nome:'Segurança do paciente',kw:['seguranca']},
+ {id:'seg',nome:'Segurança, qualidade e estatística',kw:['seguranca','estatistica','informatica']},
  {id:'cont',nome:'Assistência à vida e contraste',kw:['contraste','reacoes adversas','anafil','farmacolog','assistencia a vida']},
  {id:'go',nome:'Ginecologia e Obstetrícia',kw:['obstet','ginecolog','feto','reprodutivo','gestac','ovario','anexo','utero','endometri','pelve feminina','trompa']},
  {id:'dop',nome:'Doppler',kw:['doppler','vascular','vasos']},
