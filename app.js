@@ -1,4 +1,4 @@
-// Banco CBR app 1.35.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.36.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1639,17 +1639,22 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&NTD){e.preventDefau
 document.addEventListener('touchmove',e=>{if(NTD)e.preventDefault()},{passive:false});
 
 
-// Tags PersonalRad: bloco separado após responder; nunca entram na classificação ou nas contagens.
+// Tags PersonalRad: bloco rotulado por nível (quiz após responder; Banco com a questão aberta); nunca entram na classificação ou nas contagens.
+const PR_NIVEIS=[['specialty','Especialidade'],['system','Sistema'],['session','Sessão'],['theme','Tema'],['subtheme','Subtema'],['specific','Específico'],['test','Prova'],['year','Ano'],['area','Área'],['tag','Tag']];
 function prTagsBloco(q){
-  const tags=[],vistos=new Set();
-  function visitar(v){
-    if(typeof v==='string'){
-      const t=v.trim(),k=prNorm(t);
-      if(k&&!vistos.has(k)){vistos.add(k);tags.push(t)}
-    }else if(v&&typeof v==='object')Object.values(v).forEach(visitar);
+  const t=q.pr_tags;
+  if(!t||typeof t!=='object')return '';
+  function achatar(v,out){
+    if(typeof v==='string'||typeof v==='number'){const x=String(v).trim();if(x)out.push(x)}
+    else if(v&&typeof v==='object')Object.values(v).forEach(y=>achatar(y,out));
+    return out;
   }
-  visitar(q.pr_tags);
-  return tags.length?`<div class="pr-tags"><span class="mut">PersonalRad:</span> ${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(' ')}</div>`:'';
+  const conhecidas=new Set(PR_NIVEIS.map(n=>n[0])),linhas=[];
+  for(const [k,nome] of [...PR_NIVEIS,...Object.keys(t).filter(k=>!conhecidas.has(k)).map(k=>[k,k])]){
+    const vistos=new Set(),vals=achatar(t[k],[]).filter(x=>{const n=prNorm(x)||x;if(vistos.has(n))return false;vistos.add(n);return true});
+    if(vals.length)linhas.push(`<p><b>${esc(nome)}:</b> ${vals.map(esc).join(' · ')}</p>`);
+  }
+  return linhas.length?`<div class="ponto md pr-dados pr-tags"><div class="kick">Classificação PersonalRad</div>${linhas.join('')}</div>`:'';
 }
 function prLinhas(q){return Object.values(q.curso?.secoes||{}).flat().filter(v=>typeof v==='string')}
 function prStats(q){
@@ -3130,6 +3135,7 @@ function bCorpo(q){
   return `<div class="bc">
     <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
     ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
+    ${prTagsBloco(q)}
     <div class="row">${qDificuldade(q)}<span class="mut">${r?'Feita · '+(r.ok?'acertou':'errou'):'Não feita'}</span></div>
     ${qEnunciado(q,imgs)}${alts}
     <p style="margin:8px 0"><b>Gabarito: ${q.gab||'—'}</b>${prAcertoBloco(q)}${r?` · <span class="mut">sua última resposta: ${r.e||'?'} (${r.ok?'acertou':'errou'}, ${r.conf||''})</span>`:''}</p>

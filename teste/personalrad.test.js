@@ -274,7 +274,7 @@ for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com
   assert.match(depois,nome==='app gerado'?/class="dif d"/:/acerto dos alunos 20%/);
   assert.match(depois,/possível erro na questão/);
   assert.match(depois,/Classificação do banco\/Codex: Neuro › Tema Claude/);
-  assert.match(depois,/PersonalRad:<\/span>/);
+  assert.match(depois,/Classificação PersonalRad/);
   for(const texto of ['Tema PR','Subtema PR','Específico PR'])assert.ok(depois.includes(texto),texto);
   for(const texto of ['Tags Claude','Tema Claude','Neuro','por dificuldade','Difícil'])assert.ok(depois.includes(texto),texto);
   assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
@@ -309,12 +309,14 @@ test('pr_tags preserva todos os níveis, escapa HTML e não altera tags/cl na po
   assert.equal(executar(c,'JSON.stringify(q.pr_tags)'),JSON.stringify(c.entrada[0].pr_tags));
   assert.match(executar(c,'JSON.stringify(q)'),/Radiologia|Mama|PR/);
   const html=executar(c,'prTagsBloco(q)');
-  assert.match(html,/PersonalRad:/);
-  assert.match(html,/Radiologia/);assert.match(html,/Mama/);
+  assert.match(html,/Classificação PersonalRad/);
+  assert.match(html,/<b>Especialidade:<\/b> Radiologia<\/p>/);assert.match(html,/<b>Sessão:<\/b> Mama<\/p>/);
   assert.match(html,/&lt;b&gt;PR&lt;\/b&gt;/);assert.doesNotMatch(html,/<b>PR<\/b>/);
-  assert.equal((html.match(/class="tag"/g)||[]).length,3);
-  executar(c,"q.pr_tags={theme:{subtheme:{specific:['Profundo']}}}");
-  assert.match(executar(c,'prTagsBloco(q)'),/Profundo/);
+  assert.equal((html.match(/<p>/g)||[]).length,3);
+  executar(c,"q.pr_tags={theme:{subtheme:{specific:['Profundo']}},foo:'x',subtheme:['S'],year:[2025],system:['Gastrointestinal']}");
+  const h2=executar(c,'prTagsBloco(q)');
+  assert.match(h2,/Profundo/);assert.match(h2,/<b>foo:<\/b> x/);
+  assert.ok(h2.indexOf('Sistema')<h2.indexOf('Tema')&&h2.indexOf('Tema')<h2.indexOf('Subtema')&&h2.indexOf('Ano')<h2.indexOf('foo'));
   executar(c,'q.pr_tags={}');assert.equal(executar(c,'prTagsBloco(q)'),'');
 });
 
@@ -350,7 +352,7 @@ test('painel, contagens, incidência e pesos RI ignoram pr_tags inclusive sem ta
   assert.doesNotMatch(executar(c,"vSub('neuro')+vSub('tor')+vIncidencia()"),/Tema PR|Subtema PR|Específico PR|PersonalRad/);
 });
 
-test('Banco fechado e aberto não mostra pr_tags e conserva tags Claude',()=>{
+test('Banco fechado conserva tags Claude sem pr_tags; aberto mostra a classificação PersonalRad',()=>{
   const c=contexto();preparar(c);
   executar(c,`const esc=String,norm=s=>String(s||''),isMeta=()=>false,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[];
     const qDificuldade=()=>'',qEnunciado=()=>'',qAlternativas=()=>'',galeria=()=>'',cursoBloco=()=>'',
@@ -361,8 +363,13 @@ test('Banco fechado e aberto não mostra pr_tags e conserva tags Claude',()=>{
   executar(c,trecho(banco,'function bStatus(','function prAcertoBloco('));
   executar(c,trecho(banco,'function bCorpo(q){','async function bBaixar'));
   executar(c,trecho(banco,'function vBanco(){','// ===== comentário novo'));
-  assert.doesNotMatch(executar(c,'vBanco()'),/Radiologia|Mama|PR|PersonalRad|pr-tag/);
-  assert.doesNotMatch(executar(c,'bCorpo(q)'),/Radiologia|Mama|PR|PersonalRad|pr-tag/);
+  executar(c,"q.pr_tags.subtheme=['<i>Sub</i>']");
+  assert.doesNotMatch(executar(c,'vBanco()'),/Radiologia|Mama|PersonalRad|pr-tag/);
+  const aberto=executar(c,'bCorpo(q)');
+  for(const v of ['Classificação PersonalRad','Especialidade','Sistema','Subtema','Radiologia','Mama','<i>Sub</i>'])
+    if(v!=='Sistema')assert.ok(aberto.includes(v),v);
+  executar(c,"q.pr_tags.system=['Gastrointestinal']");
+  assert.ok(executar(c,'bCorpo(q)').includes('Sistema'));
   executar(c,"q.tags=['Claude']");
   const h=executar(c,'vBanco()');assert.match(h,/class="tag">Claude/);assert.doesNotMatch(h,/PersonalRad/);
 });
