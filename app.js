@@ -1,4 +1,4 @@
-// Banco CBR app 1.36.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.36.2 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -2724,7 +2724,7 @@ function vQuiz(){
   const last=sess.i>=sess.ids.length-1;
   return `${sess.sim?`<div class="timer"><span id="tm"></span></div>`:''}
   <div class="qlay"><div style="min-width:0"><div class="card"><div class="row mut"><span>Questão ${sess.i+1}/${sess.ids.length}</span><small class="qpos" title="Posição da questão na página Questões do Notion">Notion #${q.n??'—'}</small><b class="qtitle">${tituloQ(q,fb)}</b>${fb?qDificuldade(q):''}${fb?prProvaBloco(q):''}</div>${fb?prAvisoBloco(q):''}
-  ${fb?`${q.tags.length||q.cl?.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação do banco/Codex: ${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}</div>${q.tags.length?`<div class="tagstop">${tgHtml('q')}</div>`:''}`:''}${prTagsBloco(q)}`:''}
+  ${fb?`${q.tags.length||q.cl?.length?`<div class="mut" style="font-size:.82rem;margin-top:10px">Classificação do banco/Codex: ${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}</div>${q.tags.length?`<div class="tagstop">${tgHtml('q')}</div>`:''}`:''}`:''}
   ${qEnunciado(q,imgs)}${alts}
   ${precisaConf()?`<div class="conf"><p class="mut">Quão seguro você está de ${sel})?</p><button class="b" onclick="responder('${sel}','certeza')">${keyLab('cert')} · Certeza</button><button class="b s" onclick="responder('${sel}','duvida')">${keyLab('duv')} · Dúvida</button><button class="b s" onclick="responder('${sel}','chute')">${keyLab('chu')} · Chute</button></div>`:''}
   ${sess.sim&&r&&!precisaConf()?`<p class="mut">Resposta registrada (${r.conf}). Para trocar, escolha outra alternativa.</p>`:''}
@@ -3121,10 +3121,10 @@ function comentAlt(q,l){
   return `<div class="cmw">${c?`<div class="mut md cm cmc"><span class="src">Curso</span>${md(c)}</div>`:''}${k?`<div class="mut md cm cmk"><span class="src">Claude</span>${md(k)}</div>`:''}</div>`;
 }
 function cursoBloco(q){
-  const c=q.curso;if(!c)return prDadosBloco(q);
+  const c=q.curso;if(!c)return prDadosBloco(q)+prTagsBloco(q);
   const sec=Object.entries(c.secoes||{}).map(([k,v])=>[k,(v||[]).filter(t=>!/^\s*(?:📊|Acerto dos alunos:|Alternativas marcadas:|Tempo:|Dados do site\s*$)/i.test(t))]).filter(([k,v])=>v&&v.length&&!/alternativ/i.test(k));
-  if(!c.ponto&&!sec.length)return prDadosBloco(q);
-  return `<div class="ponto md pcurso"><div class="kick">Ponto de ensino · Curso (PersonalRad)</div>${c.ponto?md(c.ponto):''}${sec.map(([k,v])=>`<div class="kick" style="margin-top:8px">${esc(k)}</div>${md(v.join('\n\n'))}`).join('')}</div>${prDadosBloco(q)}`;
+  if(!c.ponto&&!sec.length)return prDadosBloco(q)+prTagsBloco(q);
+  return `<div class="ponto md pcurso"><div class="kick">Ponto de ensino · Curso (PersonalRad)</div>${c.ponto?md(c.ponto):''}${sec.map(([k,v])=>`<div class="kick" style="margin-top:8px">${esc(k)}</div>${md(v.join('\n\n'))}`).join('')}</div>${prDadosBloco(q)}${prTagsBloco(q)}`;
 }
 function bStatus(q,ult){const l=ult[q.id];return l?(l.ok?'<span class="bok">✓</span>':'<span class="bbad">✗</span>'):'<span class="mut">·</span>'}
 function prAcertoBloco(q){const ac=acertoPR(q),n=prStats(q).respostas;return ac==null?'':`<span class="mut" style="font-size:.82rem"> · acerto dos alunos ${ac.toLocaleString('pt-BR',{maximumFractionDigits:2})}%${n!=null?' ('+n+')':''}</span>`}
@@ -3135,7 +3135,6 @@ function bCorpo(q){
   return `<div class="bc">
     <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
     ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
-    ${prTagsBloco(q)}
     <div class="row">${qDificuldade(q)}<span class="mut">${r?'Feita · '+(r.ok?'acertou':'errou'):'Não feita'}</span></div>
     ${qEnunciado(q,imgs)}${alts}
     <p style="margin:8px 0"><b>Gabarito: ${q.gab||'—'}</b>${prAcertoBloco(q)}${r?` · <span class="mut">sua última resposta: ${r.e||'?'} (${r.ok?'acertou':'errou'}, ${r.conf||''})</span>`:''}</p>

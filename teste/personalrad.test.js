@@ -248,13 +248,14 @@ for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com
     const etapaDe=()=>'',anoDe=()=>'',norm=x=>x,posDe=()=>1,keyLab=()=>'',tgHtml=q=>'Tags Claude',
       barra=()=>'',pct=()=>0,
     precisaConf=()=>false,imgSrc=()=>false,pontoBloco=()=>'',iaBloco=()=>'',cur=()=>q,selAtual=()=>sess.sel||null;
-    const galeria=()=>'',comentAlt=()=>'',cursoBloco=()=>'',claudeMdBloco=()=>'',bannerResp=()=>'',
+    const galeria=()=>'',comentAlt=()=>'',claudeMdBloco=()=>'',bannerResp=()=>'',
       blocoFeedback=(q,r,s)=>s,verCom=()=>true;
     const difTag=q=>'<span class="dif '+q._d+'">Dif</span>';
     let sess={i:0,ids:['q1'],resp:{},cut:{},nvOpen:true};
     q.alts={A:'Certa',B:'Errada marcada',C:'Outra errada'};q.gab='A';q.cl=['Tema Claude'];q.coment={};
     q.pr_stats.alternativas={A:{percentual:60},B:{percentual:30},C:{percentual:10}};
     q.tags=['Claude'];q.pr_qualidade={reportsOpen:1};q.pr_prova={year:['2026']};q.pr_tags={theme:['Tema PR'],subtheme:['Subtema PR'],specific:['Específico PR']};`);
+  executar(c,trecho(banco,'function cursoBloco(q){','function bStatus('));
   executar(c,trecho(script,'function tituloQ(q','const TES='));
   executar(c,trecho(script,'function nvBloco(){','const DIFV='));
   executar(c,`const QID={q1:q};DIF.d.nome='Difícil';`);
@@ -275,6 +276,7 @@ for(const [nome,script] of [['app gerado',gerado]])test(`${nome}: pistas só com
   assert.match(depois,/possível erro na questão/);
   assert.match(depois,/Classificação do banco\/Codex: Neuro › Tema Claude/);
   assert.match(depois,/Classificação PersonalRad/);
+  assert.ok(depois.indexOf('Dados do site')>=0&&depois.indexOf('Classificação PersonalRad')>depois.indexOf('Dados do site'),'quiz: Classificação depois de Dados do site');
   for(const texto of ['Tema PR','Subtema PR','Específico PR'])assert.ok(depois.includes(texto),texto);
   for(const texto of ['Tags Claude','Tema Claude','Neuro','por dificuldade','Difícil'])assert.ok(depois.includes(texto),texto);
   assert.match(depois,/class="alt ok [^"]*"[^]*?Certa[^]*?60%/);
@@ -359,11 +361,12 @@ test('painel, contagens, incidência e pesos RI ignoram pr_tags inclusive sem ta
 test('Banco fechado conserva tags Claude sem pr_tags; aberto mostra a classificação PersonalRad',()=>{
   const c=contexto();preparar(c);
   executar(c,`const esc=String,norm=s=>String(s||''),isMeta=()=>false,AREA_BY={neuro:{nome:'Neuro'}},AREAS=[];
-    const qDificuldade=()=>'',qEnunciado=()=>'',qAlternativas=()=>'',galeria=()=>'',cursoBloco=()=>'',
+    const qDificuldade=()=>'',qEnunciado=()=>'',qAlternativas=()=>'',galeria=()=>'',
       claudeMdBloco=()=>'',pontoDe=()=>'';
     q.tags=[];q.cl=[];q.imgs=[];q.imgsCom=[];q.coment={};q.pr_stats=null;
     q.pr_tags={specialty:['Radiologia'],session:['Mama'],tag:['PR']};`);
   executar(c,trecho(banco,'let bq=','function comentAlt('));
+  executar(c,trecho(banco,'function cursoBloco(q){','function bStatus('));
   executar(c,trecho(banco,'function bStatus(','function prAcertoBloco('));
   executar(c,trecho(banco,'function bCorpo(q){','async function bBaixar'));
   executar(c,trecho(banco,'function vBanco(){','// ===== comentário novo'));
@@ -372,6 +375,10 @@ test('Banco fechado conserva tags Claude sem pr_tags; aberto mostra a classifica
   const aberto=executar(c,'bCorpo(q)');
   for(const v of ['Classificação PersonalRad','Especialidade','Sistema','Subtema','Radiologia','Mama','<i>Sub</i>'])
     if(v!=='Sistema')assert.ok(aberto.includes(v),v);
+  executar(c,"q.pr_stats={acerto:50,respostas:10}");
+  const ab=executar(c,'bCorpo(q)');
+  assert.ok(ab.indexOf('Dados do site')>=0&&ab.indexOf('Classificação PersonalRad')>ab.indexOf('Dados do site'),'Banco: Classificação depois de Dados do site');
+  executar(c,"q.pr_stats=null");
   executar(c,"q.pr_tags.system=['Gastrointestinal']");
   assert.ok(executar(c,'bCorpo(q)').includes('Sistema'));
   executar(c,"q.tags=['Claude']");

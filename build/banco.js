@@ -9,10 +9,10 @@ function comentAlt(q,l){
   return `<div class="cmw">${c?`<div class="mut md cm cmc"><span class="src">Curso</span>${md(c)}</div>`:''}${k?`<div class="mut md cm cmk"><span class="src">Claude</span>${md(k)}</div>`:''}</div>`;
 }
 function cursoBloco(q){
-  const c=q.curso;if(!c)return prDadosBloco(q);
+  const c=q.curso;if(!c)return prDadosBloco(q)+prTagsBloco(q);
   const sec=Object.entries(c.secoes||{}).map(([k,v])=>[k,(v||[]).filter(t=>!/^\s*(?:📊|Acerto dos alunos:|Alternativas marcadas:|Tempo:|Dados do site\s*$)/i.test(t))]).filter(([k,v])=>v&&v.length&&!/alternativ/i.test(k));
-  if(!c.ponto&&!sec.length)return prDadosBloco(q);
-  return `<div class="ponto md pcurso"><div class="kick">Ponto de ensino · Curso (PersonalRad)</div>${c.ponto?md(c.ponto):''}${sec.map(([k,v])=>`<div class="kick" style="margin-top:8px">${esc(k)}</div>${md(v.join('\n\n'))}`).join('')}</div>${prDadosBloco(q)}`;
+  if(!c.ponto&&!sec.length)return prDadosBloco(q)+prTagsBloco(q);
+  return `<div class="ponto md pcurso"><div class="kick">Ponto de ensino · Curso (PersonalRad)</div>${c.ponto?md(c.ponto):''}${sec.map(([k,v])=>`<div class="kick" style="margin-top:8px">${esc(k)}</div>${md(v.join('\n\n'))}`).join('')}</div>${prDadosBloco(q)}${prTagsBloco(q)}`;
 }
 function bStatus(q,ult){const l=ult[q.id];return l?(l.ok?'<span class="bok">✓</span>':'<span class="bbad">✗</span>'):'<span class="mut">·</span>'}
 function prAcertoBloco(q){const ac=acertoPR(q),n=prStats(q).respostas;return ac==null?'':`<span class="mut" style="font-size:.82rem"> · acerto dos alunos ${ac.toLocaleString('pt-BR',{maximumFractionDigits:2})}%${n!=null?' ('+n+')':''}</span>`}
@@ -23,7 +23,6 @@ function bCorpo(q){
   return `<div class="bc">
     <div class="mut" style="font-size:.82rem">${esc([AREA_BY[q._a].nome,...(q.cl||[])].join(' › '))}${q.classif?'':' · <b>ainda sem classificação</b>'}${prProvaBloco(q)}${prAvisoBloco(q)}</div>
     ${q.tags.length?`<div style="margin-top:4px">${q.tags.filter(t=>!isMeta(t)).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
-    ${prTagsBloco(q)}
     <div class="row">${qDificuldade(q)}<span class="mut">${r?'Feita · '+(r.ok?'acertou':'errou'):'Não feita'}</span></div>
     ${qEnunciado(q,imgs)}${alts}
     <p style="margin:8px 0"><b>Gabarito: ${q.gab||'—'}</b>${prAcertoBloco(q)}${r?` · <span class="mut">sua última resposta: ${r.e||'?'} (${r.ok?'acertou':'errou'}, ${r.conf||''})</span>`:''}</p>

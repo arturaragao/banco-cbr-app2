@@ -1,6 +1,7 @@
 # Banco CBR (app)
 
 ## Estado atual / Histórico
+- 06/11/2026 — 1.36.2 (pedido do Artur): bloco Classificação PersonalRad passa para baixo de Dados do site (Banco e quiz após responder).
 - 06/11/2026 — 1.36.1: rótulos Modalidade e Disciplina no bloco Classificação PersonalRad (vindos das tags do Notion convertidas).
 - 06/11/2026 — 1.36.0 (pedido do Artur, regra fixa): pr_tags completas por nível aparecem no Banco (questão aberta) e no quiz após responder; substitui 'Banco preserva a lista sem pr_tags' da 1.31.2; painel/RI seguem sem pr_tags.
 - 06/11/2026 — 1.35.1 (pedido do Artur): área `seg` passa a se chamar "Segurança, qualidade e estatística" (id e comportamento iguais; `kw` ganha estatistica/informatica; troca em montar.py), pois recebe bioestatística, informática e IA e segurança/comunicação vindas de "Fora da radiologia" (76 questões realocadas no repo de dados). Só `sem` fica fora de estudos/RI/painel; `seg` entra normalmente. Versão e testes ajustados.
