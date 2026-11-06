@@ -1,4 +1,4 @@
-// Banco CBR app 1.36.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.36.1 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1640,7 +1640,7 @@ document.addEventListener('touchmove',e=>{if(NTD)e.preventDefault()},{passive:fa
 
 
 // Tags PersonalRad: bloco rotulado por nível (quiz após responder; Banco com a questão aberta); nunca entram na classificação ou nas contagens.
-const PR_NIVEIS=[['specialty','Especialidade'],['system','Sistema'],['session','Sessão'],['theme','Tema'],['subtheme','Subtema'],['specific','Específico'],['test','Prova'],['year','Ano'],['area','Área'],['tag','Tag']];
+const PR_NIVEIS=[['specialty','Especialidade'],['system','Sistema'],['modality','Modalidade'],['discipline','Disciplina'],['session','Sessão'],['theme','Tema'],['subtheme','Subtema'],['specific','Específico'],['test','Prova'],['year','Ano'],['area','Área'],['tag','Tag']];
 function prTagsBloco(q){
   const t=q.pr_tags;
   if(!t||typeof t!=='object')return '';

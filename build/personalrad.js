@@ -1,5 +1,5 @@
 // Tags PersonalRad: bloco rotulado por nível (quiz após responder; Banco com a questão aberta); nunca entram na classificação ou nas contagens.
-const PR_NIVEIS=[['specialty','Especialidade'],['system','Sistema'],['session','Sessão'],['theme','Tema'],['subtheme','Subtema'],['specific','Específico'],['test','Prova'],['year','Ano'],['area','Área'],['tag','Tag']];
+const PR_NIVEIS=[['specialty','Especialidade'],['system','Sistema'],['modality','Modalidade'],['discipline','Disciplina'],['session','Sessão'],['theme','Tema'],['subtheme','Subtema'],['specific','Específico'],['test','Prova'],['year','Ano'],['area','Área'],['tag','Tag']];
 function prTagsBloco(q){
   const t=q.pr_tags;
   if(!t||typeof t!=='object')return '';

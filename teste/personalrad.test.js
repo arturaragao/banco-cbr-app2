@@ -317,6 +317,10 @@ test('pr_tags preserva todos os níveis, escapa HTML e não altera tags/cl na po
   const h2=executar(c,'prTagsBloco(q)');
   assert.match(h2,/Profundo/);assert.match(h2,/<b>foo:<\/b> x/);
   assert.ok(h2.indexOf('Sistema')<h2.indexOf('Tema')&&h2.indexOf('Tema')<h2.indexOf('Subtema')&&h2.indexOf('Ano')<h2.indexOf('foo'));
+  executar(c,'q.pr_tags={modality:["RM"],discipline:["Anatomia"]}');
+  const h3=executar(c,'prTagsBloco(q)');
+  assert.match(h3,/Modalidade/);assert.match(h3,/Disciplina/);
+  assert.ok(h3.indexOf('Modalidade')<h3.indexOf('Disciplina'));
   executar(c,'q.pr_tags={}');assert.equal(executar(c,'prTagsBloco(q)'),'');
 });
 
