@@ -1,6 +1,8 @@
 // ===== aba Banco (app): igual ao Notion — todas as questões numeradas, em toggle =====
-let bq='',bf={a:'',d:'',s:'',c:''},bAbertos=new Set(),bLim=150;
+let bq='',bf={a:'',d:'',s:'',c:'',p:''},bAbertos=new Set(),bLim=150;
 const recente=q=>q.origem==='extensao'&&q.chegou&&Date.now()-Date.parse(q.chegou)<7*864e5;
+// ordem do Banco: número do Notion decrescente (últimas em cima); sem número no fim
+const bOrdena=L=>L.slice().sort((a,b)=>(a.n==null)-(b.n==null)||(a.n==null?0:b.n-a.n));
 function comentAlt(q,l){
   const c=q.curso&&q.curso.coment&&q.curso.coment[l],k=q.coment&&q.coment[l];
   if(!c&&!k)return'';
@@ -38,10 +40,10 @@ async function bBaixar(){const el=$('#b_dl');if(el)el.disabled=true;
   toast(`${n} imagens guardadas neste aparelho`);const e=$('#b_dl');if(e){e.disabled=false;e.textContent='Baixar imagens para offline'}}
 function vBanco(){
   const n=norm(bq),ult={};log.forEach(l=>ult[l.q]=l);
-  const L=Q.filter(q=>(!n||norm((q.n??'')+' '+q.enunciado+' '+q.tags.join(' ')+' '+(q.cl||[]).join(' ')).includes(n))
+  const L=bOrdena(Q.filter(q=>(!n||norm((q.n??'')+' '+q.enunciado+' '+q.tags.join(' ')+' '+(q.cl||[]).join(' ')).includes(n))
     &&(!bf.a||q._a===bf.a)&&(!bf.d||q._d===bf.d)
     &&(!bf.s||(bf.s==='nao'?!ult[q.id]:bf.s==='ok'?ult[q.id]&&ult[q.id].ok:ult[q.id]&&!ult[q.id].ok))
-    &&(!bf.c||(bf.c==='sem'?!q.classif:recente(q))));
+    &&(!bf.c||(bf.c==='sem'?!q.classif:recente(q)))&&(!bf.p||foCBR(q))));
   const sg=Q.filter(q=>!q.gab).length,semc=Q.filter(q=>!q.classif).length,nov=Q.filter(recente).length,feitas=Q.filter(q=>ult[q.id]).length;
   const sel=(id,k,ops)=>`<select id="${id}" onchange="bf.${k}=this.value;bLim=150;render()">${ops.map(([v,t])=>`<option value="${v}" ${bf[k]===v?'selected':''}>${t}</option>`).join('')}</select>`;
   const linhas=L.slice(0,bLim).map(q=>`<details class="bq" ${bAbertos.has(q.id)?'open':''} ontoggle="bTog('${q.id}',this)"><summary>
@@ -52,6 +54,7 @@ function vBanco(){
   return `<div class="card"><h2>Banco (${Q.length} questões)</h2>
   <p class="mut">${feitas} feitas · ${semc} sem classificação · ${sg} sem gabarito (não entram nos estudos) · ${nov} novas nos últimos 7 dias</p>
   <div class="row bfil"><input id="b_q" placeholder="Buscar por número, texto ou tag" value="${esc(bq)}" onchange="bq=this.value;bLim=150;render()" style="flex:1;min-width:180px">
+   ${sel('b_p','p',[['','Todas as provas'],['cbr','Só CBR']])}
    ${sel('b_a','a',[['','Todas as áreas'],...AREAS.map(a=>[a.id,a.nome]),['sem','Sem área']])}
    ${sel('b_d','d',[['','Todas as dificuldades'],['f','Fácil'],['m','Média'],['d','Difícil']])}
    ${sel('b_s','s',[['','Feitas e não feitas'],['nao','Não feitas'],['ok','Acertei'],['err','Errei']])}

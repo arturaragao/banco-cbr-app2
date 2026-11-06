@@ -2,7 +2,7 @@
 Uso: python build/montar.py  -> gera index.html e app.js na raiz. Não editar index.html/app.js à mão: editar aqui ou em fonte/."""
 import os, re
 R = os.path.join(os.path.dirname(__file__), "..")
-VERSAO = "1.34.0"
+VERSAO = "1.35.0"
 js = open(f"{R}/fonte/artefato-app.js", encoding="utf8").read()
 js = js.split("<script>", 1)[1].rsplit("</script>", 1)[0]
 head = open(f"{R}/fonte/artefato-head.html", encoding="utf8").read()
@@ -77,6 +77,10 @@ ini = js.index("let bq='';\nfunction vBanco(){")
 fim = js.index("let cfgTab='geral';")
 js = js[:ini] + open(f"{R}/build/banco.js", encoding="utf8").read() + "\n\n" + js[fim:]
 
+# Painel: célula "Foco até a prova (CBR)" em primeiro (build/foco.js), mesmo com pnOrd salvo e sem respostas (1.35.0)
+troca("const PN_BOXES=[['resumo',", "const PN_BOXES=[['foco','Foco até a prova (CBR)',()=>vFoco()],['resumo',")
+troca("return [...sv,...ids.filter(i=>!sv.includes(i))]};", "return (r=>sv.includes('foco')?r:['foco',...r.filter(i=>i!=='foco')])([...sv,...ids.filter(i=>!sv.includes(i))])};")
+troca("if(!log.length)return `<div class=\"card\">Responda algumas questões para o painel aparecer.</div>`+vIncidencia();", "if(!log.length)return vFoco()+`<div class=\"card\">Responda algumas questões para o painel aparecer.</div>`+vIncidencia();")
 # aba Semana (substitui o artefato "Minha Semana", 21/10/2026)
 troca("let sess=null,tela='hoje',sub=null;", "let sess=null,tela='tarefas',sub=null;")
 troca("aplicaTema();render();iniciaSync();", "aplicaTema();smkIni();render();iniciaSync();smAtalhosInicia();")
@@ -104,7 +108,7 @@ troca("$('#app').innerHTML=f();", "qPinta(f());")
 # atalhos do zoom configuráveis (Config > Atalhos)
 troca("if(e.key==='Escape')zClose();else if(e.key==='ArrowRight')zStep(1);else if(e.key==='ArrowLeft')zStep(-1);else if(e.key==='+'||e.key==='=')zScale(1.4);else if(e.key==='-')zScale(1/1.4);else if(e.key==='0')zFit();return}",
       "if(e.key==='Escape')zClose();else if(keyIs(e,'znext'))zStep(1);else if(keyIs(e,'zprev'))zStep(-1);else if(keyIs(e,'zin')||(KEY('zin')==='+'&&e.key==='='))zScale(1.4);else if(keyIs(e,'zout'))zScale(1/1.4);else if(keyIs(e,'zfit'))zFit();return}")
-js = open(f"{R}/build/personalrad.js", encoding="utf8").read() + "\n\n" + js
+js = open(f"{R}/build/personalrad.js", encoding="utf8").read() + "\n\n" + open(f"{R}/build/foco.js", encoding="utf8").read() + "\n\n" + js
 js = js + "\n\n" + open(f"{R}/build/questoes.js", encoding="utf8").read()
 # reordenar cartões arrastando (22/10/2026): botões de restaurar em Config + arrastar/segurar (build/layout.js)
 troca("${layoutUI()}${pesosUI()}", "${layoutUI()}${ordemUI()}${pesosUI()}")
