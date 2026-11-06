@@ -36,10 +36,11 @@
 .nt-corpo{display:flex;flex-direction:column;gap:6px;cursor:text;padding-left:22px}
 .nt-txt{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;font-size:.94rem;color:var(--tx)}
 .nt-acoes{display:flex;gap:6px;flex:none}
-.nt-alca{cursor:grab;color:var(--mut);opacity:.45;font-size:20px;line-height:1;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;padding:2px 4px 2px 0;flex:none}
+.nt-alca{cursor:grab;padding:8px 6px 8px 0;margin:-8px 0;color:var(--mut);opacity:.45;font-size:20px;line-height:1;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;flex:none}
 .nt-nota:hover .nt-alca{opacity:.9}
 body.nt-on,body.nt-on *{cursor:grabbing!important;-webkit-user-select:none;user-select:none}
-.nt-nota.nt-lugar{opacity:.35;border-style:dashed;box-shadow:none}
+.nt-nota.nt-lugar{border:1.5px dashed var(--pri);background:color-mix(in srgb,var(--pri) 8%,var(--card));box-shadow:none}
+.nt-nota.nt-lugar>*{visibility:hidden}
 .nt-fantasma{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;margin:0;box-sizing:border-box;overflow:hidden;box-shadow:0 14px 34px rgba(15,24,48,.28)!important;border-color:var(--pri)!important;transform-origin:0 0;opacity:.96}
 .nt-caixa{width:min(640px,100%)}
 .nt-caixa .row{gap:6px}

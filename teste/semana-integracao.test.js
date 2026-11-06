@@ -589,6 +589,24 @@ test('Notas: editar não muda a ordem, nova entra no topo, arrastar reordena e f
   await a.c.ntSync();assert.deepEqual(a.salvos.at(-1).notas.filter(n=>!n.fixa).sort((x,y)=>x.ordem-y.ordem).map(n=>n.id),['b',ids[0]],'ordem persistida');
 });
 
+test('Notas 1.34: colunas independentes sem buraco, ordem de leitura previsível e realocação do arrasto',async()=>{
+  const a=await app();vm.runInContext("SM.d.notas=[1,2,3,4,5].map(i=>({id:'n'+i,titulo:'T'+i,texto:'x',em:'2026-10-0'+i,ordem:i*10}))",a.c);
+  assert.deepEqual(copia(a.c.ntDistribui(['n1','n2','n3','n4','n5'],2)),[['n1','n3','n5'],['n2','n4']]);
+  assert.deepEqual(copia(a.c.ntDistribui(['n1','n2','n3'],1)),[['n1','n2','n3']]);
+  assert.deepEqual(copia(a.c.ntLeitura(a.c.ntDistribui(['n1','n2','n3','n4','n5'],2))),['n1','n2','n3','n4','n5'],'leitura é o inverso da distribuição');
+  const html=a.c.ntGrade(),cols=html.split('class="nt-col"').slice(1).map(c=>[...c.matchAll(/data-nota="(n\d)"/g)].map(m=>m[1]));
+  assert.deepEqual(cols,[['n1','n3','n5'],['n2','n4']],'duas colunas empilhadas separadamente');
+  vm.runInContext("NT.fechadas.add('n1')",a.c);   // recolher não muda a distribuição: cada coluna empilha só as suas notas (sem linhas compartilhadas)
+  assert.deepEqual(copia(a.c.ntGrade().split('class="nt-col"').slice(1).map(c=>[...c.matchAll(/data-nota="(n\d)"/g)].map(m=>m[1]))),cols);
+  assert.match(a.c.ntGrade(),/nt-nota fechada" data-nota="n1"/);
+  assert.deepEqual(copia(a.c.ntRealoca(['a','b','c','d'],'a','d')),['b','c','d','a'],'vindo de cima: depois do alvo');
+  assert.deepEqual(copia(a.c.ntRealoca(['a','b','c','d'],'d','b')),['a','d','b','c'],'vindo de baixo: antes do alvo');
+  assert.deepEqual(copia(a.c.ntRealoca(['a','b'],'a','a')),['a','b']);assert.deepEqual(copia(a.c.ntRealoca(['a','b'],'a','z')),['a','b']);
+  a.c.ntOrdem(copia(a.c.ntRealoca(['n1','n2','n3','n4','n5'],'n1','n4')));
+  assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['n2','n3','n4','n1','n5'],'ordem gravada; editar não muda');
+  a.c.ntEditar('n2','texto','y');assert.deepEqual(copia(a.c.ntLista()).map(n=>n.id),['n2','n3','n4','n1','n5']);
+});
+
 test('planejamento não reinsere tarefas na aba Calendário, mesmo com semana/mês abertos',async()=>{
   const a=await app([{id:'a',dia:'2026-10-26',texto:'Item isolado'}]);
   vm.runInContext("SM.plan=true;SM.sem='2026-10-25';SM.diaEditor='2026-10-26'",a.c);

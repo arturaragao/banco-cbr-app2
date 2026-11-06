@@ -1,4 +1,4 @@
-// Banco CBR app 1.33.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
+// Banco CBR app 1.34.0 — gerado por build/montar.py a partir do artefato (não editar à mão)
 // ===== INTERPRETAR O TEXTO DE UMA TAREFA (pt-BR, sem API) — 1.17.0 =====
 // interpretarTarefa(texto, hoje) -> [{texto,dia,hora,urg,area,prioridade,etiquetas,repetir}]
 // Pura com hoje explícito; sem hoje usa a data local por compatibilidade com chamadas antigas.
@@ -1525,13 +1525,22 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='Tab'||e.altKey)e.stopImmediatePropagation();   // não troca de aba com o painel aberto
 },true);
 
-function ntGrade(){return ntLista().map(n=>{const f=NT.fechadas?.has(n.id);return `<article class="nt-nota${f?' fechada':''}" data-nota="${esc(n.id)}">
+// 1.34.0: colunas independentes (sem buraco quando uma nota recolhe): a nota i vai para a coluna i%n e cada coluna empilha só as suas.
+const ntNCol=()=>{try{return matchMedia('(max-width:700px)').matches?1:2}catch(e){return 2}};
+function ntDistribui(ids,n){const c=Array.from({length:n},()=>[]);ids.forEach((id,i)=>c[i%n].push(id));return c}
+function ntGrade(){
+  const l=ntLista();if(!l.length)return '<p class="mut">Nenhuma nota encontrada.</p>';
+  const m=new Map(l.map(n=>[n.id,n]));
+  return ntDistribui(l.map(n=>n.id),ntNCol()).map(c=>`<div class="nt-col">${c.map(id=>ntCartao(m.get(id))).join('')}</div>`).join('');
+}
+function ntCartao(n){const f=NT.fechadas?.has(n.id);return `<article class="nt-nota${f?' fechada':''}" data-nota="${esc(n.id)}">
   <div class="nt-topo"><span class="nt-alca" title="Arrastar para mudar a ordem" aria-hidden="true">⠿</span>
     <button type="button" class="nt-tg" aria-expanded="${!f}" onclick="ntTg('${esc(n.id)}')"><span class="nt-seta">▸</span><b>${esc(n.titulo||'')||'<span class="mut">Sem título</span>'}</b></button>
     <span class="nt-acoes"><button class="sm-tagb" aria-label="Fixar nota" aria-pressed="${!!n.fixa}" onclick="ntFixar('${esc(n.id)}')">${n.fixa?'● Fixada':'○ Fixar'}</button><button class="sm-tagb" aria-label="Editar nota" onclick="ntAbre('${esc(n.id)}')">Editar</button></span></div>
   <div class="nt-corpo" title="Clique para editar" onclick="if(!getSelection().toString())ntAbre('${esc(n.id)}')"><div class="nt-txt">${esc(n.texto||'')||'<span class="mut">Sem texto</span>'}</div>
-  <small class="mut">${esc((n.em||n.atualizado||'').slice(0,10))}</small></div></article>`}).join('')||'<p class="mut">Nenhuma nota encontrada.</p>'}
+  <small class="mut">${esc((n.em||n.atualizado||'').slice(0,10))}</small></div></article>`}
 function ntBuscar(valor){NT.busca=valor;document.getElementById('nt_grade').innerHTML=ntGrade()}
+try{matchMedia('(max-width:700px)').addEventListener('change',()=>ntReordenar())}catch(e){}
 function ntReordenar(){if(tela==='notas'&&!NTD){const g=document.getElementById('nt_grade');if(g)g.innerHTML=ntGrade()}}
 function vNotas(){
   if(!SM.d)return '<div class="card"><p class="mut">As notas ainda não estão disponíveis neste aparelho. Tente novamente com conexão.</p></div>';
@@ -1542,31 +1551,58 @@ if(SM.d){ntAplica(SM.d,ntPendentes());smGuardaCache()}
 window.addEventListener('online',()=>{ntSync().then(()=>smPuxar())});
 window.addEventListener('storage',e=>{if(e.key?.startsWith(NT_PREFIX)){if(SM.d)ntAplica(SM.d,ntPendentes());smRender()}});
 
-// Arrasto fluido pela alça ⠿ (mouse e toque): um "fantasma" segue o dedo e as outras notas
-// abrem espaço em tempo real, com animação (FLIP). Soltar grava a ordem que está na tela.
-let NTD=null;
+// Arrasto fluido (mouse e toque), estilo Notion/Trello (1.34.0): segurar a alça ⠿ (toque) ou o título (mouse, após 5 px) e arrastar.
+// Um "fantasma" com sombra segue o ponteiro, o lugar vazio mostra onde vai cair e as outras notas deslizam (FLIP).
+// Soltar grava a ordem que está na tela; Esc ou cancelamento do sistema restauram. Funciona em 1 e 2 colunas.
+let NTD=null,NTP=null;
+// Nova ordem ao soltar `id` sobre `alvo`: ele assume a posição do alvo (antes dele se vinha de baixo, depois se vinha de cima).
+function ntRealoca(ids,id,alvo){
+  const j=ids.indexOf(alvo);if(j<0||!ids.includes(id)||id===alvo)return ids;
+  const r=ids.filter(x=>x!==id);r.splice(j,0,id);return r;
+}
+// Ordem de leitura (esquerda→direita, linha a linha) a partir das colunas: inverso de ntDistribui.
+function ntLeitura(cols){const r=[],m=Math.max(0,...cols.map(c=>c.length));for(let i=0;i<m;i++)for(const c of cols)if(i<c.length)r.push(c[i]);return r}
 function ntdFlip(g,muda){
   const els=[...g.querySelectorAll('.nt-nota')],antes=new Map(els.map(e=>[e,e.getBoundingClientRect()]));muda();
   for(const e of els){const a=antes.get(e),b=e.getBoundingClientRect(),dx=a.left-b.left,dy=a.top-b.top;if(!dx&&!dy)continue;
     e.style.transition='none';e.style.transform=`translate(${dx}px,${dy}px)`;e.getBoundingClientRect();
     e.style.transition='transform .18s cubic-bezier(.2,.8,.2,1)';e.style.transform='';}
 }
+// Reencaixa os mesmos nós nas colunas conforme `ids` (os nós são movidos, não recriados, para a animação funcionar).
+function ntdEncaixa(grade,ids){
+  const cols=[...grade.querySelectorAll('.nt-col')],nos=new Map([...grade.querySelectorAll('.nt-nota')].map(e=>[e.dataset.nota,e]));
+  ntDistribui(ids,cols.length).forEach((c,k)=>c.forEach((id,i)=>{const no=nos.get(id);if(cols[k].children[i]!==no)cols[k].insertBefore(no,cols[k].children[i]||null)}));
+}
 function ntdMove(){
   const d=NTD;if(!d)return;d.g.style.transform=`translate(${d.cx-d.dx}px,${d.cy-d.dy}px)`;
-  const el=document.elementFromPoint(d.cx,d.cy),alvo=el?.closest?.('.nt-nota[data-nota]');
-  if(!alvo||alvo===d.a||alvo.style.transform)return;   // ignora a nota que ainda está animando
-  const b=alvo.getBoundingClientRect(),l=[...d.grade.children],ia=l.indexOf(d.a),ib=l.indexOf(alvo);
-  // Mesma linha (2 colunas): decide pelo meio horizontal; senão, pelo meio vertical.
-  const mesmaLinha=Math.abs(d.a.getBoundingClientRect().top-b.top)<8;
-  const depois=mesmaLinha?d.cx>b.left+b.width/2:d.cy>b.top+b.height/2;
-  const ref=depois?alvo.nextSibling:alvo;if(ref===d.a||(depois?ib+1:ib)===ia)return;
-  ntdFlip(d.grade,()=>d.grade.insertBefore(d.a,ref));
+  if(performance.now()-d.t<140)return;   // deixa a animação anterior terminar: evita vaivém
+  const el=document.elementFromPoint(d.cx,d.cy);let alvo=el?.closest?.('.nt-nota[data-nota]');
+  if(!alvo){   // abaixo da última nota de uma coluna: assume o fim dela
+    const col=el?.closest?.('.nt-col'),ns=col?[...col.querySelectorAll('.nt-nota')].filter(x=>x!==d.a):[],u=ns[ns.length-1];
+    if(u&&d.cy>u.getBoundingClientRect().bottom)alvo=u;
+  }
+  if(!alvo||alvo===d.a)return;
+  const novo=ntRealoca(d.ids,d.a.dataset.nota,alvo.dataset.nota);if(novo.join()===d.ids.join())return;
+  d.ids=novo;d.t=performance.now();ntdFlip(d.grade,()=>ntdEncaixa(d.grade,novo));
+}
+function ntdIni(a,cx,cy,pid,h){
+  const b=a.getBoundingClientRect(),grade=a.closest('.nt-grade');if(!grade)return;
+  const g=a.cloneNode(true);g.classList.add('nt-fantasma');g.style.cssText=`width:${b.width}px;height:${b.height}px`;document.body.appendChild(g);
+  const ids=ntLeitura([...grade.querySelectorAll('.nt-col')].map(c=>[...c.querySelectorAll('.nt-nota')].map(x=>x.dataset.nota)));
+  NTD={a,g,grade,pid,cx,cy,dx:cx-b.left,dy:cy-b.top,ids,inicio:[...ids],t:0};
+  a.classList.add('nt-lugar');document.body.classList.add('nt-on');
+  try{getSelection().removeAllRanges()}catch(_){}
+  try{(h||a).setPointerCapture(pid)}catch(_){}
+  if(navigator.vibrate)try{navigator.vibrate(15)}catch(_){}
+  // Rolagem automática perto das bordas, mais rápida quanto mais perto.
+  NTD.auto=setInterval(()=>{const d=NTD;if(!d)return;const z=90,v=d.cy<z?-(z-d.cy)/z:d.cy>innerHeight-z?(d.cy-(innerHeight-z))/z:0;
+    if(!v)return;scrollBy(0,Math.round(Math.max(-1,Math.min(1,v))*18));ntdMove()},16);
+  ntdMove();
 }
 function ntdFim(cancela){
   const d=NTD;if(!d)return;NTD=null;clearInterval(d.auto);d.g.remove();d.a.classList.remove('nt-lugar');document.body.classList.remove('nt-on');
   if(cancela){ntReordenar();return}
-  const vis=[...d.grade.querySelectorAll('.nt-nota[data-nota]')].map(e=>e.dataset.nota);
-  if(vis.join()!==d.inicio.join())ntOrdem(vis);
+  if(d.ids.join()!==d.inicio.join())ntOrdem(d.ids);
 }
 // Grava a nova ordem: as notas visíveis (busca) assumem as posições que já ocupavam na lista completa.
 function ntOrdem(vis){
@@ -1583,19 +1619,23 @@ function ntMover(id,ref,antes){
 }
 document.addEventListener('pointerdown',e=>{
   if(NTD||tela!=='notas'||(e.pointerType==='mouse'&&e.button!==0))return;
-  const h=e.target.closest?.('.nt-alca'),a=h&&h.closest('.nt-nota[data-nota]');if(!a)return;
-  e.preventDefault();const b=a.getBoundingClientRect(),grade=a.parentElement;
-  const g=a.cloneNode(true);g.classList.add('nt-fantasma');g.style.cssText=`width:${b.width}px;height:${b.height}px`;document.body.appendChild(g);
-  NTD={a,g,grade,pid:e.pointerId,cx:e.clientX,cy:e.clientY,dx:e.clientX-b.left,dy:e.clientY-b.top,inicio:[...grade.querySelectorAll('.nt-nota[data-nota]')].map(x=>x.dataset.nota)};
-  a.classList.add('nt-lugar');document.body.classList.add('nt-on');try{h.setPointerCapture(e.pointerId)}catch(_){}
-  if(navigator.vibrate)try{navigator.vibrate(15)}catch(_){}
-  NTD.auto=setInterval(()=>{const d=NTD;if(!d)return;if(d.cy<80)scrollBy(0,-12);else if(d.cy>innerHeight-80)scrollBy(0,12);else return;ntdMove()},16);
-  ntdMove();
+  const h=e.target.closest?.('.nt-alca'),topo=!h&&e.pointerType==='mouse'&&!e.target.closest?.('.nt-acoes')?e.target.closest?.('.nt-topo'):null;
+  const a=(h||topo)?.closest('.nt-nota[data-nota]');if(!a)return;
+  if(h){e.preventDefault();ntdIni(a,e.clientX,e.clientY,e.pointerId,h)}
+  else NTP={a,x:e.clientX,y:e.clientY,pid:e.pointerId};   // mouse no título: só vira arrasto depois de mover 5 px (clique continua alternando)
 },true);
-document.addEventListener('pointermove',e=>{const d=NTD;if(!d||e.pointerId!==d.pid)return;e.preventDefault();d.cx=e.clientX;d.cy=e.clientY;ntdMove()},{passive:false});
-document.addEventListener('pointerup',e=>{if(NTD&&e.pointerId===NTD.pid)ntdFim(false)});
-document.addEventListener('pointercancel',e=>{if(NTD&&e.pointerId===NTD.pid)ntdFim(true)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&NTD)ntdFim(true)});
+document.addEventListener('pointermove',e=>{
+  const p=NTP;if(p&&e.pointerId===p.pid&&!NTD&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>5){NTP=null;NTD_CLIQUE=true;ntdIni(p.a,e.clientX,e.clientY,p.pid,p.a.querySelector('.nt-alca'))}
+  const d=NTD;if(!d||e.pointerId!==d.pid)return;e.preventDefault();d.cx=e.clientX;d.cy=e.clientY;ntdMove();
+},{passive:false});
+let NTD_CLIQUE=false;
+document.addEventListener('pointerup',e=>{
+  NTP=null;if(NTD&&e.pointerId===NTD.pid)ntdFim(false);
+  if(NTD_CLIQUE){NTD_CLIQUE=false;   // o clique que sucede um arrasto iniciado no título não deve alternar a nota
+    const f=ev=>{ev.stopPropagation();ev.preventDefault()};document.addEventListener('click',f,true);setTimeout(()=>document.removeEventListener('click',f,true),60)}
+});
+document.addEventListener('pointercancel',e=>{NTP=null;NTD_CLIQUE=false;if(NTD&&e.pointerId===NTD.pid)ntdFim(true)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&NTD){e.preventDefault();ntdFim(true)}});
 document.addEventListener('touchmove',e=>{if(NTD)e.preventDefault()},{passive:false});
 
 

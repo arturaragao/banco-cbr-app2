@@ -264,5 +264,33 @@ test('Calendário, Tarefas e Notas 1.30: aceite no Chrome, desktop e celular', {
     await ev(`window.confirm=()=>false;ntApagar('${id}')`);assert.equal(await ev('SM.d.notas.length'),1);
     await ev(`window.confirm=()=>true;ntApagar('${id}');ntSync()`);assert.equal(await ev('SM.d.notas.length'),0);
   });
+  await t.test('Notas 1.34: recolher não deixa buraco (colunas independentes) e arrasto reordena, com Esc cancelando',async()=>{
+    await call('Emulation.setDeviceMetricsOverride',{width:1000,height:800,deviceScaleFactor:1,mobile:false});
+    await ev("go('notas');NT.busca='';SM.d.notas=[{id:'a',titulo:'A',texto:'linha\\n'.repeat(12),em:'2026-10-04',ordem:10},{id:'b',titulo:'B',texto:'b1\\nb2\\nb3\\nb4',em:'2026-10-03',ordem:20},{id:'c',titulo:'C',texto:'c',em:'2026-10-02',ordem:30},{id:'d',titulo:'D',texto:'d1\\nd2',em:'2026-10-01',ordem:40}];render()");
+    const R=id=>ev(`(()=>{const r=document.querySelector('.nt-nota[data-nota="${id}"]').getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,b:r.bottom}})()`);
+    const ids=()=>ev("ntLeitura([...document.querySelectorAll('.nt-col')].map(c=>[...c.querySelectorAll('.nt-nota')].map(e=>e.dataset.nota))).join('')");
+    assert.equal(await ev("document.querySelectorAll('.nt-col').length"),2);
+    await ev("ntTg('b')");await espera(50);
+    const b=await R('b'),d=await R('d'),c=await R('c'),a=await R('a');
+    assert.ok(d.y-b.b<=14,'d sobe e ocupa o espaço da nota recolhida: '+(d.y-b.b));
+    assert.ok(c.y-a.b<=14,'a outra coluna não depende da altura da vizinha: '+(c.y-a.b));
+    await ev("ntTg('b')");
+    const alca=async id=>ev(`(()=>{const r=document.querySelector('.nt-nota[data-nota="${id}"] .nt-alca').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+    const mouse=(type,x,y)=>call('Input.dispatchMouseEvent',{type,x,y,button:type==='mouseMoved'?'none':'left',buttons:type==='mouseReleased'?0:1,clickCount:1});
+    // Esc cancela e restaura
+    const p=await alca('a'),dd=await R('d');
+    await mouse('mousePressed',p.x,p.y);await mouse('mouseMoved',p.x+20,p.y+20);await mouse('mouseMoved',dd.x+dd.w/2,dd.y+dd.h/2);await espera(250);
+    assert.equal(await ev("!!document.querySelector('.nt-fantasma')&&document.body.classList.contains('nt-on')"),true,'fantasma durante o arrasto');
+    assert.notEqual(await ids(),'abcd','vizinhos abrem espaço');
+    await tecla('Escape');await espera(100);
+    assert.equal(await ev("!document.querySelector('.nt-fantasma')"),true);assert.equal(await ids(),'abcd','Esc restaura');
+    await mouse('mouseReleased',dd.x,dd.y);
+    // Arrasto de verdade: a vai para o lugar de d
+    const p2=await alca('a'),d2=await R('d');
+    await mouse('mousePressed',p2.x,p2.y);await mouse('mouseMoved',p2.x+20,p2.y+20);await mouse('mouseMoved',d2.x+d2.w/2,d2.y+d2.h/2);await espera(250);await mouse('mouseReleased',d2.x+d2.w/2,d2.y+d2.h/2);await espera(200);
+    assert.equal(await ids(),'bcda','a assume o lugar de d');
+    assert.equal(await ev("ntOrdenadas().map(n=>n.id).join('')"),'bcda','ordem persistida');
+    await call('Emulation.clearDeviceMetricsOverride');
+  });
   assert.deepEqual(erros,[],'nenhuma exceção JavaScript no navegador');assert.deepEqual(consoleErros,[],'nenhum console.error');
 });
