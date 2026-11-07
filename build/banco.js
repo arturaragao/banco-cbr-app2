@@ -133,7 +133,16 @@ function aplicaLayout(){if(typeof qaBotao==="function")qaBotao();
     fb.textContent=foco?'⤡ Sair do foco':'⤢ Foco';fb.title=foco?'Mostrar o cabeçalho e as abas':'Esconder o cabeçalho e as abas';
     fb.onclick=()=>{cfg.layout=foco?(l==='foco'?'otimizado':'compacto'):'compfoco';persist('_est');render()}}
   else if(fb)fb.remove();
-  if(tela==='quiz')setTimeout(()=>{const c=document.querySelector('.qnav .qn.cur');if(c)c.scrollIntoView({block:'nearest',inline:'center'})},0);
+  if(tela==='quiz')setTimeout(qCentraNum,0);
+}
+// 1.37.0: centraliza o número atual só dentro da faixa que rola na horizontal; nunca rola a página (pedido do Artur, 06/11/2026:
+// ao responder a página não pode mexer — o scrollIntoView antigo subia a página até a grade de números).
+function qCentraNum(){
+  const c=document.querySelector('.qnav .qn.cur');if(!c)return;
+  for(let e=c.parentElement;e&&e!==document.body;e=e.parentElement){
+    const o=getComputedStyle(e).overflowX;
+    if((o==='auto'||o==='scroll')&&e.scrollWidth>e.clientWidth+1){const cr=c.getBoundingClientRect(),er=e.getBoundingClientRect();e.scrollLeft+=(cr.left+cr.width/2)-(er.left+er.width/2);return}
+  }
 }
 function layoutUI(){
   return `<h3>Layout da questão</h3><p class="mut">Como a questão aparece quando você está respondendo. Muda na hora.</p>

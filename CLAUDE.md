@@ -1,6 +1,7 @@
 # Banco CBR (app)
 
 ## Estado atual / Histórico
+- 06/11/2026 — 1.37.0 (pedido do Artur): Notas — "- " no começo da linha vira "• " (com recuo), Enter continua a lista, Enter na bolinha vazia encerra (`ntListaEdita`/`ntLista_tecla` por `beforeinput`, vale no teclado do celular; execCommand mantém Ctrl+Z); clicar fora do painel salva (edição e nota nova; nova vazia só fecha), Esc/Cancelar descartam. Questão: responder/escolher/riscar não mexe no scroll — causa era `scrollIntoView` do número atual na grade (subia a página até a grade); agora `qCentraNum` só rola a faixa horizontal, e `qFixaScroll` repõe o scrollY (trocar de questão segue indo ao topo). 181/181 testes; conferido no Chromium com dados fictícios (`teste/servidor.js --simulado`). Não testado em aparelho.
 - 06/11/2026 — 1.36.2 (pedido do Artur): bloco Classificação PersonalRad passa para baixo de Dados do site (Banco e quiz após responder).
 - 06/11/2026 — 1.36.1: rótulos Modalidade e Disciplina no bloco Classificação PersonalRad (vindos das tags do Notion convertidas).
 - 06/11/2026 — 1.36.0 (pedido do Artur, regra fixa): pr_tags completas por nível aparecem no Banco (questão aberta) e no quiz após responder; substitui 'Banco preserva a lista sem pr_tags' da 1.31.2; painel/RI seguem sem pr_tags.

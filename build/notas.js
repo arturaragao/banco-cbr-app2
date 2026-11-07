@@ -99,8 +99,9 @@ function ntAbre(id=null){
     <div class="row"><b>${n?'Editar nota':'Nova nota'}</b><span style="flex:1"></span>${n?`<button type="button" class="qa-chip" onclick="ntApagar('${esc(n.id)}')">Excluir</button>`:''}<button type="button" class="qa-chip" onclick="ntFechaPainel()">Cancelar</button><button type="button" class="b" onclick="ntSalvarPainel()">Salvar</button></div>
     <input id="nt_titulo" class="qa-in" aria-label="Título" placeholder="Título (opcional)" value="${esc(r.titulo||'')}" oninput="ntRascSalva()">
     <textarea id="nt_texto" class="qa-in" aria-label="Texto da nota" placeholder="Anote uma ideia…" rows="8" oninput="ntRascSalva()">${esc(r.texto||'')}</textarea>
-    <div class="qa-dica">Ctrl+Enter salva · Esc fecha${n?'':' · o rascunho fica guardado'}</div></div>`;
-  f.addEventListener('pointerdown',e=>{if(e.target===f)ntFechaPainel()});
+    <div class="qa-dica">“- ” faz lista com bolinhas · clique fora ou Ctrl+Enter salva · Esc cancela${n?'':' (o rascunho fica guardado)'}</div></div>`;
+  f.addEventListener('pointerdown',e=>{if(e.target===f){e.preventDefault();ntSalvarPainel()}});   // 1.37.0: clicar fora salva (Esc/Cancelar descartam)
+  f.querySelector('#nt_texto').addEventListener('beforeinput',ntLista_tecla);   // beforeinput: vale também no teclado do celular
   document.body.appendChild(f);
   const t=document.getElementById(n?'nt_texto':'nt_titulo');try{t.focus();if(n)t.setSelectionRange(t.value.length,t.value.length)}catch(e){}
 }
@@ -112,7 +113,28 @@ function ntSalvarPainel(){
     if(n&&(n.titulo!==titulo||n.texto!==texto))ntMudar({id:n.id,titulo,texto,atualizado:new Date().toISOString()});
     ntFechaPainel(true);ntReordenar();return;
   }
+  if(!titulo&&!texto.trim()){ntFechaPainel(true);return}   // nota nova vazia: só fecha
   ntCriar(titulo,texto.trim());
+}
+// 1.37.0 (pedido do Artur, 06/11/2026): lista com bolinhas no texto da nota.
+// "- " no começo da linha vira "• "; Enter numa linha "• x" continua a lista; Enter numa linha só "• " encerra a lista.
+function ntListaEdita(v,ini,fim,tecla){
+  if(ini!==fim)return null;
+  const NL=String.fromCharCode(10),l0=v.lastIndexOf(NL,ini-1)+1,antes=v.slice(l0,ini);
+  if(tecla===' '){const m=/^(\s*)-$/.exec(antes);if(!m)return null;return {de:l0+m[1].length,ate:ini,txt:'• ',cur:l0+m[1].length+2}}
+  if(tecla==='Enter'){const fl=v.indexOf(NL,ini),linha=v.slice(l0,fl<0?v.length:fl),m=/^(\s*)• ?(.*)$/.exec(linha);if(!m)return null;
+    if(!m[2].trim())return {de:l0,ate:fl<0?v.length:fl,txt:'',cur:l0};   // bolinha vazia: encerra a lista
+    const t=NL+m[1]+'• ';return {de:ini,ate:ini,txt:t,cur:ini+t.length}}
+  return null;
+}
+function ntLista_tecla(e){
+  const tecla=e.inputType==='insertText'&&e.data===' '?' ':e.inputType==='insertLineBreak'||e.inputType==='insertParagraph'?'Enter':null;if(!tecla)return;
+  const t=e.target,r=ntListaEdita(t.value,t.selectionStart,t.selectionEnd,tecla);if(!r)return;
+  e.preventDefault();t.setSelectionRange(r.de,r.ate);
+  const n0=t.value.length-(r.ate-r.de)+r.txt.length;let ok=false;
+  try{ok=r.de===r.ate&&!r.txt?true:document.execCommand(r.txt?'insertText':'delete',false,r.txt)}catch(x){}   // mantém o Ctrl+Z
+  if(!ok||t.value.length!==n0)t.setRangeText(r.txt,r.de,r.ate,'end');
+  t.setSelectionRange(r.cur,r.cur);t.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function ntCriar(titulo,texto){
   if(titulo===undefined){titulo=document.getElementById('nt_titulo').value.trim();texto=document.getElementById('nt_texto').value.trim()}

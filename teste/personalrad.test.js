@@ -437,3 +437,17 @@ test('taxonomia e simulados usam SHA, atualização em fundo e cache offline',as
   assert.equal(await c.carregarDados(true),true);await c.dadosDoCache();
   assert.equal(c.window.TAXONOMIA_PR,null);assert.equal(c.window.SIMULADOS_PR,null);
 });
+
+test('1.37: responder/escolher/riscar não rola a página; grade de números não usa scrollIntoView',()=>{
+  const js=fs.readFileSync(require.resolve('../app.js'),'utf8');
+  assert.match(js,/{responder=qFixaScroll\(responder\);escolher=qFixaScroll\(escolher\);riscar=qFixaScroll\(riscar\);editar=qFixaScroll\(editar\)/);
+  assert.doesNotMatch(js,/\.qnav \.qn\.cur'\);if\(c\)c\.scrollIntoView/);
+  const ini=js.indexOf('function qFixaScroll'),fn=new Function('S',js.slice(ini,js.indexOf('if(typeof responder'))+';return qFixaScroll');
+  let y=500;const g={scrollY:500,tela:'quiz',sess:{i:3},scrollTo:(_,v)=>{y=v}};
+  const src=js.slice(ini,js.indexOf('if(typeof responder'));
+  const f=new Function('g',`with(g){${src};return qFixaScroll}`)(Object.assign(g,{setTimeout:fn=>fn()}));
+  const r=f(()=>{g.scrollY=0;y=0;return 7})();assert.equal(r,7);
+  // scrollY no contexto é lido de g; o redesenho "subiu" a página para 0 e a posição volta a 500
+  assert.equal(y,500);
+  g.scrollY=500;y=500;f(()=>{g.sess.i=4;g.scrollY=0;y=0})();assert.equal(y,0,'trocar de questão não restaura');
+});

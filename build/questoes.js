@@ -163,3 +163,10 @@ function qAlternativas(q,{r=null,fb=false,sel=null,cut=[],leitura=false}={}){
     return `<div class="alt ${c} ${cut.includes(l)?'cutd':''} ${tx.length<60?'curta':''} ${tx.length<28?'curtinha':''}"${leitura?'':' tabindex="0" onclick="escolher(\''+l+'\')"'}><b>${l})</b><div style="flex:1;min-width:0"><span class="at">${esc(tx.replace(/\s*·\s*(?:✓\s*)?(?:[\d.,]+%\s*)?$/,''))}</span>${prAlternativa(q,l,fb)}${fb&&verCom(q)?comentAlt(q,l):''}</div>${leitura?'':`<button class="cut ${cut.includes(l)?'on':''}" title="Riscar alternativa (F)" aria-label="Riscar alternativa ${l}" onclick="event.stopPropagation();riscar('${l}')">${TES}</button>`}</div>`;
   }).join('');
 }
+
+// ===== 1.37.0 (pedido do Artur, 06/11/2026): responder/escolher/riscar não mexe no scroll da página =====
+// Guarda a posição antes do redesenho e repõe depois (inclusive após o setTimeout do layout). Trocar de questão segue indo ao topo.
+function qFixaScroll(fn){return function(...a){const y=scrollY,q0=sess&&sess.i;const r=fn.apply(this,a);
+  if(tela==='quiz'&&sess&&sess.i===q0){const volta=()=>{if(sess&&sess.i===q0&&Math.abs(scrollY-y)>1)scrollTo(0,y)};volta();setTimeout(volta,0)}
+  return r}}
+if(typeof responder==='function'){responder=qFixaScroll(responder);escolher=qFixaScroll(escolher);riscar=qFixaScroll(riscar);editar=qFixaScroll(editar)}

@@ -731,3 +731,24 @@ test('Tarefas: grupos identificam destino e planejamento vem depois das tarefas'
   assert.ok(html.indexOf('Planejar semana')>html.indexOf('data-tid="ultima"'));
   assert.match(html,/data-drop="2026-10-27" data-area="ferramenta" data-sub=""/);
 });
+
+test('Notas 1.37: "- " vira bolinha, Enter continua a lista, Enter na bolinha vazia encerra; nota nova vazia só fecha',async()=>{
+  const a=await app(),E=(v,i,k)=>copia(a.c.ntListaEdita(v,i,i,k));
+  assert.deepEqual(E('-',1,' '),{de:0,ate:1,txt:'• ',cur:2});
+  assert.deepEqual(E('abc\n  -',7,' '),{de:6,ate:7,txt:'• ',cur:8},'com recuo');
+  assert.equal(E('a-',2,' '),null,'hífen no meio da linha não vira bolinha');
+  assert.deepEqual(E('• item',6,'Enter'),{de:6,ate:6,txt:'\n• ',cur:9});
+  assert.deepEqual(E('x\n  • item',10,'Enter'),{de:10,ate:10,txt:'\n  • ',cur:15},'mantém o recuo');
+  assert.deepEqual(E('• a\n• ',6,'Enter'),{de:4,ate:6,txt:'',cur:4},'bolinha vazia encerra');
+  assert.equal(E('texto comum',11,'Enter'),null);
+  assert.equal(a.c.ntListaEdita('-',0,1,' '),null,'com seleção não mexe');
+  a.elementos.set('nt_titulo',{value:''});a.elementos.set('nt_texto',{value:'  '});
+  const antes=copia(a.c.SM?.d?.notas||vm.runInContext('SM.d.notas||[]',a.c)).length;
+  a.c.ntSalvarPainel();assert.equal(vm.runInContext('(SM.d.notas||[]).length',a.c),antes,'nota vazia não é criada');
+});
+
+test('Notas 1.37: clicar fora do painel salva (não descarta) e a dica avisa',()=>{
+  const s=fs.readFileSync(require.resolve('../build/notas.js'),'utf8');
+  assert.match(s,/addEventListener\('pointerdown',e=>\{if\(e\.target===f\)\{e\.preventDefault\(\);ntSalvarPainel\(\)\}\}\)/);
+  assert.match(s,/clique fora ou Ctrl\+Enter salva · Esc cancela/);
+});
