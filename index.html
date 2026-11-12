@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Radio mudou</title>
+  <script>
+    function montarDestino(input) {
+      const url = new URL(input);
+      const prefixo = '/banco-cbr-app2/';
+      if (url.pathname === '/banco-cbr-app2') url.pathname = '/radio/';
+      else if (url.pathname.startsWith(prefixo)) url.pathname = '/radio/' + url.pathname.slice(prefixo.length);
+      return url.href;
+    }
+    location.replace(montarDestino(location.href));
+  </script>
+  <noscript><meta http-equiv="refresh" content="0;url=https://arturaragao.github.io/radio/"></noscript>
+</head>
+<body>
+  <p>Radio mudou para <a href="https://arturaragao.github.io/radio/">arturaragao.github.io/radio</a></p>
+</body>
+</html>
